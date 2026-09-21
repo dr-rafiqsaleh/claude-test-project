@@ -172,20 +172,31 @@ export const SERVICE_TYPES = [
   'Commercial Pest Control',
 ]
 
+/** The pests a UK pest controller deals with, rodents first. */
 export const PEST_TYPES = [
+  'Rat',
+  'Mouse',
   'Cockroach',
   'Ant',
-  'Spider',
-  'Termite',
-  'Rodent',
   'Bed Bug',
+  'Flea',
   'Wasp',
   'Bee',
-  'Flea',
-  'Silverfish',
   'Fly',
-  'Mosquito',
+  'Moth',
+  'Stored Product Insect',
+  'Carpet Beetle',
+  'Bird',
+  'Squirrel',
+  'Spider',
+  'Silverfish',
 ]
+
+/** `PEST_TYPES` plus any older or custom pests already on a record, so none are hidden. */
+export function pestOptions(current = []) {
+  const extras = current.filter((pest) => !PEST_TYPES.includes(pest))
+  return extras.length ? [...PEST_TYPES, ...extras] : PEST_TYPES
+}
 
 export const RECURRENCE_TYPES = {
   none: 'One-off',
@@ -262,6 +273,99 @@ export const RISK_LEVEL_HEX = {
   high: '#f97316',
   critical: '#ef4444',
 }
+
+/** A finding's severity, as customers see it on the report. */
+export const PRIORITY_LABELS = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Urgent',
+}
+
+export const VISIT_TYPES = ['initial', 'follow_up', 'routine', 'requested', 'contract', 'other']
+
+export const VISIT_TYPE_LABELS = {
+  initial: 'Initial',
+  follow_up: 'Follow-up',
+  routine: 'Routine',
+  requested: 'Requested',
+  contract: 'Contract',
+  other: 'Other',
+}
+
+/** How much pest activity was found, across the whole site. */
+export const ACTIVITY_LEVELS = ['none', 'low', 'medium', 'high']
+
+export const ACTIVITY_LEVEL_LABELS = {
+  none: 'None',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+}
+
+export const ACTIVITY_LEVEL_COLORS = {
+  none: 'bg-primary/15 text-primary',
+  low: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+  medium: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+  high: 'bg-destructive/15 text-destructive',
+}
+
+export const HYGIENE_RATINGS = ['good', 'fair', 'poor']
+
+export const HYGIENE_RATING_LABELS = { good: 'Good', fair: 'Fair', poor: 'Poor' }
+
+/** Signs of pests a technician can tick on a finding. */
+export const EVIDENCE_TYPES = [
+  'Droppings',
+  'Gnawing',
+  'Live sighting',
+  'Dead pests',
+  'Nests',
+  'Smear marks',
+  'Runs or tracks',
+  'Eggs or cases',
+  'Damage',
+  'Bites',
+]
+
+/** Who needs to act on a finding's recommendation. */
+export const RESPONSIBLE_PARTIES = ['customer', 'landlord', 'contractor']
+
+export const RESPONSIBLE_PARTY_LABELS = {
+  customer: 'Customer',
+  landlord: 'Landlord',
+  contractor: 'Us',
+}
+
+export const BAIT_STATUSES = ['deposited', 'checked', 'topped_up', 'removed']
+
+export const BAIT_STATUS_LABELS = {
+  deposited: 'Deposited',
+  checked: 'Checked',
+  topped_up: 'Topped up',
+  removed: 'Removed',
+}
+
+/** Product kinds; each decides which safety advice the report prints. */
+export const PRODUCT_CATEGORIES = ['insecticide', 'rodenticide', 'other']
+
+export const PRODUCT_CATEGORY_LABELS = {
+  insecticide: 'Insecticide',
+  rodenticide: 'Rodenticide',
+  other: 'Other (traps, monitors...)',
+}
+
+/** The assessments ticked at sign-off, in report order. */
+export const ASSESSMENTS = [
+  { key: 'risk_assessment', label: 'Risk assessment' },
+  { key: 'coshh_assessment', label: 'COSHH assessment' },
+  { key: 'environmental_assessment', label: 'Environmental assessment' },
+  { key: 'site_plan', label: 'Site plan in place' },
+]
+
+export const ASSESSMENT_ANSWERS = ['yes', 'no', 'n_a']
+
+export const ASSESSMENT_ANSWER_LABELS = { yes: 'Yes', no: 'No', n_a: 'N/A' }
 
 export const TREATMENT_METHODS = [
   'spray',
@@ -472,16 +576,17 @@ export const DEFAULT_PRIMARY_COLOR = '#059669'
 export const INSPECTION_AREAS = [
   'Kitchen',
   'Bathroom',
-  'Laundry',
   'Living Room',
   'Bedroom',
+  'Hallway',
+  'Utility Room',
+  'Loft',
+  'Cellar',
+  'Under Floor',
   'Garage',
-  'Roof Void',
-  'Subfloor',
-  'Garden/Yard',
-  'Perimeter',
-  'Shed',
-  'Fence Line',
+  'Garden',
+  'External Perimeter',
+  'Bin Store',
   'Drains',
   'Other',
 ]

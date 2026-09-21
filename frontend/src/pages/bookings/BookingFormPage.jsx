@@ -50,7 +50,7 @@ import { useAuthStore } from '@/store/authStore'
 import {
   DEFAULT_BOOKING_DURATION_MINUTES,
   EDITABLE_BOOKING_STATUSES,
-  PEST_TYPES,
+  pestOptions,
   QuoteStatus,
   RECURRENCE_TYPES,
   SERVICE_TYPES,
@@ -82,6 +82,9 @@ const bookingSchema = z
     customer_notes: z.string().trim().max(5000),
     technician_notes: z.string().trim().max(5000),
     internal_notes: z.string().trim().max(5000),
+    site_contact_name: z.string().trim().max(120),
+    site_contact_phone: z.string().trim().max(40),
+    order_number: z.string().trim().max(60),
   })
   .refine(
     (values) =>
@@ -145,6 +148,9 @@ export function BookingFormPage() {
       customer_notes: '',
       technician_notes: '',
       internal_notes: '',
+      site_contact_name: '',
+      site_contact_phone: '',
+      order_number: '',
     },
     mode: 'onBlur',
   })
@@ -222,6 +228,9 @@ export function BookingFormPage() {
             customer_notes: booking.customer_notes ?? '',
             technician_notes: booking.technician_notes ?? '',
             internal_notes: booking.internal_notes ?? '',
+            site_contact_name: booking.site_contact_name ?? '',
+            site_contact_phone: booking.site_contact_phone ?? '',
+            order_number: booking.order_number ?? '',
           })
         } else if (quoteIdParam) {
           const quote = await getQuote(quoteIdParam)
@@ -294,10 +303,7 @@ export function BookingFormPage() {
   )
 
   /** Pest checkboxes, including any legacy value already on the record. */
-  const pestTypeOptions = useMemo(() => {
-    const extras = (selectedPestTypes ?? []).filter((pest) => !PEST_TYPES.includes(pest))
-    return extras.length ? [...PEST_TYPES, ...extras] : PEST_TYPES
-  }, [selectedPestTypes])
+  const pestTypeOptions = useMemo(() => pestOptions(selectedPestTypes ?? []), [selectedPestTypes])
 
   /** Start or duration changed -> recompute the end time. */
   function syncEnd(start, minutes) {
@@ -361,6 +367,9 @@ export function BookingFormPage() {
       quoted_amount: values.quoted_amount === '' ? null : Number(values.quoted_amount),
       customer_notes: values.customer_notes === '' ? null : values.customer_notes,
       technician_notes: values.technician_notes === '' ? null : values.technician_notes,
+      site_contact_name: values.site_contact_name || null,
+      site_contact_phone: values.site_contact_phone || null,
+      order_number: values.order_number || null,
     }
 
     if (!isTechnician) {
@@ -453,7 +462,9 @@ export function BookingFormPage() {
           <Card>
             <CardHeader>
               <CardTitle>Customer &amp; quote</CardTitle>
-              <CardDescription>Who the job is for, and the quote it came from.</CardDescription>
+              <CardDescription>
+                Who the job is for, who will be on site, and the quote it came from.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative">
@@ -531,6 +542,48 @@ export function BookingFormPage() {
                               ? 'No accepted quotes waiting to be converted.'
                               : 'Selecting a quote fills in the service details below.'}
                       </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <FormField
+                  control={control}
+                  name="site_contact_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Site contact</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. the tenant" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="site_contact_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Site contact phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="07700 900123" type="tel" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="order_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer order no.</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Purchase order, if they use one" />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

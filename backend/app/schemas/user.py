@@ -30,6 +30,7 @@ class UserCreate(BaseModel):
 
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=120)
+    job_title: Optional[str] = Field(default=None, max_length=80)
     password: str = Field(min_length=8, max_length=128)
     role: UserRole = UserRole.TECHNICIAN
     is_active: bool = True
@@ -47,12 +48,20 @@ class UserCreate(BaseModel):
             raise ValueError("Full name cannot be empty")
         return cleaned
 
+    @field_validator("job_title")
+    @classmethod
+    def _strip_job_title(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.strip() or None
+
 
 class UserUpdate(BaseModel):
     """Payload for partially updating a user."""
 
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    job_title: Optional[str] = Field(default=None, max_length=80)
     password: Optional[str] = Field(default=None, min_length=8, max_length=128)
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
@@ -74,6 +83,13 @@ class UserUpdate(BaseModel):
             raise ValueError("Full name cannot be empty")
         return cleaned
 
+    @field_validator("job_title")
+    @classmethod
+    def _strip_job_title(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.strip() or None
+
 
 class UserResponse(BaseModel):
     """Public representation of a user."""
@@ -83,6 +99,7 @@ class UserResponse(BaseModel):
     id: str = Field(alias="id")
     email: str
     full_name: str
+    job_title: Optional[str] = None
     role: UserRole
     is_active: bool
     created_at: datetime

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 from beanie import Document
 from pydantic import Field
@@ -21,6 +22,7 @@ class User(Document):
 
     email: str
     full_name: str
+    job_title: Optional[str] = None  # printed as their position on reports
     hashed_password: str
     role: UserRole = UserRole.TECHNICIAN
     is_active: bool = True

@@ -6,6 +6,7 @@ import { RiskLevelBadge } from '@/components/jobs/RiskLevelBadge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { PRIORITY_LABELS, RESPONSIBLE_PARTY_LABELS } from '@/lib/constants'
 
 /**
  * One inspection finding, with its photo strip.
@@ -83,7 +84,7 @@ export function FindingCard({
               {finding.area}
             </h4>
             <span className="text-sm text-muted-foreground">- {finding.pest_type}</span>
-            <RiskLevelBadge level={finding.severity} />
+            <RiskLevelBadge level={finding.severity} label={PRIORITY_LABELS[finding.severity]} />
           </div>
         </div>
 
@@ -112,6 +113,15 @@ export function FindingCard({
         </div>
       ) : null}
 
+      {finding.evidence?.length ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Evidence
+          </p>
+          <p className="text-sm text-foreground">{finding.evidence.join(', ')}</p>
+        </div>
+      ) : null}
+
       {finding.recommendation ? (
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -119,6 +129,17 @@ export function FindingCard({
           </p>
           <p className="whitespace-pre-wrap text-sm text-foreground">
             {finding.recommendation}
+          </p>
+        </div>
+      ) : null}
+
+      {finding.responsible_party ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Action by
+          </p>
+          <p className="text-sm text-foreground">
+            {RESPONSIBLE_PARTY_LABELS[finding.responsible_party] ?? finding.responsible_party}
           </p>
         </div>
       ) : null}

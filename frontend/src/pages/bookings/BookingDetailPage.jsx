@@ -9,6 +9,7 @@ import {
   ClipboardList,
   DollarSign,
   FileText,
+  Hash,
   Hourglass,
   Lock,
   MapPin,
@@ -19,6 +20,7 @@ import {
   StickyNote,
   Timer,
   User as UserIcon,
+  UserRound,
   Wrench,
   XCircle,
 } from 'lucide-react'
@@ -408,7 +410,16 @@ export function BookingDetailPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <DetailField icon={UserIcon} label="Name" value={booking.customer_name ?? '--'} />
-              <DetailField icon={Phone} label="Phone" value={booking.customer_phone ?? '--'} />
+              <DetailField
+                icon={Phone}
+                label="Phone"
+                value={booking.customer_phone ?? '--'}
+                href={
+                  booking.customer_phone
+                    ? `tel:${booking.customer_phone.replace(/\s/g, '')}`
+                    : undefined
+                }
+              />
               <DetailField
                 icon={MapPin}
                 label="Service address"
@@ -425,6 +436,23 @@ export function BookingDetailPage() {
                     : (booking.customer_address ?? '--')
                 }
               />
+              {booking.site_contact_name || booking.site_contact_phone ? (
+                <DetailField
+                  icon={UserRound}
+                  label="Site contact"
+                  value={[booking.site_contact_name, booking.site_contact_phone]
+                    .filter(Boolean)
+                    .join(', ')}
+                  href={
+                    booking.site_contact_phone
+                      ? `tel:${booking.site_contact_phone.replace(/\s/g, '')}`
+                      : undefined
+                  }
+                />
+              ) : null}
+              {booking.order_number ? (
+                <DetailField icon={Hash} label="Order number" value={booking.order_number} />
+              ) : null}
               <Button asChild variant="outline" size="sm" className="w-full">
                 <Link to={`/customers/${booking.customer_id}`}>View customer</Link>
               </Button>

@@ -9,8 +9,11 @@ const DARK_CLASSES = {
   critical: '',
 }
 
-/** Pill showing a finding's severity, or a job's overall risk level. */
-export function RiskLevelBadge({ level, className, size = 'sm' }) {
+/**
+ * Pill showing a finding's priority, or an older job's overall risk level.
+ * `label` overrides the default wording, e.g. "Urgent" for a finding.
+ */
+export function RiskLevelBadge({ level, label, className, size = 'sm' }) {
   if (!level) return null
 
   return (
@@ -23,7 +26,7 @@ export function RiskLevelBadge({ level, className, size = 'sm' }) {
         className,
       )}
     >
-      {RISK_LEVEL_LABELS[level] ?? level}
+      {label ?? RISK_LEVEL_LABELS[level] ?? level}
     </span>
   )
 }

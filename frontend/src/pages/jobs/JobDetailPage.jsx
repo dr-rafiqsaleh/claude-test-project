@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Download,
   FileText,
+  Hash,
   MapPin,
   PenLine,
   Phone,
@@ -18,18 +19,31 @@ import {
   Smartphone,
   Timer,
   User as UserIcon,
+  UserRound,
   Wrench,
   XCircle,
 } from 'lucide-react'
 
 import { createInvoiceFromJob } from '@/api/invoices'
 import { downloadJobReport, updateJobSignature, updateJobStatus } from '@/api/jobs'
+import { ActivityBadge } from '@/components/jobs/ActivityBadge'
 import { FindingCard } from '@/components/jobs/FindingCard'
 import { FindingForm } from '@/components/jobs/FindingForm'
-import { CheckboxField, FormField, SELECT_CLASSES } from '@/components/jobs/JobFormControls'
+import { FormField } from '@/components/jobs/JobFormControls'
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge'
 import { PhotoLightbox } from '@/components/jobs/PhotoLightbox'
-import { RiskLevelBadge } from '@/components/jobs/RiskLevelBadge'
+import {
+  ActionTakenField,
+  ActivityFields,
+  AssessmentFields,
+  ConditionsFields,
+  FollowUpFields,
+  InspectionSummaryField,
+  UnableToSignField,
+  VisitTypeField,
+  reportHasContent,
+  useReportFields,
+} from '@/components/jobs/ReportFields'
 import { SignaturePad } from '@/components/jobs/SignaturePad'
 import { TreatmentCard } from '@/components/jobs/TreatmentCard'
 import { TreatmentForm } from '@/components/jobs/TreatmentForm'
@@ -49,19 +63,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { LoadingState, Spinner } from '@/components/ui/spinner'
-import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { useJob, useJobPhotos } from '@/hooks/useJobs'
 import { useReportAutosave } from '@/hooks/useReportAutosave'
 import { toApiError } from '@/lib/api'
-import {
-  cn,
-  formatBookingDateTime,
-  formatDuration,
-  toDateInputValue,
-} from '@/lib/utils'
+import { cn, formatBookingDateTime, formatDuration } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import { JOB_STATUS, RISK_LEVELS, RISK_LEVEL_LABELS } from '@/lib/constants'
+import { JOB_STATUS } from '@/lib/constants'
 
 
 /** Subtle "Saving..." / "Saved" indicator shown next to the job number. */
@@ -107,6 +115,9 @@ export function JobDetailPage() {
 
   const { job, loading, error, refetch, setJob } = useJob(id)
   const { saveState, saveNow, scheduleSave } = useReportAutosave(id, setJob)
+  // Local copies of the report fields, so typing is never interrupted by a
+  // background save round-trip.
+  const { fields, setField, setAssessment } = useReportFields(job, { saveNow, scheduleSave })
   const { photos, upload, remove: removePhoto } = useJobPhotos(id)
 
   const [transitioning, setTransitioning] = useState(false)
@@ -120,58 +131,19 @@ export function JobDetailPage() {
   const [signatures, setSignatures] = useState({ customer: null, technician: null })
   const [savingSignature, setSavingSignature] = useState(false)
 
-  // Locally-controlled summary fields, so typing is never interrupted by a
-  // background save round-trip.
-  const [summary, setSummary] = useState(null)
-
   const isAssigned = Boolean(job && job.technician_id && job.technician_id === user?.id)
   const editable =
     Boolean(job) &&
     (job.status === JOB_STATUS.PENDING || job.status === JOB_STATUS.IN_PROGRESS) &&
     (canWrite || isAssigned)
 
-  // Seed the local form state once the job arrives.
   useEffect(() => {
     if (!job) return
-    setSummary((current) =>
-      current && current.__jobId === job.id
-        ? current
-        : {
-            __jobId: job.id,
-            overall_risk_level: job.overall_risk_level ?? '',
-            inspection_notes: job.inspection_notes ?? '',
-            recommendations: job.recommendations ?? '',
-            follow_up_required: Boolean(job.follow_up_required),
-            follow_up_notes: job.follow_up_notes ?? '',
-            next_service_due: toDateInputValue(job.next_service_due),
-          },
+    setSignatureName(
+      (current) =>
+        current || job.customer_name_signed || job.site_contact_name || job.customer_name || '',
     )
-    setSignatureName((current) => current || job.customer_name_signed || job.customer_name || '')
   }, [job])
-
-
-  function updateSummary(field, value, { immediate = false } = {}) {
-    setSummary((current) => ({ ...current, [field]: value }))
-
-    let payloadValue = value
-    if (field === 'overall_risk_level') payloadValue = value || null
-    if (field === 'next_service_due') {
-      payloadValue = value ? new Date(`${value}T00:00:00`).toISOString() : null
-    }
-    if (
-      field === 'inspection_notes' ||
-      field === 'recommendations' ||
-      field === 'follow_up_notes'
-    ) {
-      payloadValue = value.trim() ? value : null
-    }
-
-    if (immediate) {
-      void saveNow({ [field]: payloadValue })
-    } else {
-      scheduleSave({ [field]: payloadValue })
-    }
-  }
 
   async function addFinding(finding) {
     const saved = await saveNow({ findings: [...(job.findings ?? []), finding] })
@@ -299,7 +271,7 @@ export function JobDetailPage() {
     return <LoadingState message="Loading report..." />
   }
 
-  if (error || !job || !summary) {
+  if (error || !job || !fields) {
     return (
       <div className="space-y-4">
         <Button variant="ghost" className="-ml-2" onClick={() => navigate('/jobs')}>
@@ -329,11 +301,9 @@ export function JobDetailPage() {
   const isCompleted = job.status === JOB_STATUS.COMPLETED
   const isCancelled = job.status === JOB_STATUS.CANCELLED
   const canStart = isPending && (canWrite || isAssigned)
-  const canComplete =
-    isInProgress &&
-    (canWrite || isAssigned) &&
-    ((job.findings?.length ?? 0) > 0 || Boolean(summary.inspection_notes.trim()))
+  const canComplete = isInProgress && (canWrite || isAssigned) && reportHasContent(job, fields)
   const showSignatures = isInProgress || isCompleted
+  const sectionProps = { fields, setField, saveNow, disabled: !editable }
 
   return (
     <div className="space-y-6">
@@ -344,9 +314,7 @@ export function JobDetailPage() {
         badge={
           <>
             <JobStatusBadge status={job.status} />
-            {job.overall_risk_level ? (
-              <RiskLevelBadge level={job.overall_risk_level} />
-            ) : null}
+            <ActivityBadge level={job.activity_level} />
             <SaveIndicator state={saveState} />
           </>
         }
@@ -387,7 +355,7 @@ export function JobDetailPage() {
                 title={
                   canComplete
                     ? undefined
-                    : 'Record at least one finding or some inspection notes first'
+                    : 'Record the pest activity, a finding or the action taken first'
                 }
                 onClick={() => void changeStatus(JOB_STATUS.COMPLETED)}
               >
@@ -437,7 +405,7 @@ export function JobDetailPage() {
         }
       />
 
-      {/* Section 1 - Job info ------------------------------------------- */}
+      {/* Job info -------------------------------------------------------- */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -524,8 +492,28 @@ export function JobDetailPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             <DetailField icon={UserIcon} label="Name" value={job.customer_name ?? '--'} />
-            <DetailField icon={Phone} label="Phone" value={job.customer_phone ?? '--'} />
+            <DetailField
+              icon={Phone}
+              label="Phone"
+              value={job.customer_phone ?? '--'}
+              href={job.customer_phone ? `tel:${job.customer_phone.replace(/\s/g, '')}` : undefined}
+            />
             <DetailField icon={MapPin} label="Service address" value={addressLine(job)} />
+            {job.site_contact_name || job.site_contact_phone ? (
+              <DetailField
+                icon={UserRound}
+                label="Site contact"
+                value={[job.site_contact_name, job.site_contact_phone].filter(Boolean).join(', ')}
+                href={
+                  job.site_contact_phone
+                    ? `tel:${job.site_contact_phone.replace(/\s/g, '')}`
+                    : undefined
+                }
+              />
+            ) : null}
+            {job.order_number ? (
+              <DetailField icon={Hash} label="Order number" value={job.order_number} />
+            ) : null}
             <Button asChild variant="outline" size="sm" className="w-full">
               <Link to={`/customers/${job.customer_id}`}>View customer</Link>
             </Button>
@@ -533,15 +521,31 @@ export function JobDetailPage() {
         </Card>
       </div>
 
-      {/* Section 2 - Findings ------------------------------------------- */}
+      {/* Visit & pest activity ------------------------------------------ */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Visit &amp; pest activity</CardTitle>
+          <CardDescription>
+            {editable
+              ? 'Why the visit happened and how much activity was found. Changes save automatically.'
+              : 'Why the visit happened and how much activity was found.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <VisitTypeField {...sectionProps} />
+          <ActivityFields {...sectionProps} />
+        </CardContent>
+      </Card>
+
+      {/* Findings -------------------------------------------------------- */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
           <div>
             <CardTitle>Inspection findings</CardTitle>
             <CardDescription>
               {editable
-                ? 'What was found on site, area by area. Attach photos to each finding.'
-                : 'What was found on site, area by area.'}
+                ? 'An overall summary, then what was found area by area, with photos.'
+                : 'An overall summary, then what was found area by area.'}
             </CardDescription>
           </div>
           {editable && !showFindingForm ? (
@@ -552,8 +556,14 @@ export function JobDetailPage() {
           ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
+          <InspectionSummaryField {...sectionProps} />
+
           {showFindingForm ? (
-            <FindingForm onAdd={addFinding} onCancel={() => setShowFindingForm(false)} />
+            <FindingForm
+              pestsFound={fields.pests_found}
+              onAdd={addFinding}
+              onCancel={() => setShowFindingForm(false)}
+            />
           ) : null}
 
           {job.findings?.length ? (
@@ -572,36 +582,53 @@ export function JobDetailPage() {
               />
             ))
           ) : !showFindingForm ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
+            <p className="py-4 text-center text-sm text-muted-foreground">
               No findings recorded yet.
             </p>
           ) : null}
         </CardContent>
       </Card>
 
-      {/* Section 3 - Treatments ----------------------------------------- */}
+      {/* Hygiene & proofing --------------------------------------------- */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Hygiene &amp; proofing</CardTitle>
+          <CardDescription>What the customer needs to put right.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ConditionsFields {...sectionProps} />
+        </CardContent>
+      </Card>
+
+      {/* Action taken & products ---------------------------------------- */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
           <div>
-            <CardTitle>Treatments applied</CardTitle>
-            <CardDescription>Products, methods and the areas each one covered.</CardDescription>
+            <CardTitle>Action taken &amp; products used</CardTitle>
+            <CardDescription>What was done, and every product used on site.</CardDescription>
           </div>
           {editable && !showTreatmentForm ? (
             <Button variant="outline" size="sm" onClick={() => setShowTreatmentForm(true)}>
               <Plus className="h-4 w-4" />
-              Add treatment
+              Add product
             </Button>
           ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
+          <ActionTakenField {...sectionProps} />
+
           {showTreatmentForm ? (
-            <TreatmentForm onAdd={addTreatment} onCancel={() => setShowTreatmentForm(false)} />
+            <TreatmentForm
+              pestsFound={fields.pests_found}
+              onAdd={addTreatment}
+              onCancel={() => setShowTreatmentForm(false)}
+            />
           ) : null}
 
           {job.treatments?.length ? (
             job.treatments.map((treatment, index) => (
               <TreatmentCard
-                key={`${treatment.pest_type}-${treatment.method}-${index}`}
+                key={`${treatment.product_name}-${treatment.pest_type}-${index}`}
                 treatment={treatment}
                 index={index}
                 editable={editable}
@@ -609,107 +636,36 @@ export function JobDetailPage() {
               />
             ))
           ) : !showTreatmentForm ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No treatments recorded yet.
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No products recorded yet.
             </p>
           ) : null}
         </CardContent>
       </Card>
 
-      {/* Section 4 - Summary -------------------------------------------- */}
+      {/* Recommendations & follow-up ------------------------------------ */}
       <Card>
         <CardHeader>
-          <CardTitle>Summary &amp; recommendations</CardTitle>
-          <CardDescription>
-            {editable
-              ? 'Changes save automatically a moment after you stop typing.'
-              : 'The wrap-up recorded by the technician.'}
-          </CardDescription>
+          <CardTitle>Recommendations &amp; follow-up</CardTitle>
+          <CardDescription>What the customer should do next, and whether we return.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
-          <FormField label="Overall risk level" htmlFor="job-risk">
-            <select
-              id="job-risk"
-              value={summary.overall_risk_level}
-              disabled={!editable}
-              onChange={(event) =>
-                updateSummary('overall_risk_level', event.target.value, { immediate: true })
-              }
-              className={cn(SELECT_CLASSES, 'sm:w-[220px]')}
-            >
-              <option value="">Not assessed</option>
-              {RISK_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {RISK_LEVEL_LABELS[level]}
-                </option>
-              ))}
-            </select>
-          </FormField>
-
-          <FormField label="Inspection notes" htmlFor="job-notes">
-            <Textarea
-              id="job-notes"
-              rows={5}
-              disabled={!editable}
-              value={summary.inspection_notes}
-              onChange={(event) => updateSummary('inspection_notes', event.target.value)}
-              onBlur={() => void saveNow()}
-              placeholder="Conditions on site, access notes, anything the office should know."
-            />
-          </FormField>
-
-          <FormField label="Recommendations" htmlFor="job-recommendations">
-            <Textarea
-              id="job-recommendations"
-              rows={4}
-              disabled={!editable}
-              value={summary.recommendations}
-              onChange={(event) => updateSummary('recommendations', event.target.value)}
-              onBlur={() => void saveNow()}
-              placeholder="What the customer should do next, and what we recommend booking in."
-            />
-          </FormField>
-
-          <CheckboxField
-            id="job-follow-up"
-            checked={summary.follow_up_required}
-            disabled={!editable}
-            onChange={(checked) => updateSummary('follow_up_required', checked, { immediate: true })}
-            label="Follow-up required"
-            description="Flag this job so the office books a return visit."
-          />
-
-          {summary.follow_up_required ? (
-            <div className="grid gap-5 sm:grid-cols-2">
-              <FormField label="Follow-up notes" htmlFor="job-follow-up-notes" className="sm:col-span-2">
-                <Textarea
-                  id="job-follow-up-notes"
-                  rows={3}
-                  disabled={!editable}
-                  value={summary.follow_up_notes}
-                  onChange={(event) => updateSummary('follow_up_notes', event.target.value)}
-                  onBlur={() => void saveNow()}
-                  placeholder="Return visit to check bait take and top up stations."
-                />
-              </FormField>
-
-              <FormField label="Next service due" htmlFor="job-next-service">
-                <Input
-                  id="job-next-service"
-                  type="date"
-                  disabled={!editable}
-                  value={summary.next_service_due}
-                  onChange={(event) =>
-                    updateSummary('next_service_due', event.target.value, { immediate: true })
-                  }
-                />
-              </FormField>
-            </div>
-          ) : null}
+        <CardContent>
+          <FollowUpFields {...sectionProps} />
         </CardContent>
       </Card>
 
-      {/* Section 5 - Signatures ----------------------------------------- */}
+      {/* Assessments ----------------------------------------------------- */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Assessments</CardTitle>
+          <CardDescription>The assessments in place for this visit, as printed on the report.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AssessmentFields {...sectionProps} setAssessment={setAssessment} />
+        </CardContent>
+      </Card>
+
+      {/* Signatures ------------------------------------------------------ */}
       {showSignatures ? (
         <Card>
           <CardHeader>
@@ -719,7 +675,11 @@ export function JobDetailPage() {
                 ? `Signed by ${job.customer_name_signed ?? 'the customer'} on ${formatBookingDateTime(
                     job.signed_at,
                   )}.`
-                : 'Capture the customer and technician signatures on site.'}
+                : job.customer_unable_to_sign
+                  ? `The customer was not available to sign${
+                      job.customer_unable_reason ? `: ${job.customer_unable_reason}` : '.'
+                    }`
+                  : 'Capture the customer and technician signatures on site.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -733,14 +693,18 @@ export function JobDetailPage() {
               />
             </FormField>
 
+            <UnableToSignField {...sectionProps} />
+
             <div className="grid gap-6 lg:grid-cols-2">
-              <SignaturePad
-                label="Customer signature"
-                existingSignature={job.customer_signature}
-                readOnly={isCompleted && !canWrite}
-                onSave={(dataUrl) => setSignatures((s) => ({ ...s, customer: dataUrl }))}
-                onClear={() => setSignatures((s) => ({ ...s, customer: null }))}
-              />
+              {!fields.customer_unable_to_sign || job.customer_signature ? (
+                <SignaturePad
+                  label="Customer signature"
+                  existingSignature={job.customer_signature}
+                  readOnly={isCompleted && !canWrite}
+                  onSave={(dataUrl) => setSignatures((s) => ({ ...s, customer: dataUrl }))}
+                  onClear={() => setSignatures((s) => ({ ...s, customer: null }))}
+                />
+              ) : null}
               <SignaturePad
                 label="Technician signature"
                 existingSignature={job.technician_signature}
@@ -764,7 +728,7 @@ export function JobDetailPage() {
         </Card>
       ) : null}
 
-      {/* Section 6 - Report --------------------------------------------- */}
+      {/* Report ---------------------------------------------------------- */}
       {isCompleted ? (
         <Card>
           <CardHeader>

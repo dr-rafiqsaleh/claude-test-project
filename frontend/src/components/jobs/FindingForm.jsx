@@ -1,24 +1,34 @@
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 
-import { FormField, SELECT_CLASSES } from '@/components/jobs/JobFormControls'
+import { ChoiceChips, FormField, SELECT_CLASSES } from '@/components/jobs/JobFormControls'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { INSPECTION_AREAS, PEST_TYPES, RISK_LEVELS, RISK_LEVEL_LABELS } from '@/lib/constants'
+import {
+  EVIDENCE_TYPES,
+  INSPECTION_AREAS,
+  PRIORITY_LABELS,
+  RESPONSIBLE_PARTIES,
+  RESPONSIBLE_PARTY_LABELS,
+  RISK_LEVELS,
+  pestOptions,
+} from '@/lib/constants'
 
 const OTHER = 'Other'
 
-function emptyFinding() {
+function emptyFinding(pests) {
   return {
     area: INSPECTION_AREAS[0],
     customArea: '',
-    pest_type: PEST_TYPES[0],
+    pest_type: pests[0],
     customPest: '',
     severity: 'low',
+    evidence: [],
     description: '',
     recommendation: '',
+    responsible_party: '',
   }
 }
 
@@ -26,10 +36,12 @@ function emptyFinding() {
  * Inline "Add finding" form.
  *
  * Calls `onAdd(finding)` with a plain finding object ready to append to
- * `job.findings`, then resets itself.
+ * `job.findings`, then resets itself. `pestsFound` (the report's ticked pests)
+ * are offered first, so the usual pest is already chosen.
  */
-export function FindingForm({ onAdd, onCancel, large = false, className }) {
-  const [draft, setDraft] = useState(emptyFinding)
+export function FindingForm({ onAdd, onCancel, pestsFound = [], large = false, className }) {
+  const pests = [...new Set([...pestsFound, ...pestOptions(pestsFound)])]
+  const [draft, setDraft] = useState(() => emptyFinding(pests))
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
@@ -63,8 +75,10 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
       area,
       pest_type: pestType,
       severity: draft.severity,
+      evidence: draft.evidence,
       description: draft.description.trim(),
       recommendation: draft.recommendation.trim(),
+      responsible_party: draft.responsible_party || null,
       photo_ids: [],
     })
     setSaving(false)
@@ -74,7 +88,7 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
       setError('Not saved. Check your connection and tap Add finding again.')
       return
     }
-    setDraft(emptyFinding())
+    setDraft(emptyFinding(pests))
   }
 
   return (
@@ -125,7 +139,7 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
             onChange={(event) => set('pest_type', event.target.value)}
             className={selectClass}
           >
-            {PEST_TYPES.map((pest) => (
+            {pests.map((pest) => (
               <option key={pest} value={pest}>
                 {pest}
               </option>
@@ -142,7 +156,7 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
           ) : null}
         </FormField>
 
-        <FormField label="Severity" htmlFor="finding-severity">
+        <FormField label="Priority" htmlFor="finding-severity">
           <select
             id="finding-severity"
             value={draft.severity}
@@ -151,12 +165,23 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
           >
             {RISK_LEVELS.map((level) => (
               <option key={level} value={level}>
-                {RISK_LEVEL_LABELS[level]}
+                {PRIORITY_LABELS[level]}
               </option>
             ))}
           </select>
         </FormField>
       </div>
+
+      <FormField label="Evidence seen">
+        <ChoiceChips
+          ariaLabel="Evidence seen"
+          multiple
+          options={EVIDENCE_TYPES}
+          value={draft.evidence}
+          onChange={(value) => set('evidence', value)}
+          large={large}
+        />
+      </FormField>
 
       <FormField label="Description" htmlFor="finding-description">
         <Textarea
@@ -175,8 +200,19 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
           value={draft.recommendation}
           onChange={(event) => set('recommendation', event.target.value)}
           rows={large ? 4 : 3}
-          placeholder="Gel bait applied to harbourage points; review in four weeks."
+          placeholder="Seal the gap behind the cooker; keep food in sealed containers."
           className={large ? 'text-base' : undefined}
+        />
+      </FormField>
+
+      <FormField label="Who needs to act">
+        <ChoiceChips
+          ariaLabel="Who needs to act"
+          options={RESPONSIBLE_PARTIES}
+          labels={RESPONSIBLE_PARTY_LABELS}
+          value={draft.responsible_party}
+          onChange={(value) => set('responsible_party', value)}
+          large={large}
         />
       </FormField>
 

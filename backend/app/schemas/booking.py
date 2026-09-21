@@ -60,6 +60,9 @@ class BookingCreate(BaseModel):
     service_type: str = Field(min_length=1, max_length=120)
     pest_types: List[str] = Field(default_factory=list)
     service_address: Optional[Dict[str, Any]] = None
+    site_contact_name: Optional[str] = Field(default=None, max_length=120)
+    site_contact_phone: Optional[str] = Field(default=None, max_length=40)
+    order_number: Optional[str] = Field(default=None, max_length=60)
     recurrence: RecurrenceType = RecurrenceType.NONE
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     internal_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
@@ -85,7 +88,14 @@ class BookingCreate(BaseModel):
     def _strip_ids(cls, value: Optional[str]) -> Optional[str]:
         return _clean_optional_text(value)
 
-    @field_validator("technician_notes", "internal_notes", "customer_notes")
+    @field_validator(
+        "technician_notes",
+        "internal_notes",
+        "customer_notes",
+        "site_contact_name",
+        "site_contact_phone",
+        "order_number",
+    )
     @classmethod
     def _strip_notes(cls, value: Optional[str]) -> Optional[str]:
         return _clean_optional_text(value)
@@ -108,6 +118,9 @@ class BookingUpdate(BaseModel):
     service_type: Optional[str] = Field(default=None, min_length=1, max_length=120)
     pest_types: Optional[List[str]] = None
     service_address: Optional[Dict[str, Any]] = None
+    site_contact_name: Optional[str] = Field(default=None, max_length=120)
+    site_contact_phone: Optional[str] = Field(default=None, max_length=40)
+    order_number: Optional[str] = Field(default=None, max_length=60)
     recurrence: Optional[RecurrenceType] = None
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     internal_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
@@ -132,7 +145,14 @@ class BookingUpdate(BaseModel):
             return None
         return _clean_string_list(value)
 
-    @field_validator("technician_notes", "internal_notes", "customer_notes")
+    @field_validator(
+        "technician_notes",
+        "internal_notes",
+        "customer_notes",
+        "site_contact_name",
+        "site_contact_phone",
+        "order_number",
+    )
     @classmethod
     def _strip_notes(cls, value: Optional[str]) -> Optional[str]:
         return _clean_optional_text(value)
@@ -169,6 +189,9 @@ class QuoteToBookingRequest(BaseModel):
     service_type: Optional[str] = Field(default=None, max_length=120)
     pest_types: Optional[List[str]] = None
     service_address: Optional[Dict[str, Any]] = None
+    site_contact_name: Optional[str] = Field(default=None, max_length=120)
+    site_contact_phone: Optional[str] = Field(default=None, max_length=40)
+    order_number: Optional[str] = Field(default=None, max_length=60)
     estimated_duration_minutes: Optional[int] = Field(default=None, ge=5, le=1440)
     quoted_amount: Optional[float] = Field(default=None, ge=0)
     customer_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
@@ -221,6 +244,9 @@ class BookingResponse(BaseModel):
     service_type: str
     pest_types: List[str] = Field(default_factory=list)
     service_address: Optional[Dict[str, Any]] = None
+    site_contact_name: Optional[str] = None
+    site_contact_phone: Optional[str] = None
+    order_number: Optional[str] = None
 
     recurrence: RecurrenceType = RecurrenceType.NONE
     parent_booking_id: Optional[str] = None

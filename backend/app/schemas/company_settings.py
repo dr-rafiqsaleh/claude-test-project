@@ -1,11 +1,52 @@
 """Company settings request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from app.models.company_settings import ProductCategory
 from app.schemas.common import ApiResponse
+
+#: Longest a block of report wording may be.
+MAX_REPORT_TEXT = 4000
+
+
+def _clean_optional(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+class ProductSchema(BaseModel):
+    """One product in the company's product list (in and out).
+
+    A new product may arrive without an id; the service gives it one.
+    """
+
+    id: Optional[str] = Field(None, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
+    category: ProductCategory = ProductCategory.OTHER
+    active_ingredient: Optional[str] = Field(None, max_length=200)
+    formulation: Optional[str] = Field(None, max_length=120)
+    registration_number: Optional[str] = Field(None, max_length=60)
+    safety_data_sheet_ref: Optional[str] = Field(None, max_length=200)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("A product needs a name")
+        return cleaned
+
+    @field_validator(
+        "id", "active_ingredient", "formulation", "registration_number", "safety_data_sheet_ref"
+    )
+    @classmethod
+    def _strip_optional(cls, value: Optional[str]) -> Optional[str]:
+        return _clean_optional(value)
 
 
 class CompanySettingsUpdate(BaseModel):
@@ -36,6 +77,11 @@ class CompanySettingsUpdate(BaseModel):
 
     default_quote_valid_days: Optional[int] = Field(None, ge=1, le=365)
     default_quote_terms: Optional[str] = Field(None, max_length=4000)
+
+    products: Optional[List[ProductSchema]] = Field(None, max_length=300)
+    report_insecticide_guidance: Optional[str] = Field(None, max_length=MAX_REPORT_TEXT)
+    report_rodenticide_guidance: Optional[str] = Field(None, max_length=MAX_REPORT_TEXT)
+    report_declaration: Optional[str] = Field(None, max_length=MAX_REPORT_TEXT)
 
     smtp_host: Optional[str] = Field(None, max_length=200)
     smtp_port: Optional[int] = Field(None, ge=1, le=65535)
@@ -79,6 +125,11 @@ class CompanySettingsResponse(BaseModel):
 
     default_quote_valid_days: int = 30
     default_quote_terms: Optional[str] = None
+
+    products: List[ProductSchema] = Field(default_factory=list)
+    report_insecticide_guidance: str = ""
+    report_rodenticide_guidance: str = ""
+    report_declaration: str = ""
 
     smtp_host: Optional[str] = None
     smtp_port: Optional[int] = None

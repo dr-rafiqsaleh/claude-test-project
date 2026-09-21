@@ -65,6 +65,9 @@ class Booking(Document):
     service_type: str  # e.g. "General Pest Control", "Termite Inspection"
     pest_types: List[str] = Field(default_factory=list)  # e.g. ["Cockroach", "Ant"]
     service_address: Optional[dict] = None  # overrides the customer address when set
+    site_contact_name: Optional[str] = None  # who will be on site, e.g. the tenant
+    site_contact_phone: Optional[str] = None
+    order_number: Optional[str] = None  # the customer's purchase order, if they use one
 
     # Recurrence
     recurrence: RecurrenceType = RecurrenceType.NONE

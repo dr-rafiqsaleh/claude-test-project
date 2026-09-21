@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/table'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge'
+import { ActivityBadge } from '@/components/jobs/ActivityBadge'
 import { RiskLevelBadge } from '@/components/jobs/RiskLevelBadge'
 import { SELECT_CLASSES } from '@/components/jobs/JobFormControls'
 import { useJobs } from '@/hooks/useJobs'
@@ -283,7 +284,7 @@ export function JobsPage() {
                   <TableHead className="hidden md:table-cell">Service type</TableHead>
                   <TableHead>Scheduled</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="hidden sm:table-cell">Risk</TableHead>
+                  <TableHead className="hidden sm:table-cell">Activity</TableHead>
                   <TableHead className="hidden sm:table-cell">Report</TableHead>
                   <TableHead className="w-12 text-right">Actions</TableHead>
                 </TableRow>
@@ -318,7 +319,10 @@ export function JobsPage() {
                         <JobStatusBadge status={job.status} />
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        {job.overall_risk_level ? (
+                        {job.activity_level ? (
+                          <ActivityBadge level={job.activity_level} />
+                        ) : job.overall_risk_level ? (
+                          // Reports written before the activity level existed.
                           <RiskLevelBadge level={job.overall_risk_level} />
                         ) : (
                           <span className="text-sm text-muted-foreground/70">--</span>

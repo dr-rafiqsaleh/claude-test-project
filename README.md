@@ -75,9 +75,14 @@ Errors keep the shape with `success: false`; validation failures also carry
   Calendar scheduling, technician assignment, recurrence, conflict-aware status
   transitions, conversion from an accepted quote.
 - **Phase 4 — Jobs & inspection reports** ✅
-  Mobile-first technician portal, inspection findings with severity, treatments
-  applied with SDS references, photo upload, customer and technician signature
-  capture, full photographic PDF report.
+  Mobile-first technician portal and one combined Pest Control Inspection &
+  Treatment Report: visit type, pest activity level, findings with evidence,
+  priority and who needs to act, hygiene and proofing, products used (picked
+  from a product list in Settings, with active ingredient, HSE/MAPP number and
+  bait status), assessments, safety advice matched to the products used,
+  signatures or a "not available to sign" reason, and a photographic PDF.
+  `python scripts/check_report.py` exercises it end to end on a throwaway
+  database.
 - **Phase 5 — Invoicing & payments** ✅
   Invoices raised automatically when a job completes, partial payments, overdue
   sweeping, dashboard revenue aggregation, tax invoice PDF.

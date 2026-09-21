@@ -130,6 +130,9 @@ def build_booking_payload(
         "service_type": booking.service_type,
         "pest_types": list(booking.pest_types or []),
         "service_address": booking.service_address,
+        "site_contact_name": booking.site_contact_name,
+        "site_contact_phone": booking.site_contact_phone,
+        "order_number": booking.order_number,
         "recurrence": booking.recurrence,
         "parent_booking_id": str(booking.parent_booking_id) if booking.parent_booking_id else None,
         "technician_notes": booking.technician_notes,
@@ -224,6 +227,9 @@ async def create_booking(
         service_type=payload.service_type,
         pest_types=payload.pest_types,
         service_address=payload.service_address,
+        site_contact_name=payload.site_contact_name,
+        site_contact_phone=payload.site_contact_phone,
+        order_number=payload.order_number,
         recurrence=payload.recurrence,
         technician_notes=payload.technician_notes,
         internal_notes=payload.internal_notes,
@@ -311,6 +317,9 @@ async def create_booking_from_quote(
         service_type=payload.service_type or derived_service_type,
         pest_types=payload.pest_types if payload.pest_types is not None else derived_pest_types,
         service_address=payload.service_address,
+        site_contact_name=payload.site_contact_name,
+        site_contact_phone=payload.site_contact_phone,
+        order_number=payload.order_number,
         recurrence=payload.recurrence,
         technician_notes=payload.technician_notes,
         internal_notes=payload.internal_notes,
@@ -505,7 +514,14 @@ async def update_booking(
     if "recurrence" in data and data["recurrence"] is not None:
         booking.recurrence = RecurrenceType(data["recurrence"])
 
-    for field in ("technician_notes", "internal_notes", "customer_notes"):
+    for field in (
+        "technician_notes",
+        "internal_notes",
+        "customer_notes",
+        "site_contact_name",
+        "site_contact_phone",
+        "order_number",
+    ):
         if field in data:
             setattr(booking, field, data[field])
 
@@ -548,10 +564,7 @@ async def update_status(
     if status == BookingStatus.COMPLETED:
         job = await job_service.find_job_for_booking(booking)
         if job is None or not job_service.report_has_content(job):
-            raise BookingStateError(
-                "Record at least one finding or some inspection notes in the visit "
-                "report before completing it"
-            )
+            raise BookingStateError(job_service.REPORT_EMPTY_MESSAGE)
 
     now = datetime.utcnow()
     booking.status = status

@@ -46,6 +46,7 @@ async def create_user(payload: UserCreate) -> User:
     user = User(
         email=email,
         full_name=payload.full_name,
+        job_title=payload.job_title,
         hashed_password=hash_password(payload.password),
         role=payload.role,
         is_active=payload.is_active,
@@ -105,6 +106,9 @@ async def update_user(user_id: PydanticObjectId | str, payload: UserUpdate) -> U
 
     if "full_name" in data:
         user.full_name = str(data["full_name"])
+
+    if "job_title" in data:
+        user.job_title = data["job_title"]
 
     if "role" in data:
         user.role = UserRole(data["role"])

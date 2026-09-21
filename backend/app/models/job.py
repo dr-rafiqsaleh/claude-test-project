@@ -8,6 +8,8 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
 
+from app.models.company_settings import ProductCategory
+
 
 class JobStatus(str, Enum):
     """Lifecycle states for a job."""
@@ -38,6 +40,59 @@ class RiskLevel(str, Enum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
+
+class VisitType(str, Enum):
+    """Why the technician is on site."""
+
+    INITIAL = "initial"
+    FOLLOW_UP = "follow_up"
+    ROUTINE = "routine"
+    REQUESTED = "requested"
+    CONTRACT = "contract"
+    OTHER = "other"
+
+
+class ActivityLevel(str, Enum):
+    """How much pest activity the technician found, across the whole site."""
+
+    NONE = "none"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class HygieneRating(str, Enum):
+    """The state of the site's hygiene and housekeeping."""
+
+    GOOD = "good"
+    FAIR = "fair"
+    POOR = "poor"
+
+
+class ResponsibleParty(str, Enum):
+    """Who needs to act on a finding's recommendation."""
+
+    CUSTOMER = "customer"
+    LANDLORD = "landlord"
+    CONTRACTOR = "contractor"  # the pest control company itself
+
+
+class BaitStatus(str, Enum):
+    """What happened to a bait point on this visit."""
+
+    DEPOSITED = "deposited"
+    CHECKED = "checked"
+    TOPPED_UP = "topped_up"
+    REMOVED = "removed"
+
+
+class AssessmentAnswer(str, Enum):
+    """Whether an assessment was in place for this visit."""
+
+    YES = "yes"
+    NO = "no"
+    NOT_APPLICABLE = "n_a"
 
 
 #: Statuses a job can no longer move out of.
@@ -71,22 +126,43 @@ class InspectionFinding(BaseModel):
 
     area: str  # e.g. "Kitchen", "Roof void", "Subfloor"
     pest_type: str  # e.g. "Cockroach", "Termite"
-    severity: RiskLevel = RiskLevel.LOW
+    severity: RiskLevel = RiskLevel.LOW  # shown as the finding's priority
+    evidence: List[str] = Field(default_factory=list)  # e.g. "Droppings", "Gnawing"
     description: str = ""
     recommendation: str = ""
+    responsible_party: Optional[ResponsibleParty] = None
     photo_ids: List[str] = Field(default_factory=list)  # Photo document ids
 
 
 class TreatmentApplied(BaseModel):
-    """One treatment carried out on site."""
+    """One product used on site.
+
+    The product's details are copied from the company product list when it is
+    picked, so later edits to that list never change a written report.
+    """
 
     pest_type: str
     method: TreatmentMethod = TreatmentMethod.SPRAY
+    product_id: Optional[str] = None  # the company product list entry it came from
     product_name: str = ""
+    product_category: Optional[ProductCategory] = None
+    active_ingredient: Optional[str] = None
+    formulation: Optional[str] = None
+    registration_number: Optional[str] = None  # HSE / MAPP number
     product_concentration: Optional[str] = None  # e.g. "0.5%"
     areas_treated: List[str] = Field(default_factory=list)
     quantity_used: Optional[str] = None  # e.g. "500ml"
+    bait_status: Optional[BaitStatus] = None
     safety_data_sheet_ref: Optional[str] = None
+
+
+class ReportAssessments(BaseModel):
+    """The assessments in place for a visit, as ticked on the report."""
+
+    risk_assessment: Optional[AssessmentAnswer] = None
+    coshh_assessment: Optional[AssessmentAnswer] = None
+    environmental_assessment: Optional[AssessmentAnswer] = None
+    site_plan: Optional[AssessmentAnswer] = None
 
 
 class Job(Document):
@@ -109,21 +185,33 @@ class Job(Document):
     actual_start: Optional[datetime] = None
     actual_end: Optional[datetime] = None
 
-    # Inspection report
+    # Inspection report, in the order it is filled in on site
+    visit_type: Optional[VisitType] = None
+    visit_type_other: Optional[str] = None  # when visit_type is OTHER
+    activity_level: Optional[ActivityLevel] = None
+    pests_found: List[str] = Field(default_factory=list)
+    inspection_notes: Optional[str] = None  # the inspection summary
     findings: List[InspectionFinding] = Field(default_factory=list)
+    hygiene_rating: Optional[HygieneRating] = None
+    hygiene_notes: Optional[str] = None
+    proofing_notes: Optional[str] = None
+    action_taken: Optional[str] = None
     treatments: List[TreatmentApplied] = Field(default_factory=list)
-    overall_risk_level: Optional[RiskLevel] = None
-    inspection_notes: Optional[str] = None
     recommendations: Optional[str] = None
     follow_up_required: bool = False
     follow_up_notes: Optional[str] = None
     next_service_due: Optional[datetime] = None
+    assessments: ReportAssessments = Field(default_factory=ReportAssessments)
+    # Superseded by activity_level on the report; kept for older records.
+    overall_risk_level: Optional[RiskLevel] = None
 
     # Signature
     customer_name_signed: Optional[str] = None
     customer_signature: Optional[str] = None  # base64 PNG data URL
     signed_at: Optional[datetime] = None
     technician_signature: Optional[str] = None  # base64 PNG data URL
+    customer_unable_to_sign: bool = False
+    customer_unable_reason: Optional[str] = None  # e.g. "Tenant not at home"
 
     # Report generated
     report_generated: bool = False

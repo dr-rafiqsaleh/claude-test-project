@@ -12,6 +12,7 @@ from app.models.company_settings import (
     ALLOWED_LOGO_TYPES,
     MAX_LOGO_BYTES,
     CompanySettings,
+    Product,
 )
 from app.schemas.company_settings import CompanySettingsUpdate
 
@@ -54,6 +55,10 @@ def build_settings_payload(settings: CompanySettings) -> dict:
         "job_prefix": settings.job_prefix,
         "default_quote_valid_days": settings.default_quote_valid_days,
         "default_quote_terms": settings.default_quote_terms,
+        "products": [product.model_dump() for product in settings.products],
+        "report_insecticide_guidance": settings.report_insecticide_guidance,
+        "report_rodenticide_guidance": settings.report_rodenticide_guidance,
+        "report_declaration": settings.report_declaration,
         "smtp_host": settings.smtp_host,
         "smtp_port": settings.smtp_port,
         "smtp_username": settings.smtp_username,
@@ -94,6 +99,24 @@ async def update_settings(
     """Apply a partial update to the singleton."""
     settings = await get_settings()
     payload = data.model_dump(exclude_unset=True)
+
+    if "products" in payload:
+        # The list arrives whole; new products get an id here. Reports copy a
+        # product's details when it is used, so editing the list never changes
+        # a report that has already been written.
+        settings.products = [
+            Product(**{key: value for key, value in item.items() if value is not None})
+            for item in payload.pop("products") or []
+        ]
+
+    for field in (
+        "report_insecticide_guidance",
+        "report_rodenticide_guidance",
+        "report_declaration",
+    ):
+        # Cleared wording is stored empty, which leaves that part off the report.
+        if field in payload:
+            setattr(settings, field, (payload.pop(field) or "").strip())
 
     for field, value in payload.items():
         if not hasattr(settings, field):
@@ -205,6 +228,9 @@ async def get_settings_for_pdf() -> dict:
         "booking_prefix": settings.booking_prefix,
         "job_prefix": settings.job_prefix,
         "primary_color": settings.primary_color or "#059669",
+        "report_insecticide_guidance": settings.report_insecticide_guidance,
+        "report_rodenticide_guidance": settings.report_rodenticide_guidance,
+        "report_declaration": settings.report_declaration,
     }
 
 

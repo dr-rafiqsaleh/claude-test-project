@@ -1182,6 +1182,11 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
         booking = await Booking.get(job.booking_id) if job.booking_id else None
         job_ref = booking.booking_number if booking else job.job_number
         reference_block.append(Paragraph(f"Job: {_escape(job_ref)}", styles["small"]))
+        if booking is not None and booking.order_number:
+            # Commercial customers match invoices to their own purchase orders.
+            reference_block.append(
+                Paragraph(f"Your order no: {_escape(booking.order_number)}", styles["small"])
+            )
         reference_block.append(
             Paragraph(f"Service: {_escape(job.service_type)}", styles["small"])
         )

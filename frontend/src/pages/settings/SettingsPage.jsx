@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   AlertCircle,
   Building2,
+  ClipboardList,
   ExternalLink,
   ImageOff,
   Info,
@@ -21,6 +22,10 @@ import {
   updateSettings,
   uploadLogo,
 } from '@/api/settings'
+import {
+  ProductListEditor,
+  isBlankProduct,
+} from '@/components/settings/ProductListEditor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page'
@@ -30,6 +35,7 @@ import { Label } from '@/components/ui/label'
 import { LoadingState, Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
+import { primeCompanySettings } from '@/hooks/useCompanySettings'
 import { toApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { DEFAULT_PRIMARY_COLOR, MAX_LOGO_BYTES } from '@/lib/constants'
@@ -37,6 +43,7 @@ import { DEFAULT_PRIMARY_COLOR, MAX_LOGO_BYTES } from '@/lib/constants'
 const TABS = [
   { key: 'company', label: 'Company Profile', icon: Building2 },
   { key: 'documents', label: 'Invoice & Quote Defaults', icon: Receipt },
+  { key: 'reports', label: 'Reports', icon: ClipboardList },
   { key: 'email', label: 'Email', icon: Mail },
   { key: 'users', label: 'Users', icon: UserCog },
   { key: 'appearance', label: 'Appearance', icon: Palette },
@@ -65,6 +72,10 @@ const EMPTY_FORM = {
   job_prefix: 'RPT',
   default_quote_valid_days: 30,
   default_quote_terms: '',
+  products: [],
+  report_insecticide_guidance: '',
+  report_rodenticide_guidance: '',
+  report_declaration: '',
   smtp_host: '',
   smtp_port: '',
   smtp_username: '',
@@ -85,6 +96,13 @@ function toForm(settings) {
     ),
     default_tax_rate: Math.round((Number(settings.default_tax_rate ?? 0.2) || 0) * 10000) / 100,
     smtp_port: settings.smtp_port ?? '',
+    products: (settings.products ?? []).map((product) => ({
+      ...product,
+      active_ingredient: product.active_ingredient ?? '',
+      formulation: product.formulation ?? '',
+      registration_number: product.registration_number ?? '',
+      safety_data_sheet_ref: product.safety_data_sheet_ref ?? '',
+    })),
   }
 }
 
@@ -117,6 +135,21 @@ function toPayload(form) {
     job_prefix: String(form.job_prefix ?? 'RPT').trim().toUpperCase() || 'RPT',
     default_quote_valid_days: Math.max(Number(form.default_quote_valid_days) || 1, 1),
     default_quote_terms: optional(form.default_quote_terms),
+    // Rows left completely empty are dropped rather than saved.
+    products: form.products
+      .filter((product) => !isBlankProduct(product))
+      .map((product) => ({
+        id: product.id || null,
+        name: String(product.name ?? '').trim(),
+        category: product.category,
+        active_ingredient: optional(product.active_ingredient),
+        formulation: optional(product.formulation),
+        registration_number: optional(product.registration_number),
+        safety_data_sheet_ref: optional(product.safety_data_sheet_ref),
+      })),
+    report_insecticide_guidance: String(form.report_insecticide_guidance ?? '').trim(),
+    report_rodenticide_guidance: String(form.report_rodenticide_guidance ?? '').trim(),
+    report_declaration: String(form.report_declaration ?? '').trim(),
     smtp_host: optional(form.smtp_host),
     smtp_port: form.smtp_port === '' || form.smtp_port === null ? null : Number(form.smtp_port),
     smtp_username: optional(form.smtp_username),
@@ -257,6 +290,12 @@ export function SettingsPage() {
       return
     }
 
+    if (form.products.some((product) => !isBlankProduct(product) && !String(product.name).trim())) {
+      toastError('A product needs a name', 'Name it, or remove the row, then save again.')
+      setActiveTab('reports')
+      return
+    }
+
     setSaving(true)
     try {
       if (pendingLogo) {
@@ -267,6 +306,7 @@ export function SettingsPage() {
       }
 
       const updated = await updateSettings(toPayload(form))
+      primeCompanySettings(updated)
       setSettings(updated)
       setForm(toForm(updated))
       setDirty(false)
@@ -680,6 +720,83 @@ export function SettingsPage() {
             <SaveBar saving={saving} dirty={dirty} onSave={() => void save()} />
           </CardContent>
         </Card>
+      ) : null}
+
+      {/* ---------------------------------------------------------------- */}
+      {activeTab === 'reports' ? (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Products</CardTitle>
+              <CardDescription>
+                The products your technicians use. They pick one on a report and its active
+                ingredient, HSE/MAPP number and safety sheet are filled in for them. Editing this
+                list never changes a report that has already been written.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProductListEditor
+                products={form.products}
+                onChange={(products) => set('products', products)}
+              />
+              <div className="mt-6">
+                <SaveBar saving={saving} dirty={dirty} onSave={() => void save()} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Report wording</CardTitle>
+              <CardDescription>
+                Printed on every inspection report. Safety advice only appears when that kind of
+                product was used. Leave a box empty to leave it off.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Field
+                label="Safety advice: insecticides"
+                htmlFor="report_insecticide_guidance"
+                hint="One point per line."
+              >
+                <Textarea
+                  id="report_insecticide_guidance"
+                  rows={6}
+                  value={form.report_insecticide_guidance}
+                  onChange={(event) => set('report_insecticide_guidance', event.target.value)}
+                />
+              </Field>
+
+              <Field
+                label="Safety advice: rodenticides"
+                htmlFor="report_rodenticide_guidance"
+                hint="One point per line."
+              >
+                <Textarea
+                  id="report_rodenticide_guidance"
+                  rows={6}
+                  value={form.report_rodenticide_guidance}
+                  onChange={(event) => set('report_rodenticide_guidance', event.target.value)}
+                />
+              </Field>
+
+              <Field
+                label="Declaration"
+                htmlFor="report_declaration"
+                hint="Printed above the signatures."
+              >
+                <Textarea
+                  id="report_declaration"
+                  rows={5}
+                  value={form.report_declaration}
+                  onChange={(event) => set('report_declaration', event.target.value)}
+                />
+              </Field>
+
+              <SaveBar saving={saving} dirty={dirty} onSave={() => void save()} />
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       {/* ---------------------------------------------------------------- */}

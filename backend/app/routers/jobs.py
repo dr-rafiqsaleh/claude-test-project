@@ -241,12 +241,10 @@ async def update_job_status(
             detail="You do not have permission to perform this action",
         )
 
-    if payload.status == JobStatus.COMPLETED and not (
-        existing.findings or (existing.inspection_notes or "").strip()
-    ):
+    if payload.status == JobStatus.COMPLETED and not job_service.report_has_content(existing):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Record at least one finding or some inspection notes before completing the job",
+            detail=job_service.REPORT_EMPTY_MESSAGE,
         )
 
     try:

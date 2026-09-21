@@ -37,6 +37,67 @@ export function ReadOnlyField({ label, value, className }) {
   )
 }
 
+/**
+ * A row of tap-to-choose buttons, quicker than a dropdown on a phone.
+ *
+ * Single choice by default: `value` is a string, and tapping the chosen
+ * option again clears it. With `multiple`, `value` is an array and each
+ * option toggles.
+ */
+export function ChoiceChips({
+  options,
+  labels = {},
+  value,
+  onChange,
+  multiple = false,
+  large = false,
+  disabled = false,
+  ariaLabel,
+  className,
+}) {
+  const selected = multiple ? (value ?? []) : [value]
+
+  function toggle(option) {
+    if (multiple) {
+      onChange(
+        selected.includes(option)
+          ? selected.filter((item) => item !== option)
+          : [...selected, option],
+      )
+    } else {
+      onChange(value === option ? '' : option)
+    }
+  }
+
+  return (
+    <div role="group" aria-label={ariaLabel} className={cn('flex flex-wrap gap-2', className)}>
+      {options.map((option) => {
+        const isSelected = selected.includes(option)
+        return (
+          <button
+            key={option}
+            type="button"
+            disabled={disabled}
+            aria-pressed={isSelected}
+            onClick={() => toggle(option)}
+            className={cn(
+              'rounded-full border px-3 font-medium transition-colors duration-150',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+              large ? 'min-h-11 py-2 text-sm' : 'py-1 text-xs',
+              isSelected
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-input bg-card text-muted-foreground enabled:hover:bg-muted/50',
+            )}
+          >
+            {labels[option] ?? option}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 /** A simple checkbox with a label, sized for touch. */
 export function CheckboxField({ id, checked, onChange, label, description, disabled }) {
   return (

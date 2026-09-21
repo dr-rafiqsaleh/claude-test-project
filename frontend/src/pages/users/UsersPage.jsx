@@ -101,6 +101,7 @@ const PASSWORD_HINT =
 function buildUserSchema(isEdit) {
   return z.object({
     full_name: z.string().trim().min(1, 'Full name is required').max(120),
+    job_title: z.string().trim().max(80),
     email: z.string().trim().min(1, 'Email is required').email('Enter a valid email address'),
     password: z.string().refine(
       (value) => (isEdit && value === '') || passwordSchema.safeParse(value).success,
@@ -113,6 +114,7 @@ function buildUserSchema(isEdit) {
 
 const EMPTY_USER = {
   full_name: '',
+  job_title: '',
   email: '',
   password: '',
   role: UserRole.TECHNICIAN,
@@ -171,6 +173,7 @@ export function UsersPage() {
     setFormError(null)
     form.reset({
       full_name: user.full_name,
+      job_title: user.job_title ?? '',
       email: user.email,
       password: '',
       role: user.role,
@@ -185,6 +188,7 @@ export function UsersPage() {
       if (editing) {
         await update(editing.id, {
           full_name: values.full_name,
+          job_title: values.job_title || null,
           email: values.email,
           role: values.role,
           is_active: values.is_active,
@@ -194,6 +198,7 @@ export function UsersPage() {
       } else {
         await create({
           full_name: values.full_name,
+          job_title: values.job_title || null,
           email: values.email,
           password: values.password,
           role: values.role,
@@ -335,6 +340,11 @@ export function UsersPage() {
                         {isSelf ? (
                           <span className="ml-2 text-xs font-normal text-muted-foreground/70">(you)</span>
                         ) : null}
+                        {user.job_title ? (
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            {user.job_title}
+                          </span>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
@@ -423,6 +433,21 @@ export function UsersPage() {
                     <FormControl>
                       <Input {...field} placeholder="Olivia Office" hasError={Boolean(fieldState.error)} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="job_title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Job title</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Senior Technician" />
+                    </FormControl>
+                    <FormDescription>Printed as their position on inspection reports.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
