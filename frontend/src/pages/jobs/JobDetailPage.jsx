@@ -250,7 +250,7 @@ export function JobDetailPage() {
       await saveNow({}, { throwOnError: true })
       const updated = await updateJobStatus(job.id, status)
       setJob(updated)
-      toastSuccess('Job updated', `${job.job_number} is now ${status.replace('_', ' ')}.`)
+      toastSuccess('Visit updated', `${job.job_number} is now ${status.replace('_', ' ')}.`)
     } catch (err) {
       toastError('Could not update this job', toApiError(err).message)
     } finally {
@@ -394,7 +394,7 @@ export function JobDetailPage() {
               ) : (
                 <PlayCircle className="h-4 w-4" />
               )}
-              Start job
+              Start visit
             </Button>
           ) : null}
 
@@ -413,7 +413,7 @@ export function JobDetailPage() {
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              Complete job
+              Complete visit
             </Button>
           ) : null}
 

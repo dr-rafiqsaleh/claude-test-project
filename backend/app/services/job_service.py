@@ -26,7 +26,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from app.models.booking import Booking
+from app.models.booking import TERMINAL_STATUSES as BOOKING_TERMINAL_STATUSES
+from app.models.booking import Booking, BookingStatus
 from app.models.counter import JOB_COUNTER, Counter
 from app.models.customer import Customer
 from app.models.job import (
@@ -35,6 +36,7 @@ from app.models.job import (
     InspectionFinding,
     Job,
     JobStatus,
+    TERMINAL_STATUSES,
     RiskLevel,
     TreatmentApplied,
     TreatmentMethod,
@@ -474,6 +476,7 @@ async def update_status(
 
     job.touch()
     await job.save()
+    booking = await _sync_booking_from_job(job) or booking
 
     if status == JobStatus.COMPLETED:
         await _raise_invoice_for_job(job, user_id)
@@ -485,6 +488,90 @@ async def update_status(
         await notification_service.notify_job_completed(job.id)
 
     return job, customer, technician, booking
+
+
+# ---------------------------------------------------------------------------
+# Visit sync
+#
+# A booking and its job are one site visit: the booking is the appointment,
+# the job is the report. Their statuses move together - whichever side is
+# changed, the other follows - so nobody has to push the same visit through
+# two separate lifecycles.
+# ---------------------------------------------------------------------------
+
+#: The booking status that mirrors each job status. A pending job belongs to a
+#: visit that has not started yet, so it leaves the booking alone.
+_BOOKING_STATUS_FOR_JOB: Dict[JobStatus, BookingStatus] = {
+    JobStatus.IN_PROGRESS: BookingStatus.IN_PROGRESS,
+    JobStatus.COMPLETED: BookingStatus.COMPLETED,
+    JobStatus.CANCELLED: BookingStatus.CANCELLED,
+}
+
+
+def report_has_content(job: Job) -> bool:
+    """True once the report holds a finding or some inspection notes."""
+    return bool(job.findings or (job.inspection_notes or "").strip())
+
+
+async def find_job_for_booking(booking: Booking) -> Optional[Job]:
+    """The job carrying a booking's report, or None if the visit has not started."""
+    if booking.job_id is not None:
+        job = await Job.get(booking.job_id)
+        if job is not None:
+            return job
+    return await Job.find_one({"booking_id": booking.id})
+
+
+async def sync_job_with_booking(booking: Booking, user_id: PydanticObjectId) -> Optional[Job]:
+    """Bring a visit's job in line after its booking changed status.
+
+    Starting the visit opens its job, so the technician has a report to fill
+    in straight away. Completing or cancelling the visit takes the job with it.
+    """
+    job = await find_job_for_booking(booking)
+
+    if booking.status == BookingStatus.CANCELLED:
+        if job is not None and job.status not in TERMINAL_STATUSES:
+            job, *_ = await update_status(job.id, JobStatus.CANCELLED, user_id)
+        return job
+
+    if booking.status not in (BookingStatus.IN_PROGRESS, BookingStatus.COMPLETED):
+        return job
+
+    if job is None:
+        job, *_ = await create_job_from_booking(booking.id, user_id)
+    booking.job_id = job.id  # keep the caller's copy current for its response
+
+    if job.status == JobStatus.PENDING:
+        job, *_ = await update_status(job.id, JobStatus.IN_PROGRESS, user_id)
+    if booking.status == BookingStatus.COMPLETED and job.status == JobStatus.IN_PROGRESS:
+        job, *_ = await update_status(job.id, JobStatus.COMPLETED, user_id)
+    return job
+
+
+async def _sync_booking_from_job(job: Job) -> Optional[Booking]:
+    """Move a visit's booking to match its job, which has just changed status.
+
+    Writes the booking directly: going through booking_service would sync
+    straight back to this job.
+    """
+    booking = await Booking.get(job.booking_id)
+    target = _BOOKING_STATUS_FOR_JOB.get(job.status)
+    if booking is None or target is None or booking.status == target:
+        return booking
+    if booking.status in BOOKING_TERMINAL_STATUSES:
+        return booking
+
+    booking.status = target
+    booking.job_id = job.id
+    if target == BookingStatus.IN_PROGRESS:
+        booking.actual_start = job.actual_start
+    elif target == BookingStatus.COMPLETED:
+        booking.actual_start = booking.actual_start or job.actual_start
+        booking.actual_end = job.actual_end
+    booking.touch()
+    await booking.save()
+    return booking
 
 
 async def update_signature(

@@ -20,7 +20,11 @@ from app.schemas.booking import BookingCreate, BookingUpdate, QuoteToBookingRequ
 
 #: Allowed status transitions for the booking lifecycle.
 ALLOWED_TRANSITIONS: Dict[BookingStatus, Set[BookingStatus]] = {
-    BookingStatus.SCHEDULED: {BookingStatus.CONFIRMED, BookingStatus.CANCELLED},
+    BookingStatus.SCHEDULED: {
+        BookingStatus.CONFIRMED,
+        BookingStatus.IN_PROGRESS,
+        BookingStatus.CANCELLED,
+    },
     BookingStatus.CONFIRMED: {BookingStatus.IN_PROGRESS, BookingStatus.CANCELLED},
     BookingStatus.IN_PROGRESS: {BookingStatus.COMPLETED, BookingStatus.CANCELLED},
     BookingStatus.COMPLETED: set(),
@@ -520,8 +524,16 @@ async def update_status(
     booking_id: "PydanticObjectId | str",
     status: BookingStatus,
     reason: Optional[str] = None,
+    user_id: Optional[PydanticObjectId] = None,
 ) -> Tuple[Booking, Optional[Customer], Optional[User], Optional[Quote]]:
-    """Move a booking to a new status, enforcing the lifecycle state machine."""
+    """Move a booking to a new status, enforcing the lifecycle state machine.
+
+    The booking's job follows it (see job_service.sync_job_with_booking), and a
+    visit can only be completed once its report has something in it.
+    """
+    # Imported lazily: job_service imports the booking model at module scope.
+    from app.services import job_service  # noqa: PLC0415
+
     booking, customer, technician, quote = await get_booking(booking_id)
 
     if status == booking.status:
@@ -532,6 +544,14 @@ async def update_status(
         raise BookingStateError(
             f"Cannot change a {booking.status.value} booking to {status.value}"
         )
+
+    if status == BookingStatus.COMPLETED:
+        job = await job_service.find_job_for_booking(booking)
+        if job is None or not job_service.report_has_content(job):
+            raise BookingStateError(
+                "Record at least one finding or some inspection notes in the visit "
+                "report before completing it"
+            )
 
     now = datetime.utcnow()
     booking.status = status
@@ -547,6 +567,7 @@ async def update_status(
 
     booking.touch()
     await booking.save()
+    await job_service.sync_job_with_booking(booking, user_id or booking.created_by)
     return booking, customer, technician, quote
 
 

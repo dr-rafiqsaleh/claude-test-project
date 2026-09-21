@@ -137,7 +137,7 @@ export function JobReportFormPage() {
     try {
       const updated = await updateJobStatus(job.id, JOB_STATUS.IN_PROGRESS)
       setJob(updated)
-      toastSuccess('Job started', 'Your start time has been recorded.')
+      toastSuccess('Visit started', 'Your start time has been recorded.')
     } catch (err) {
       toastError('Could not start the job', toApiError(err).message)
     } finally {
@@ -213,7 +213,7 @@ export function JobReportFormPage() {
       setJob(updated)
       setCompleted(true)
       setSignatures({ customer: null, technician: null })
-      toastSuccess('Job completed', 'The inspection report is ready.')
+      toastSuccess('Visit completed', 'The inspection report is ready.')
     } catch (err) {
       toastError('Could not complete the job', toApiError(err).message)
     } finally {
@@ -288,7 +288,7 @@ export function JobReportFormPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                Job completed
+                Visit completed
               </h1>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {job.job_number} is signed off. Report will be generated.
@@ -364,10 +364,10 @@ export function JobReportFormPage() {
         </div>
       </Step>
 
-      {/* Step 2 - Start the job ----------------------------------------- */}
+      {/* Step 2 - Start the visit ----------------------------------------- */}
       <Step
         number={2}
-        title="Start the job"
+        title="Start the visit"
         icon={PlayCircle}
         description={
           job.actual_start
@@ -386,7 +386,7 @@ export function JobReportFormPage() {
             ) : (
               <PlayCircle className="h-5 w-5" />
             )}
-            Start job
+            Start visit
           </Button>
         ) : (
           <div className="flex items-center gap-2 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
@@ -618,7 +618,7 @@ export function JobReportFormPage() {
                 ) : (
                   <CheckCircle2 className="h-5 w-5" />
                 )}
-                {working ? 'Completing...' : 'Complete job'}
+                {working ? 'Completing...' : 'Complete visit'}
               </Button>
               {!hasReportContent ? (
                 <p className="text-center text-xs text-slate-500 dark:text-slate-400">

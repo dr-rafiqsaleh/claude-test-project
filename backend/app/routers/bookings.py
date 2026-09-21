@@ -9,7 +9,6 @@ All routes require authentication.
 * Only admins may delete a booking.
 """
 
-import logging
 from datetime import datetime
 from typing import Optional
 
@@ -45,7 +44,6 @@ from app.services.booking_service import (
     build_booking_payload,
 )
 
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/bookings", tags=["bookings"])
 
@@ -69,30 +67,6 @@ def _assert_can_view(user: User, payload: dict) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only view bookings assigned to you",
         )
-
-
-async def _open_job_for(booking, user: User) -> None:
-    """Create the job that carries a completed booking's inspection report.
-
-    Imported lazily: ``job_service`` reads bookings, so importing it at module
-    scope would close an import cycle.
-    """
-    from app.services import job_service  # noqa: PLC0415 - deliberate lazy import
-
-    try:
-        job, _customer, _technician, _booking = await job_service.create_job_from_booking(
-            booking.id,
-            user_id=user.id,
-        )
-    except job_service.JobAlreadyExistsError:
-        # Another request got there first; nothing more to do.
-        return
-    except Exception:  # noqa: BLE001 - never fail the status change over this
-        logger.exception("Could not open a job for booking %s", booking.booking_number)
-        return
-
-    booking.job_id = job.id
-    logger.info("Opened job %s for booking %s", job.job_number, booking.booking_number)
 
 
 # ---------------------------------------------------------------------------
@@ -359,15 +333,21 @@ async def update_booking_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     if _is_technician(current_user):
+        # A technician runs their own visits end to end: start on arrival,
+        # complete once the report is filed.
         assigned = existing.technician_id is not None and str(existing.technician_id) == str(current_user.id)
-        finishing_own_job = (
+        starting = (
+            existing.status in (BookingStatus.SCHEDULED, BookingStatus.CONFIRMED)
+            and payload.status == BookingStatus.IN_PROGRESS
+        )
+        finishing = (
             existing.status == BookingStatus.IN_PROGRESS
             and payload.status == BookingStatus.COMPLETED
         )
-        if not assigned or not finishing_own_job:
+        if not assigned or not (starting or finishing):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Technicians can only complete a job they have already started",
+                detail="Technicians can only start and complete visits assigned to them",
             )
     elif current_user.role not in (UserRole.ADMIN, UserRole.OFFICE_STAFF):
         raise HTTPException(
@@ -380,15 +360,12 @@ async def update_booking_status(
             booking_id,
             payload.status,
             reason=payload.reason,
+            user_id=current_user.id,
         )
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BookingStateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-
-    # Completing a booking opens the job that carries the inspection report.
-    if booking.status == BookingStatus.COMPLETED and booking.job_id is None:
-        await _open_job_for(booking, current_user)
 
     payload_out = build_booking_payload(booking, customer, technician, quote)
 

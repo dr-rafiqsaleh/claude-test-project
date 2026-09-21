@@ -24,7 +24,6 @@ import {
 } from 'lucide-react'
 
 import { updateBookingStatus } from '@/api/bookings'
-import { createJobFromBooking } from '@/api/jobs'
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -109,45 +108,31 @@ export function BookingDetailPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [cancelError, setCancelError] = useState(null)
 
-  async function changeStatus(status, reason, { thenGoToNewJob = false } = {}) {
-    if (!booking) return false
+  async function changeStatus(status, reason) {
+    if (!booking) return null
     setTransitioning(true)
     try {
       const updated = await updateBookingStatus(booking.id, status, reason)
       setBooking(updated)
       toastSuccess(
-        'Booking updated',
+        'Visit updated',
         `${booking.booking_number} is now ${BOOKING_STATUS_LABELS[status].toLowerCase()}.`,
       )
-
-      if (thenGoToNewJob) {
-        // Completing a booking opens the job that carries the inspection
-        // report. The API creates it automatically, so only fall back to an
-        // explicit create when it did not.
-        let jobId = updated.job_id
-        if (!jobId) {
-          try {
-            const job = await createJobFromBooking(booking.id)
-            jobId = job.id
-          } catch (jobError) {
-            toastError('Could not open the job', toApiError(jobError).message)
-          }
-        }
-
-        if (jobId) {
-          toastSuccess('Job opened', 'Fill in the inspection report on site.')
-          navigate(`/jobs/${jobId}/report`)
-        }
-      }
-      return true
+      return updated
     } catch (err) {
-      const apiError = toApiError(err, 'Could not update this booking')
+      const apiError = toApiError(err, 'Could not update this visit')
       toastError('Update failed', apiError.message)
       setCancelError(apiError.message)
-      return false
+      return null
     } finally {
       setTransitioning(false)
     }
+  }
+
+  /** Starting the visit opens its report; technicians go straight to it. */
+  async function startVisit() {
+    const updated = await changeStatus(BOOKING_STATUS.IN_PROGRESS)
+    if (updated?.job_id && isTechnician) navigate(`/jobs/${updated.job_id}/report`)
   }
 
   async function submitCancellation() {
@@ -190,7 +175,14 @@ export function BookingDetailPage() {
 
   const isScheduled = booking.status === BOOKING_STATUS.SCHEDULED
   const isConfirmed = booking.status === BOOKING_STATUS.CONFIRMED
-  const isInProgress = booking.status === BOOKING_STATUS.IN_PROGRESS
+  const isAssigned = Boolean(booking.technician_id && booking.technician_id === user?.id)
+  const canRunVisit = canWrite || isAssigned
+  // Technicians fill the report in on the phone form; the office uses the full page.
+  const reportPath = booking.job_id
+    ? isTechnician
+      ? `/jobs/${booking.job_id}/report`
+      : `/jobs/${booking.job_id}`
+    : null
   const isTerminal =
     booking.status === BOOKING_STATUS.COMPLETED || booking.status === BOOKING_STATUS.CANCELLED
   const editable = EDITABLE_BOOKING_STATUSES.includes(booking.status)
@@ -236,56 +228,43 @@ export function BookingDetailPage() {
             </Button>
           ) : null}
 
-          {booking.job_id ? (
-            <Button asChild variant="outline">
-              <Link to={`/jobs/${booking.job_id}`}>
-                <ClipboardList className="h-4 w-4" />
-                View job
-              </Link>
-            </Button>
-          ) : null}
-
           {canWrite && isScheduled ? (
             <Button
+              variant="outline"
               disabled={transitioning}
               onClick={() => void changeStatus(BOOKING_STATUS.CONFIRMED)}
             >
-              {transitioning ? (
-                <Spinner size="sm" className="text-white" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
+              <CheckCircle2 className="h-4 w-4" />
               Confirm
             </Button>
           ) : null}
 
-          {canWrite && isConfirmed ? (
-            <Button
-              disabled={transitioning}
-              onClick={() => void changeStatus(BOOKING_STATUS.IN_PROGRESS)}
-            >
+          {canRunVisit && (isScheduled || isConfirmed) ? (
+            <Button disabled={transitioning} onClick={() => void startVisit()}>
               {transitioning ? (
                 <Spinner size="sm" className="text-white" />
               ) : (
                 <PlayCircle className="h-4 w-4" />
               )}
-              Start job
+              Start visit
             </Button>
           ) : null}
 
-          {isInProgress ? (
-            <Button
-              disabled={transitioning}
-              onClick={() =>
-                void changeStatus(BOOKING_STATUS.COMPLETED, undefined, { thenGoToNewJob: true })
-              }
-            >
-              {transitioning ? (
-                <Spinner size="sm" className="text-white" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
-              Complete job
+          {reportPath && !isTerminal ? (
+            <Button asChild>
+              <Link to={reportPath}>
+                <ClipboardList className="h-4 w-4" />
+                Open report
+              </Link>
+            </Button>
+          ) : null}
+
+          {reportPath && isTerminal ? (
+            <Button asChild variant="outline">
+              <Link to={`/jobs/${booking.job_id}`}>
+                <ClipboardList className="h-4 w-4" />
+                View report
+              </Link>
             </Button>
           ) : null}
 

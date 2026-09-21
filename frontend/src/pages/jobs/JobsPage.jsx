@@ -10,13 +10,11 @@ import {
   FileText,
   MoreHorizontal,
   Pencil,
-  Plus,
   Search,
   Trash2,
 } from 'lucide-react'
 
-import { listBookings } from '@/api/bookings'
-import { createJobFromBooking, downloadJobReport } from '@/api/jobs'
+import { downloadJobReport } from '@/api/jobs'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,14 +28,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,8 +58,6 @@ import { cn, formatBookingDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import {
   ALL_JOB_STATUSES,
-  BOOKING_STATUS,
-  BOOKING_STATUS_LABELS,
   DELETABLE_JOB_STATUSES,
   EDITABLE_JOB_STATUSES,
   JOB_STATUS,
@@ -102,7 +90,6 @@ export function JobsPage() {
   const [pendingDelete, setPendingDelete] = useState(null)
   const [working, setWorking] = useState(false)
   const [downloadingId, setDownloadingId] = useState(null)
-  const [newJobOpen, setNewJobOpen] = useState(false)
 
   const debouncedSearch = useDebounce(search, 350)
   const { technicians } = useTechnicians(canWrite)
@@ -186,12 +173,6 @@ export function JobsPage() {
           </p>
         </div>
 
-        {canWrite ? (
-          <Button onClick={() => setNewJobOpen(true)}>
-            <Plus className="h-4 w-4" />
-            New job from booking
-          </Button>
-        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-1 rounded-md border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
@@ -310,17 +291,12 @@ export function JobsPage() {
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {isFiltered
                   ? 'Try a different search term or clear the filters.'
-                  : 'A job opens automatically when a booking is completed, or start one from a booking below.'}
+                  : "A visit's report opens as soon as the visit is started from its booking."}
               </p>
             </div>
             {isFiltered ? (
               <Button variant="outline" onClick={clearFilters}>
                 Clear filters
-              </Button>
-            ) : canWrite ? (
-              <Button onClick={() => setNewJobOpen(true)}>
-                <Plus className="h-4 w-4" />
-                New job from booking
               </Button>
             ) : null}
           </div>
@@ -486,16 +462,6 @@ export function JobsPage() {
         )}
       </Card>
 
-      <NewJobDialog
-        open={newJobOpen}
-        onOpenChange={setNewJobOpen}
-        onCreated={(job) => {
-          setNewJobOpen(false)
-          void refetch()
-          navigate(`/jobs/${job.id}`)
-        }}
-      />
-
       <AlertDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => {
@@ -527,137 +493,6 @@ export function JobsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
-}
-
-/** Picks a confirmed/in-progress/completed booking that has no job yet, and opens a job against it. */
-function NewJobDialog({ open, onOpenChange, onCreated }) {
-  const [bookings, setBookings] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [selected, setSelected] = useState('')
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    const controller = new AbortController()
-    let cancelled = false
-
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        // Fetch confirmed, in-progress and completed bookings without a job in parallel
-        const [confirmed, inProgress, completed] = await Promise.all([
-          listBookings({ page: 1, page_size: 100, status: BOOKING_STATUS.CONFIRMED, no_job: true }, controller.signal),
-          listBookings({ page: 1, page_size: 100, status: BOOKING_STATUS.IN_PROGRESS, no_job: true }, controller.signal),
-          listBookings({ page: 1, page_size: 100, status: BOOKING_STATUS.COMPLETED, no_job: true }, controller.signal),
-        ])
-        if (cancelled) return
-        const all = [
-          ...(completed?.items ?? []),
-          ...(inProgress?.items ?? []),
-          ...(confirmed?.items ?? []),
-        ]
-        setBookings(all)
-        setSelected(all[0]?.id ?? '')
-      } catch (err) {
-        if (cancelled) return
-        setError(toApiError(err, 'Could not load bookings').message)
-        setBookings([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void load()
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [open])
-
-  async function handleCreate() {
-    if (!selected) return
-    setCreating(true)
-    setError(null)
-    try {
-      const job = await createJobFromBooking(selected)
-      toastSuccess('Job created', `${job.job_number} is ready for the technician.`)
-      onCreated(job)
-    } catch (err) {
-      const apiError = toApiError(err, 'Could not create the job')
-      setError(apiError.message)
-      toastError('Could not create the job', apiError.message)
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(next) => !creating && onOpenChange(next)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New job from a booking</DialogTitle>
-          <DialogDescription>
-            Pick a confirmed or completed booking that has no job yet. The customer, technician,
-            schedule and service details are copied across.
-          </DialogDescription>
-        </DialogHeader>
-
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Spinner />
-          </div>
-        ) : bookings.length === 0 ? (
-          <p className="py-4 text-sm text-slate-500 dark:text-slate-400">
-            No confirmed or completed bookings without a job were found. Confirm a booking first, or complete another booking.
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            <Label htmlFor="new-job-booking">Booking</Label>
-            <select
-              id="new-job-booking"
-              value={selected}
-              onChange={(event) => setSelected(event.target.value)}
-              className={SELECT_CLASSES}
-            >
-              {bookings.map((booking) => (
-                <option key={booking.id} value={booking.id}>
-                  {booking.booking_number} ({BOOKING_STATUS_LABELS[booking.status] ?? booking.status}) —{' '}
-                  {booking.customer_name ?? 'Unknown'} —{' '}
-                  {formatBookingDateTime(booking.scheduled_start)}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {error ? (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        ) : null}
-
-        <DialogFooter>
-          <Button variant="outline" disabled={creating} onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={creating || !selected || bookings.length === 0}
-            onClick={() => void handleCreate()}
-          >
-            {creating ? <Spinner size="sm" className="text-white" /> : <Plus className="h-4 w-4" />}
-            {creating ? 'Creating...' : 'Create job'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 

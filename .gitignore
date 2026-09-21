@@ -75,3 +75,6 @@ Thumbs.db
 logs/
 tmp/
 .cache/
+
+# Local data backups written by maintenance scripts
+backups/
