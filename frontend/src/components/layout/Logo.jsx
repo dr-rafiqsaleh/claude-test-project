@@ -41,7 +41,7 @@ export function Logo({ className, size = 32, textClassName, subtitle }) {
       <div className="flex flex-col leading-none">
         <span className={cn('text-lg font-bold tracking-tight', textClassName)}>QKil</span>
         {subtitle ? (
-          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-slate-400">
+          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
             {subtitle}
           </span>
         ) : null}

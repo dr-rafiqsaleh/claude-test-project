@@ -8,10 +8,10 @@ function Detail({ label, value }) {
   if (!value) return null
   return (
     <div className="min-w-0">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="break-words text-sm text-slate-800 dark:text-slate-200">{value}</p>
+      <p className="break-words text-sm text-foreground">{value}</p>
     </div>
   )
 }
@@ -21,16 +21,16 @@ export function TreatmentCard({ treatment, index, editable = false, onDelete, cl
   return (
     <div
       className={cn(
-        'space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900',
+        'space-y-3 rounded-lg border border-border bg-card p-4',
         className,
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
             Treatment {index + 1}
           </span>
-          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <h4 className="text-sm font-semibold text-foreground">
             {treatment.pest_type}
           </h4>
           <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
@@ -43,7 +43,7 @@ export function TreatmentCard({ treatment, index, editable = false, onDelete, cl
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={onDelete}
             aria-label={`Delete treatment ${index + 1}`}
           >

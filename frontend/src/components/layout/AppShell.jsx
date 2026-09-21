@@ -15,8 +15,8 @@ function FieldShell() {
   const navigate = useNavigate()
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
-      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 dark:border-slate-800 dark:bg-slate-900">
+    <div className="flex min-h-screen flex-col bg-muted/50">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-3">
         <Button
           variant="ghost"
           size="icon"
@@ -46,7 +46,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex h-full min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-full min-h-screen bg-muted/50">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex min-w-0 flex-1 flex-col">

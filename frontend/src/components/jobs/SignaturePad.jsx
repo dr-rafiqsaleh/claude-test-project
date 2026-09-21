@@ -145,12 +145,12 @@ export function SignaturePad({
   return (
     <div className={cn('space-y-2', className)} ref={containerRef}>
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <PenLine className="h-3.5 w-3.5" />
           {label}
         </p>
         {saved ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
             <Check className="h-3.5 w-3.5" />
             Captured
           </span>
@@ -162,7 +162,7 @@ export function SignaturePad({
           <canvas
             ref={canvasRef}
             aria-label={`${label} drawing area`}
-            className="touch-none rounded-md border border-slate-300 bg-white dark:border-slate-600"
+            className="touch-none rounded-md border border-input bg-card"
             style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
           />
           <div className="flex flex-wrap gap-2">
@@ -195,12 +195,12 @@ export function SignaturePad({
             <img
               src={existingSignature}
               alt={`${label} (captured)`}
-              className="rounded-md border border-slate-300 bg-white dark:border-slate-600"
+              className="rounded-md border border-input bg-card"
               style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, objectFit: 'contain' }}
             />
           ) : (
             <div
-              className="flex items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400 dark:border-slate-600 dark:bg-slate-900"
+              className="flex items-center justify-center rounded-md border border-dashed border-input bg-muted/50 text-sm text-muted-foreground/70"
               style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
             >
               Not signed

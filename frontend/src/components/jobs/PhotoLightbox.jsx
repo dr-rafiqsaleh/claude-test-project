@@ -25,7 +25,7 @@ export function PhotoLightbox({ jobId, photo, open, onOpenChange }) {
           <img
             src={getPhotoUrl(jobId, photo.id)}
             alt={photo.filename}
-            className="max-h-[70vh] w-full rounded-md bg-slate-100 object-contain dark:bg-slate-800"
+            className="max-h-[70vh] w-full rounded-md bg-muted object-contain"
           />
         ) : null}
       </DialogContent>

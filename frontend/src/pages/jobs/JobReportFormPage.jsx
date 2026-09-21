@@ -48,18 +48,18 @@ function Step({ number, title, description, icon: Icon, children, muted = false 
   return (
     <section
       className={cn(
-        'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900',
+        'rounded-xl border border-border bg-card p-4 shadow-sm',
         muted && 'opacity-60',
       )}
     >
       <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
           {Icon ? <Icon className="h-4 w-4" /> : number}
         </div>
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
           {description ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           ) : null}
         </div>
       </div>
@@ -246,9 +246,9 @@ export function JobReportFormPage() {
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <p className="font-medium text-slate-900 dark:text-slate-100">Job not found</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="font-medium text-foreground">Job not found</p>
+            <p className="text-sm text-muted-foreground">
               {error?.message ?? 'This job may have been removed.'}
             </p>
             <Button variant="outline" onClick={() => void refetch()}>
@@ -283,14 +283,14 @@ export function JobReportFormPage() {
       <div className="mx-auto max-w-2xl space-y-4 px-4 py-8">
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-14 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
-              <PartyPopper className="h-8 w-8 text-emerald-600" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15">
+              <PartyPopper className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+              <h1 className="text-xl font-semibold text-foreground">
                 Visit completed
               </h1>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {job.job_number} is signed off. Report will be generated.
               </p>
             </div>
@@ -298,7 +298,7 @@ export function JobReportFormPage() {
             <div className="flex flex-col gap-2 pt-2 sm:flex-row">
               <Button disabled={downloading} onClick={() => void handleDownload()}>
                 {downloading ? (
-                  <Spinner size="sm" className="text-white" />
+                  <Spinner size="sm" className="text-current" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
@@ -328,15 +328,15 @@ export function JobReportFormPage() {
           </div>
 
           <div className="flex items-start gap-3">
-            <UserIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+            <UserIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              <p className="text-sm font-medium text-foreground">
                 {job.customer_name ?? 'Unknown customer'}
               </p>
               {job.customer_phone ? (
                 <a
                   href={`tel:${job.customer_phone.replace(/\s+/g, '')}`}
-                  className="inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline dark:text-emerald-400"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                 >
                   <Phone className="h-3.5 w-3.5" />
                   {job.customer_phone}
@@ -346,19 +346,19 @@ export function JobReportFormPage() {
           </div>
 
           <div className="flex items-start gap-3">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-            <p className="text-sm text-slate-700 dark:text-slate-300">{address}</p>
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
+            <p className="text-sm text-foreground">{address}</p>
           </div>
 
           <div className="flex items-start gap-3">
-            <Bug className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-            <p className="text-sm text-slate-700 dark:text-slate-300">
+            <Bug className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
+            <p className="text-sm text-foreground">
               {job.service_type}
               {job.pest_types?.length ? ` - ${job.pest_types.join(', ')}` : ''}
             </p>
           </div>
 
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-muted-foreground">
             Scheduled {formatBookingDateTime(job.scheduled_start)}
           </p>
         </div>
@@ -382,14 +382,14 @@ export function JobReportFormPage() {
             onClick={() => void handleStart()}
           >
             {working ? (
-              <Spinner size="sm" className="text-white" />
+              <Spinner size="sm" className="text-current" />
             ) : (
               <PlayCircle className="h-5 w-5" />
             )}
             Start visit
           </Button>
         ) : (
-          <div className="flex items-center gap-2 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <div className="flex items-center gap-2 rounded-md bg-primary/10 p-3 text-sm text-primary">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             Started {formatBookingDateTime(job.actual_start)}
           </div>
@@ -614,14 +614,14 @@ export function JobReportFormPage() {
                 onClick={() => void handleComplete()}
               >
                 {working ? (
-                  <Spinner size="sm" className="text-white" />
+                  <Spinner size="sm" className="text-current" />
                 ) : (
                   <CheckCircle2 className="h-5 w-5" />
                 )}
                 {working ? 'Completing...' : 'Complete visit'}
               </Button>
               {!hasReportContent ? (
-                <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-center text-xs text-muted-foreground">
                   Add at least one finding or some inspection notes before completing.
                 </p>
               ) : null}
@@ -630,7 +630,7 @@ export function JobReportFormPage() {
         </div>
       </Step>
 
-      <p className="pt-2 text-center text-xs text-slate-400">
+      <p className="pt-2 text-center text-xs text-muted-foreground/70">
         {saveState === 'saving'
           ? 'Saving...'
           : saveState === 'saved'

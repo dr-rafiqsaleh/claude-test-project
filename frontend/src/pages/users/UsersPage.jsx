@@ -4,8 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -26,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
@@ -226,32 +225,23 @@ export function UsersPage() {
 
   const submitting = form.formState.isSubmitting
   const isFiltered = Boolean(debouncedSearch.trim()) || roleFilter !== ANY || statusFilter !== 'all'
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            Users
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Manage staff accounts and what each person can access.
-          </p>
-        </div>
-
-        <Button onClick={openCreate}>
+      <PageHeader
+        title="Users"
+        description="Manage staff accounts and what each person can access."
+        actions={<Button onClick={openCreate}>
           <Plus className="h-4 w-4" />
           New user
-        </Button>
-      </div>
+        </Button>}
+      />
 
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -298,30 +288,13 @@ export function UsersPage() {
         {loading ? (
           <LoadingState message="Loading users..." />
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Could not load users</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
-            </div>
-            <Button variant="outline" onClick={() => void refetch()}>
-              Try again
-            </Button>
-          </div>
+          <ErrorState title="Could not load users" message={error.message} onRetry={refetch} />
         ) : users.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <UserCog className="h-6 w-6 text-slate-400" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
-                {isFiltered ? 'No users match your filters' : 'No users yet'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {isFiltered ? 'Try a different search or clear the filters.' : 'Create the first staff account.'}
-              </p>
-            </div>
-            {isFiltered ? (
+          <EmptyState
+            icon={UserCog}
+            title={isFiltered ? 'No users match your filters' : 'No users yet'}
+            description={isFiltered ? 'Try a different search or clear the filters.' : 'Create the first staff account.'}
+            action={isFiltered ? (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -338,7 +311,7 @@ export function UsersPage() {
                 New user
               </Button>
             )}
-          </div>
+          />
         ) : (
           <>
             <Table>
@@ -357,13 +330,13 @@ export function UsersPage() {
                   const isSelf = currentUser?.id === user.id
                   return (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                      <TableCell className="font-medium text-foreground">
                         {user.full_name}
                         {isSelf ? (
-                          <span className="ml-2 text-xs font-normal text-slate-400">(you)</span>
+                          <span className="ml-2 text-xs font-normal text-muted-foreground/70">(you)</span>
                         ) : null}
                       </TableCell>
-                      <TableCell className="text-slate-600 dark:text-slate-400">{user.email}</TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={ROLE_BADGE[user.role]}>{ROLE_LABELS[user.role]}</Badge>
                       </TableCell>
@@ -372,7 +345,7 @@ export function UsersPage() {
                           {user.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden text-slate-600 dark:text-slate-400 md:table-cell">
+                      <TableCell className="hidden text-muted-foreground md:table-cell">
                         {formatDate(user.created_at)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -391,7 +364,7 @@ export function UsersPage() {
                             <DropdownMenuItem
                               disabled={isSelf || !user.is_active}
                               onSelect={() => setPendingDeactivate(user)}
-                              className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                             >
                               <UserX className="h-4 w-4" />
                               Deactivate
@@ -405,37 +378,7 @@ export function UsersPage() {
               </TableBody>
             </Table>
 
-            <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row dark:border-slate-800">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Showing <span className="font-medium">{rangeStart}</span>-
-                <span className="font-medium">{rangeEnd}</span> of{' '}
-                <span className="font-medium">{total}</span>
-              </p>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="px-2 text-sm text-slate-600 dark:text-slate-400">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </>
         )}
       </Card>
@@ -462,7 +405,7 @@ export function UsersPage() {
           {formError ? (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{formError}</span>
@@ -594,7 +537,7 @@ export function UsersPage() {
                 <Button type="submit" disabled={submitting}>
                   {submitting ? (
                     <>
-                      <Spinner size="sm" className="text-white" />
+                      <Spinner size="sm" className="text-current" />
                       Saving...
                     </>
                   ) : isEdit ? (
@@ -628,7 +571,7 @@ export function UsersPage() {
             <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={deactivating}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void confirmDeactivate()

@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
   Download,
   Eye,
@@ -27,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -156,26 +154,17 @@ export function JobsPage() {
     setSearchParams(next, { replace: true })
   }
 
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            Jobs
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {user?.role === UserRole.TECHNICIAN
-              ? 'Your on-site work and inspection reports.'
-              : 'Track on-site work, inspection reports and sign-offs.'}
-          </p>
-        </div>
+      <PageHeader
+        title="Jobs"
+        description={user?.role === UserRole.TECHNICIAN
+        ? 'Your on-site work and inspection reports.'
+        : 'Track on-site work, inspection reports and sign-offs.'}
+      />
 
-      </div>
-
-      <div className="flex flex-wrap gap-1 rounded-md border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex flex-wrap gap-1 rounded-md border border-border bg-card p-1">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -184,8 +173,8 @@ export function JobsPage() {
             className={cn(
               'rounded px-3 py-1.5 text-sm font-medium transition-colors',
               statusFilter === tab.key
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted',
             )}
           >
             {tab.label}
@@ -197,7 +186,7 @@ export function JobsPage() {
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -226,7 +215,7 @@ export function JobsPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="space-y-1.5">
-              <Label htmlFor="job-date-from" className="text-xs text-slate-500">
+              <Label htmlFor="job-date-from" className="text-xs text-muted-foreground">
                 From
               </Label>
               <Input
@@ -238,7 +227,7 @@ export function JobsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="job-date-to" className="text-xs text-slate-500">
+              <Label htmlFor="job-date-to" className="text-xs text-muted-foreground">
                 To
               </Label>
               <Input
@@ -269,37 +258,20 @@ export function JobsPage() {
         {loading ? (
           <LoadingState message="Loading jobs..." />
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Could not load jobs</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
-            </div>
-            <Button variant="outline" onClick={() => void refetch()}>
-              Try again
-            </Button>
-          </div>
+          <ErrorState title="Could not load jobs" message={error.message} onRetry={refetch} />
         ) : jobs.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <ClipboardList className="h-6 w-6 text-slate-400" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
-                {isFiltered ? 'No jobs match your filters' : 'No jobs yet'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {isFiltered
-                  ? 'Try a different search term or clear the filters.'
-                  : "A visit's report opens as soon as the visit is started from its booking."}
-              </p>
-            </div>
-            {isFiltered ? (
+          <EmptyState
+            icon={ClipboardList}
+            title={isFiltered ? 'No jobs match your filters' : 'No jobs yet'}
+            description={isFiltered
+            ? 'Try a different search term or clear the filters.'
+            : "A visit's report opens as soon as the visit is started from its booking."}
+            action={isFiltered ? (
               <Button variant="outline" onClick={clearFilters}>
                 Clear filters
               </Button>
             ) : null}
-          </div>
+          />
         ) : (
           <>
             <Table>
@@ -327,19 +299,19 @@ export function JobsPage() {
                       className="cursor-pointer"
                       onClick={() => navigate(`/jobs/${job.id}`)}
                     >
-                      <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                      <TableCell className="font-medium text-foreground">
                         {job.job_number}
                       </TableCell>
-                      <TableCell className="text-slate-600 dark:text-slate-400">
+                      <TableCell className="text-muted-foreground">
                         {job.customer_name ?? '--'}
                       </TableCell>
-                      <TableCell className="hidden text-slate-600 dark:text-slate-400 lg:table-cell">
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">
                         {job.technician_name ?? 'Unassigned'}
                       </TableCell>
-                      <TableCell className="hidden text-slate-600 dark:text-slate-400 md:table-cell">
+                      <TableCell className="hidden text-muted-foreground md:table-cell">
                         {job.service_type}
                       </TableCell>
-                      <TableCell className="text-slate-600 dark:text-slate-400">
+                      <TableCell className="text-muted-foreground">
                         {formatBookingDateTime(job.scheduled_start)}
                       </TableCell>
                       <TableCell>
@@ -349,7 +321,7 @@ export function JobsPage() {
                         {job.overall_risk_level ? (
                           <RiskLevelBadge level={job.overall_risk_level} />
                         ) : (
-                          <span className="text-sm text-slate-400">--</span>
+                          <span className="text-sm text-muted-foreground/70">--</span>
                         )}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
@@ -358,7 +330,7 @@ export function JobsPage() {
                         ) : completed ? (
                           <Badge variant="secondary">Ready</Badge>
                         ) : (
-                          <span className="text-sm text-slate-400">--</span>
+                          <span className="text-sm text-muted-foreground/70">--</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -410,7 +382,7 @@ export function JobsPage() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onSelect={() => setPendingDelete(job)}
-                                    className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                     Delete
@@ -427,37 +399,7 @@ export function JobsPage() {
               </TableBody>
             </Table>
 
-            <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row dark:border-slate-800">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Showing <span className="font-medium">{rangeStart}</span>-
-                <span className="font-medium">{rangeEnd}</span> of{' '}
-                <span className="font-medium">{total}</span>
-              </p>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="px-2 text-sm text-slate-600 dark:text-slate-400">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </>
         )}
       </Card>
@@ -481,7 +423,7 @@ export function JobsPage() {
             <AlertDialogCancel disabled={working}>Keep job</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void confirmDelete()

@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   MoreHorizontal,
   Pencil,
@@ -26,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -119,22 +117,13 @@ export function CustomersPage() {
   }
 
   const isFiltered = Boolean(debouncedSearch.trim()) || statusFilter !== 'active' || countyFilter !== ANY
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            Customers
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Manage the customer records behind every quote, booking and job.
-          </p>
-        </div>
-
-        {canWrite ? (
+      <PageHeader
+        title="Customers"
+        description="Manage the customer records behind every quote, booking and job."
+        actions={canWrite ? (
           <Button asChild>
             <Link to="/customers/new">
               <Plus className="h-4 w-4" />
@@ -142,13 +131,13 @@ export function CustomersPage() {
             </Link>
           </Button>
         ) : null}
-      </div>
+      />
 
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -192,32 +181,15 @@ export function CustomersPage() {
         {loading ? (
           <LoadingState message="Loading customers..." />
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Could not load customers</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
-            </div>
-            <Button variant="outline" onClick={() => void refetch()}>
-              Try again
-            </Button>
-          </div>
+          <ErrorState title="Could not load customers" message={error.message} onRetry={refetch} />
         ) : customers.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <Users className="h-6 w-6 text-slate-400" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
-                {isFiltered ? 'No customers match your filters' : 'No customers yet'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {isFiltered
-                  ? 'Try a different search term or clear the filters.'
-                  : 'Add your first customer to get started.'}
-              </p>
-            </div>
-            {isFiltered ? (
+          <EmptyState
+            icon={Users}
+            title={isFiltered ? 'No customers match your filters' : 'No customers yet'}
+            description={isFiltered
+            ? 'Try a different search term or clear the filters.'
+            : 'Add your first customer to get started.'}
+            action={isFiltered ? (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -236,7 +208,7 @@ export function CustomersPage() {
                 </Link>
               </Button>
             ) : null}
-          </div>
+          />
         ) : (
           <>
             <Table>
@@ -257,14 +229,14 @@ export function CustomersPage() {
                     className="cursor-pointer"
                     onClick={() => navigate(`/customers/${customer.id}`)}
                   >
-                    <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                    <TableCell className="font-medium text-foreground">
                       {customer.first_name} {customer.last_name}
                     </TableCell>
-                    <TableCell className="text-slate-600 dark:text-slate-400">{customer.phone}</TableCell>
-                    <TableCell className="hidden text-slate-600 dark:text-slate-400 md:table-cell">
+                    <TableCell className="text-muted-foreground">{customer.phone}</TableCell>
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
                       {customer.email ?? '--'}
                     </TableCell>
-                    <TableCell className="hidden max-w-[280px] truncate text-slate-600 dark:text-slate-400 lg:table-cell">
+                    <TableCell className="hidden max-w-[280px] truncate text-muted-foreground lg:table-cell">
                       {formatAddress(customer.address)}
                     </TableCell>
                     <TableCell>
@@ -295,7 +267,7 @@ export function CustomersPage() {
                                 {customer.is_active ? (
                                   <DropdownMenuItem
                                     onSelect={() => setPendingDelete(customer)}
-                                    className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                     Archive
@@ -317,37 +289,7 @@ export function CustomersPage() {
               </TableBody>
             </Table>
 
-            <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row dark:border-slate-800">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Showing <span className="font-medium">{rangeStart}</span>-
-                <span className="font-medium">{rangeEnd}</span> of{' '}
-                <span className="font-medium">{total}</span>
-              </p>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="px-2 text-sm text-slate-600 dark:text-slate-400">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </>
         )}
       </Card>
@@ -371,7 +313,7 @@ export function CustomersPage() {
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void confirmDelete()

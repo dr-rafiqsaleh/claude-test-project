@@ -27,6 +27,7 @@ import { listInvoices, getInvoiceSummary } from '@/api/invoices'
 import { listJobs } from '@/api/jobs'
 import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -115,27 +116,27 @@ async function fetchChartInvoices() {
 }
 
 function StatSkeleton() {
-  return <div className="h-8 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+  return <div className="h-8 w-20 animate-pulse rounded bg-muted" />
 }
 
 function RowSkeleton({ className }) {
-  return <div className={cn('h-4 animate-pulse rounded bg-slate-200 dark:bg-slate-800', className)} />
+  return <div className={cn('h-4 animate-pulse rounded bg-muted', className)} />
 }
 
 function StatCard({ label, value, icon: Icon, hint, to, linkLabel, loading, tone = 'default' }) {
   const tones = {
-    default: 'text-slate-900 dark:text-slate-50',
-    emerald: 'text-emerald-700 dark:text-emerald-400',
-    red: 'text-red-600 dark:text-red-400',
+    default: 'text-foreground',
+    emerald: 'text-primary',
+    red: 'text-destructive',
   }
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-slate-500 dark:text-slate-400">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
           {label}
         </CardTitle>
-        <Icon className={cn('h-4 w-4', tone === 'red' ? 'text-red-500' : 'text-emerald-600')} />
+        <Icon className={cn('h-4 w-4', tone === 'red' ? 'text-destructive' : 'text-primary')} />
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -143,7 +144,7 @@ function StatCard({ label, value, icon: Icon, hint, to, linkLabel, loading, tone
         ) : (
           <span className={cn('text-3xl font-semibold tracking-tight', tones[tone])}>{value}</span>
         )}
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
         {to ? (
           <Button asChild variant="link" size="sm" className="mt-2 h-auto p-0">
             <Link to={to}>
@@ -246,15 +247,19 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          {greeting()}
-          {user ? `, ${user.full_name.split(' ')[0]}` : ''}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {user ? `Signed in as ${ROLE_LABELS[user.role]}.` : ''} Here is where things stand today.
-        </p>
-      </div>
+      <PageHeader
+        title={
+          <>
+            {greeting()}
+            {user ? `, ${user.full_name.split(' ')[0]}` : ''}
+          </>
+        }
+        description={
+          <>
+            {user ? `Signed in as ${ROLE_LABELS[user.role]}.` : ''} Here is where things stand today.
+          </>
+        }
+      />
 
       {/* Row 1 - stat cards ---------------------------------------------- */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -320,11 +325,11 @@ export function DashboardPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="h-[300px] animate-pulse rounded-md bg-slate-100 dark:bg-slate-800/60" />
+            <div className="h-[300px] animate-pulse rounded-md bg-muted" />
           ) : !canSeeInvoices || revenueFailed ? (
             <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-center">
-              <Receipt className="h-8 w-8 text-slate-300" />
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <Receipt className="h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
                 {canSeeInvoices
                   ? 'Revenue figures are unavailable right now.'
                   : 'Revenue figures are only visible to office staff and admins.'}
@@ -332,8 +337,8 @@ export function DashboardPage() {
             </div>
           ) : !hasRevenue ? (
             <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-center">
-              <Receipt className="h-8 w-8 text-slate-300" />
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <Receipt className="h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
                 No invoices raised in the last {CHART_MONTHS} months.
               </p>
             </div>
@@ -398,7 +403,7 @@ export function DashboardPage() {
                 <RowSkeleton className="w-4/6" />
               </div>
             ) : recentInvoices.length === 0 ? (
-              <p className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+              <p className="px-6 py-10 text-center text-sm text-muted-foreground">
                 {canSeeInvoices ? 'No invoices raised yet.' : '--'}
               </p>
             ) : (
@@ -415,13 +420,13 @@ export function DashboardPage() {
                 <TableBody>
                   {recentInvoices.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                      <TableCell className="font-medium text-foreground">
                         {invoice.invoice_number}
                       </TableCell>
-                      <TableCell className="text-slate-600 dark:text-slate-400">
+                      <TableCell className="text-muted-foreground">
                         {invoice.customer_name ?? '--'}
                       </TableCell>
-                      <TableCell className="text-right text-slate-900 dark:text-slate-100">
+                      <TableCell className="text-right text-foreground">
                         {formatCurrency(invoice.total)}
                       </TableCell>
                       <TableCell>
@@ -461,21 +466,21 @@ export function DashboardPage() {
                 <RowSkeleton className="w-4/6" />
               </div>
             ) : upcomingBookings.length === 0 ? (
-              <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+              <p className="py-10 text-center text-sm text-muted-foreground">
                 Nothing scheduled in the next 60 days.
               </p>
             ) : (
-              <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+              <ul className="divide-y divide-border">
                 {upcomingBookings.map((event) => (
                   <li key={event.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
-                      <CalendarClock className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                      <CalendarClock className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      <p className="text-sm font-medium text-foreground">
                         {formatBookingDateTime(event.start)}
                       </p>
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      <p className="truncate text-xs text-muted-foreground">
                         {event.extendedProps?.customer_name ?? 'Unknown customer'} &middot;{' '}
                         {event.extendedProps?.service_type ?? '--'} &middot;{' '}
                         {event.extendedProps?.technician_name ?? 'Unassigned'}

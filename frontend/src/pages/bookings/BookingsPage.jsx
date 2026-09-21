@@ -33,6 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge'
 import { Button } from '@/components/ui/button'
+import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -71,7 +72,7 @@ const PAGE_SIZE = 20
 const ANY = '__any__'
 
 const SELECT_CLASSES =
-  'flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+  'flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60'
 
 const CALENDAR_VIEWS = [
   { key: 'timeGridDay', label: 'Day' },
@@ -183,33 +184,24 @@ export function BookingsPage() {
     setSearchParams(next, { replace: true })
   }
 
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            Bookings
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {user?.role === UserRole.TECHNICIAN
-              ? 'The jobs scheduled for you.'
-              : 'Schedule technicians and keep the service calendar up to date.'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
+      <PageHeader
+        title="Bookings"
+        description={user?.role === UserRole.TECHNICIAN
+        ? 'The jobs scheduled for you.'
+        : 'Schedule technicians and keep the service calendar up to date.'}
+        actions={<div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-md border border-input p-0.5">
             <button
               type="button"
               onClick={() => setView('list')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors',
                 view === 'list'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted',
               )}
             >
               <ListIcon className="h-4 w-4" />
@@ -221,8 +213,8 @@ export function BookingsPage() {
               className={cn(
                 'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors',
                 view === 'calendar'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted',
               )}
             >
               <CalendarDays className="h-4 w-4" />
@@ -238,8 +230,8 @@ export function BookingsPage() {
               </Link>
             </Button>
           ) : null}
-        </div>
-      </div>
+        </div>}
+      />
 
       {view === 'calendar' ? (
         <BookingsCalendar
@@ -253,7 +245,7 @@ export function BookingsPage() {
             <CardContent className="space-y-3 p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="relative flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
@@ -296,7 +288,7 @@ export function BookingsPage() {
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="space-y-1.5">
-                  <Label htmlFor="booking-date-from" className="text-xs text-slate-500">
+                  <Label htmlFor="booking-date-from" className="text-xs text-muted-foreground">
                     From
                   </Label>
                   <Input
@@ -308,7 +300,7 @@ export function BookingsPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="booking-date-to" className="text-xs text-slate-500">
+                  <Label htmlFor="booking-date-to" className="text-xs text-muted-foreground">
                     To
                   </Label>
                   <Input
@@ -339,34 +331,15 @@ export function BookingsPage() {
             {loading ? (
               <LoadingState message="Loading bookings..." />
             ) : error ? (
-              <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-                <AlertCircle className="h-10 w-10 text-red-500" />
-                <div>
-                  <p className="font-medium text-slate-900 dark:text-slate-100">
-                    Could not load bookings
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
-                </div>
-                <Button variant="outline" onClick={() => void refetch()}>
-                  Try again
-                </Button>
-              </div>
+              <ErrorState title="Could not load bookings" message={error.message} onRetry={refetch} />
             ) : bookings.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                  <CalendarClock className="h-6 w-6 text-slate-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900 dark:text-slate-100">
-                    {isFiltered ? 'No bookings match your filters' : 'No bookings yet'}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    {isFiltered
-                      ? 'Try a different search term or clear the filters.'
-                      : 'Schedule your first booking to get started.'}
-                  </p>
-                </div>
-                {isFiltered ? (
+              <EmptyState
+                icon={CalendarClock}
+                title={isFiltered ? 'No bookings match your filters' : 'No bookings yet'}
+                description={isFiltered
+                ? 'Try a different search term or clear the filters.'
+                : 'Schedule your first booking to get started.'}
+                action={isFiltered ? (
                   <Button variant="outline" onClick={clearFilters}>
                     Clear filters
                   </Button>
@@ -378,7 +351,7 @@ export function BookingsPage() {
                     </Link>
                   </Button>
                 ) : null}
-              </div>
+              />
             ) : (
               <>
                 <Table>
@@ -404,22 +377,22 @@ export function BookingsPage() {
                           className="cursor-pointer"
                           onClick={() => navigate(`/bookings/${booking.id}`)}
                         >
-                          <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                          <TableCell className="font-medium text-foreground">
                             {booking.booking_number}
                           </TableCell>
-                          <TableCell className="text-slate-600 dark:text-slate-400">
+                          <TableCell className="text-muted-foreground">
                             {booking.customer_name ?? '--'}
                           </TableCell>
-                          <TableCell className="hidden text-slate-600 dark:text-slate-400 lg:table-cell">
+                          <TableCell className="hidden text-muted-foreground lg:table-cell">
                             {booking.technician_name ?? 'Unassigned'}
                           </TableCell>
-                          <TableCell className="hidden text-slate-600 dark:text-slate-400 md:table-cell">
+                          <TableCell className="hidden text-muted-foreground md:table-cell">
                             {booking.service_type}
                           </TableCell>
-                          <TableCell className="text-slate-600 dark:text-slate-400">
+                          <TableCell className="text-muted-foreground">
                             {formatBookingDateTime(booking.scheduled_start)}
                           </TableCell>
-                          <TableCell className="hidden text-slate-600 dark:text-slate-400 sm:table-cell">
+                          <TableCell className="hidden text-muted-foreground sm:table-cell">
                             {formatDuration(
                               booking.duration_minutes || booking.estimated_duration_minutes,
                             )}
@@ -467,7 +440,7 @@ export function BookingsPage() {
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem
                                         onSelect={() => setPendingDelete(booking)}
-                                        className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
+                                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                         Delete
@@ -484,37 +457,7 @@ export function BookingsPage() {
                   </TableBody>
                 </Table>
 
-                <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row dark:border-slate-800">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Showing <span className="font-medium">{rangeStart}</span>-
-                    <span className="font-medium">{rangeEnd}</span> of{' '}
-                    <span className="font-medium">{total}</span>
-                  </p>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
-                    </Button>
-                    <span className="px-2 text-sm text-slate-600 dark:text-slate-400">
-                      Page {page} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
               </>
             )}
           </Card>
@@ -540,7 +483,7 @@ export function BookingsPage() {
             <AlertDialogCancel disabled={working}>Keep booking</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void confirmDelete()
@@ -571,7 +514,7 @@ export function BookingsPage() {
             <AlertDialogCancel disabled={working}>Keep booking</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void confirmCancel()
@@ -657,7 +600,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <p className="ml-2 text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>
+            <p className="ml-2 text-sm font-semibold text-foreground">{title}</p>
             {loading ? <Spinner size="sm" className="ml-1" /> : null}
           </div>
 
@@ -678,7 +621,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
               </select>
             ) : null}
 
-            <div className="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
+            <div className="inline-flex rounded-md border border-input p-0.5">
               {CALENDAR_VIEWS.map((item) => (
                 <button
                   key={item.key}
@@ -687,8 +630,8 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
                   className={cn(
                     'rounded px-3 py-1.5 text-sm font-medium transition-colors',
                     activeView === item.key
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted',
                   )}
                 >
                   {item.label}
@@ -699,7 +642,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
         </div>
 
         {error ? (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             <span className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error.message}
@@ -737,8 +680,8 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Legend</span>
+        <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Legend</span>
           {ALL_BOOKING_STATUSES.map((status) => (
             <BookingStatusBadge key={status} status={status} />
           ))}

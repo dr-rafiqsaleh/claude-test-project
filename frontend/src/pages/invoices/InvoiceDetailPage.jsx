@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { DetailField, PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { LoadingState, Spinner } from '@/components/ui/spinner'
@@ -58,32 +59,6 @@ import {
   TERMINAL_INVOICE_STATUSES,
 } from '@/lib/constants'
 
-function Field({ icon: Icon, label, value, href }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
-        <Icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          {label}
-        </p>
-        {href ? (
-          <Link
-            to={href}
-            className="break-words text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-          >
-            {value}
-          </Link>
-        ) : (
-          <p className="break-words text-sm font-medium text-slate-900 dark:text-slate-100">
-            {value}
-          </p>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export function InvoiceDetailPage() {
   const { id } = useParams()
@@ -157,10 +132,10 @@ export function InvoiceDetailPage() {
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
+            <AlertCircle className="h-10 w-10 text-destructive" />
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Invoice not found</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="font-medium text-foreground">Invoice not found</p>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {error?.message ?? 'This invoice may have been removed.'}
               </p>
             </div>
@@ -189,83 +164,84 @@ export function InvoiceDetailPage() {
       </Button>
 
       {/* Header ----------------------------------------------------------- */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-              {invoice.invoice_number}
-            </h1>
+      <PageHeader
+        title={invoice.invoice_number}
+        badge={
+          <>
             <InvoiceStatusBadge status={invoice.status} />
             {overdue && invoice.status !== INVOICE_STATUS.OVERDUE ? (
-              <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
+              <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-medium text-destructive">
                 Past due
               </span>
             ) : null}
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          </>
+        }
+        description={
+          <>
             {invoice.customer_name ?? 'Unknown customer'} &middot; issued{' '}
             {formatDate(invoice.issue_date)} &middot; due {formatDate(invoice.due_date)}
-          </p>
-        </div>
+          </>
+        }
+        actions={
+          <>
+            {canWrite && isDraft ? (
+              <Button
+                disabled={transitioning}
+                onClick={() =>
+                  void changeStatus(
+                    INVOICE_STATUS.SENT,
+                    `${invoice.invoice_number} is now marked as sent.`,
+                  )
+                }
+              >
+                {transitioning ? (
+                  <Spinner size="sm" className="text-current" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Send invoice
+              </Button>
+            ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          {canWrite && isDraft ? (
-            <Button
-              disabled={transitioning}
-              onClick={() =>
-                void changeStatus(
-                  INVOICE_STATUS.SENT,
-                  `${invoice.invoice_number} is now marked as sent.`,
-                )
-              }
-            >
-              {transitioning ? (
-                <Spinner size="sm" className="text-white" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              Send invoice
+            {canWrite && payable ? (
+              <Button onClick={() => setPaymentOpen(true)}>
+                <Banknote className="h-4 w-4" />
+                Record payment
+              </Button>
+            ) : null}
+
+            <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
+              {downloading ? <Spinner size="sm" /> : <Download className="h-4 w-4" />}
+              {downloading ? 'Preparing...' : 'Download PDF'}
             </Button>
-          ) : null}
 
-          {canWrite && payable ? (
-            <Button onClick={() => setPaymentOpen(true)}>
-              <Banknote className="h-4 w-4" />
-              Record payment
-            </Button>
-          ) : null}
+            {canWrite && editable ? (
+              <Button asChild variant="outline">
+                <Link to={`/invoices/${invoice.id}/edit`}>
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Link>
+              </Button>
+            ) : null}
 
-          <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
-            {downloading ? <Spinner size="sm" /> : <Download className="h-4 w-4" />}
-            {downloading ? 'Preparing...' : 'Download PDF'}
-          </Button>
+            {invoice.job_id ? (
+              <Button asChild variant="outline">
+                <Link to={`/jobs/${invoice.job_id}`}>
+                  <ClipboardList className="h-4 w-4" />
+                  {invoice.job_number ? `View ${invoice.job_number}` : 'View job'}
+                </Link>
+              </Button>
+            ) : null}
 
-          {canWrite && editable ? (
-            <Button asChild variant="outline">
-              <Link to={`/invoices/${invoice.id}/edit`}>
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Link>
-            </Button>
-          ) : null}
-
-          {invoice.job_id ? (
-            <Button asChild variant="outline">
-              <Link to={`/jobs/${invoice.job_id}`}>
-                <ClipboardList className="h-4 w-4" />
-                {invoice.job_number ? `View ${invoice.job_number}` : 'View job'}
-              </Link>
-            </Button>
-          ) : null}
-
-          {isAdmin && cancellable ? (
-            <Button variant="destructive" disabled={transitioning} onClick={() => setCancelOpen(true)}>
-              <XCircle className="h-4 w-4" />
-              Cancel invoice
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            {isAdmin && cancellable ? (
+              <Button variant="destructive" disabled={transitioning} onClick={() => setCancelOpen(true)}>
+                <XCircle className="h-4 w-4" />
+                Cancel invoice
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       {/* Section 1 - Invoice info ---------------------------------------- */}
       <div className="grid gap-6 lg:grid-cols-3">
@@ -274,10 +250,10 @@ export function InvoiceDetailPage() {
             <CardTitle className="text-base">Customer</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <Field icon={UserIcon} label="Name" value={invoice.customer_name ?? '--'} />
-            <Field icon={Mail} label="Email" value={invoice.customer_email ?? '--'} />
-            <Field icon={Phone} label="Phone" value={invoice.customer_phone ?? '--'} />
-            <Field icon={MapPin} label="Address" value={invoice.customer_address ?? '--'} />
+            <DetailField icon={UserIcon} label="Name" value={invoice.customer_name ?? '--'} />
+            <DetailField icon={Mail} label="Email" value={invoice.customer_email ?? '--'} />
+            <DetailField icon={Phone} label="Phone" value={invoice.customer_phone ?? '--'} />
+            <DetailField icon={MapPin} label="Address" value={invoice.customer_address ?? '--'} />
             <Button asChild variant="outline" size="sm" className="w-full">
               <Link to={`/customers/${invoice.customer_id}`}>View customer</Link>
             </Button>
@@ -289,22 +265,22 @@ export function InvoiceDetailPage() {
             <CardTitle className="text-base">Invoice details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <Field icon={FileText} label="Invoice number" value={invoice.invoice_number} />
-            <Field icon={CalendarDays} label="Issue date" value={formatDate(invoice.issue_date)} />
+            <DetailField icon={FileText} label="Invoice number" value={invoice.invoice_number} />
+            <DetailField icon={CalendarDays} label="Issue date" value={formatDate(invoice.issue_date)} />
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
-                <CalendarDays className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Due date
                 </p>
                 <p
                   className={cn(
                     'break-words text-sm font-medium',
                     overdue
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-slate-900 dark:text-slate-100',
+                      ? 'text-destructive'
+                      : 'text-foreground',
                   )}
                 >
                   {formatDate(invoice.due_date)}
@@ -312,23 +288,23 @@ export function InvoiceDetailPage() {
               </div>
             </div>
             {invoice.job_number ? (
-              <Field
+              <DetailField
                 icon={ClipboardList}
                 label="Job"
                 value={invoice.job_number}
-                href={`/jobs/${invoice.job_id}`}
+                to={`/jobs/${invoice.job_id}`}
               />
             ) : null}
             {invoice.quote_number ? (
-              <Field
+              <DetailField
                 icon={Building2}
                 label="Quote"
                 value={invoice.quote_number}
-                href={`/quotes/${invoice.quote_id}`}
+                to={`/quotes/${invoice.quote_id}`}
               />
             ) : null}
             {invoice.sent_at ? (
-              <Field icon={Send} label="Sent" value={formatDateTime(invoice.sent_at)} />
+              <DetailField icon={Send} label="Sent" value={formatDateTime(invoice.sent_at)} />
             ) : null}
           </CardContent>
         </Card>
@@ -339,42 +315,42 @@ export function InvoiceDetailPage() {
             <CardTitle className="text-base">Amount summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="rounded-lg border border-dashed border-input bg-muted/50 p-4">
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-slate-500 dark:text-slate-400">Subtotal</dt>
-                  <dd className="font-medium text-slate-900 dark:text-slate-100">
+                  <dt className="text-muted-foreground">Subtotal</dt>
+                  <dd className="font-medium text-foreground">
                     {formatCurrency(invoice.subtotal)}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-500 dark:text-slate-400">VAT</dt>
-                  <dd className="font-medium text-slate-900 dark:text-slate-100">
+                  <dt className="text-muted-foreground">VAT</dt>
+                  <dd className="font-medium text-foreground">
                     {formatCurrency(invoice.tax_amount)}
                   </dd>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-base">
-                  <dt className="font-semibold text-slate-900 dark:text-slate-100">Total</dt>
-                  <dd className="font-semibold text-slate-900 dark:text-slate-100">
+                  <dt className="font-semibold text-foreground">Total</dt>
+                  <dd className="font-semibold text-foreground">
                     {formatCurrency(invoice.total)}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-500 dark:text-slate-400">Amount paid</dt>
-                  <dd className="font-medium text-emerald-700 dark:text-emerald-400">
+                  <dt className="text-muted-foreground">Amount paid</dt>
+                  <dd className="font-medium text-primary">
                     {formatCurrency(invoice.amount_paid)}
                   </dd>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-base">
-                  <dt className="font-semibold text-slate-900 dark:text-slate-100">Balance due</dt>
+                  <dt className="font-semibold text-foreground">Balance due</dt>
                   <dd
                     className={cn(
                       'font-semibold',
                       balanceDue > 0
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-emerald-700 dark:text-emerald-400',
+                        ? 'text-destructive'
+                        : 'text-primary',
                     )}
                   >
                     {formatCurrency(balanceDue)}
@@ -406,19 +382,19 @@ export function InvoiceDetailPage() {
             <TableBody>
               {(invoice.items ?? []).map((item, index) => (
                 <TableRow key={`${item.description}-${index}`}>
-                  <TableCell className="text-slate-900 dark:text-slate-100">
+                  <TableCell className="text-foreground">
                     {item.description}
                   </TableCell>
-                  <TableCell className="text-right text-slate-600 dark:text-slate-400">
+                  <TableCell className="text-right text-muted-foreground">
                     {Number(item.quantity)}
                   </TableCell>
-                  <TableCell className="text-right text-slate-600 dark:text-slate-400">
+                  <TableCell className="text-right text-muted-foreground">
                     {formatCurrency(item.unit_price)}
                   </TableCell>
-                  <TableCell className="text-right text-slate-600 dark:text-slate-400">
+                  <TableCell className="text-right text-muted-foreground">
                     {formatCurrency(item.tax_amount)}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-slate-900 dark:text-slate-100">
+                  <TableCell className="text-right font-medium text-foreground">
                     {formatCurrency(item.total)}
                   </TableCell>
                 </TableRow>
@@ -426,29 +402,29 @@ export function InvoiceDetailPage() {
             </TableBody>
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={4} className="text-right text-slate-500 dark:text-slate-400">
+                <TableCell colSpan={4} className="text-right text-muted-foreground">
                   Subtotal
                 </TableCell>
-                <TableCell className="text-right text-slate-900 dark:text-slate-100">
+                <TableCell className="text-right text-foreground">
                   {formatCurrency(invoice.subtotal)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell colSpan={4} className="text-right text-slate-500 dark:text-slate-400">
+                <TableCell colSpan={4} className="text-right text-muted-foreground">
                   VAT ({Math.round(Number(invoice.items?.[0]?.tax_rate ?? 0.2) * 100)}%)
                 </TableCell>
-                <TableCell className="text-right text-slate-900 dark:text-slate-100">
+                <TableCell className="text-right text-foreground">
                   {formatCurrency(invoice.tax_amount)}
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell
                   colSpan={4}
-                  className="text-right text-base font-semibold text-slate-900 dark:text-slate-100"
+                  className="text-right text-base font-semibold text-foreground"
                 >
                   Total
                 </TableCell>
-                <TableCell className="text-right text-base font-semibold text-slate-900 dark:text-slate-100">
+                <TableCell className="text-right text-base font-semibold text-foreground">
                   {formatCurrency(invoice.total)}
                 </TableCell>
               </TableRow>
@@ -481,19 +457,19 @@ export function InvoiceDetailPage() {
               <TableBody>
                 {payments.map((payment) => (
                   <TableRow key={payment.payment_id}>
-                    <TableCell className="text-slate-900 dark:text-slate-100">
+                    <TableCell className="text-foreground">
                       {formatDate(payment.paid_at)}
                     </TableCell>
-                    <TableCell className="text-slate-600 dark:text-slate-400">
+                    <TableCell className="text-muted-foreground">
                       {PAYMENT_METHODS[payment.method] ?? payment.method}
                     </TableCell>
-                    <TableCell className="text-slate-600 dark:text-slate-400">
+                    <TableCell className="text-muted-foreground">
                       {payment.reference ?? '--'}
                     </TableCell>
-                    <TableCell className="hidden text-slate-600 dark:text-slate-400 md:table-cell">
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
                       {payment.notes ?? '--'}
                     </TableCell>
-                    <TableCell className="text-right font-medium text-emerald-700 dark:text-emerald-400">
+                    <TableCell className="text-right font-medium text-primary">
                       {formatCurrency(payment.amount)}
                     </TableCell>
                   </TableRow>
@@ -501,23 +477,23 @@ export function InvoiceDetailPage() {
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-right text-slate-500 dark:text-slate-400">
+                  <TableCell colSpan={4} className="text-right text-muted-foreground">
                     Amount paid
                   </TableCell>
-                  <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">
+                  <TableCell className="text-right font-semibold text-primary">
                     {formatCurrency(invoice.amount_paid)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-right text-slate-500 dark:text-slate-400">
+                  <TableCell colSpan={4} className="text-right text-muted-foreground">
                     Balance due
                   </TableCell>
                   <TableCell
                     className={cn(
                       'text-right font-semibold',
                       balanceDue > 0
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-emerald-700 dark:text-emerald-400',
+                        ? 'text-destructive'
+                        : 'text-primary',
                     )}
                   >
                     {formatCurrency(balanceDue)}
@@ -545,19 +521,19 @@ export function InvoiceDetailPage() {
               </CardDescription>
             </div>
             {notesOpen ? (
-              <ChevronDown className="h-5 w-5 shrink-0 text-slate-400" />
+              <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground/70" />
             ) : (
-              <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" />
             )}
           </button>
         </CardHeader>
         {notesOpen ? (
           <CardContent className="space-y-5">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Notes
               </p>
-              <p className="mt-1 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">
+              <p className="mt-1 whitespace-pre-line text-sm text-foreground">
                 {invoice.notes || 'No notes recorded.'}
               </p>
             </div>
@@ -565,10 +541,10 @@ export function InvoiceDetailPage() {
             <Separator />
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Terms &amp; conditions
               </p>
-              <p className="mt-1 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">
+              <p className="mt-1 whitespace-pre-line text-sm text-foreground">
                 {invoice.terms}
               </p>
             </div>
@@ -577,10 +553,10 @@ export function InvoiceDetailPage() {
               <>
                 <Separator />
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Payment instructions
                   </p>
-                  <p className="mt-1 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">
+                  <p className="mt-1 whitespace-pre-line text-sm text-foreground">
                     {invoice.payment_instructions}
                   </p>
                 </div>
@@ -615,7 +591,7 @@ export function InvoiceDetailPage() {
             <AlertDialogCancel disabled={transitioning}>Keep invoice</AlertDialogCancel>
             <AlertDialogAction
               disabled={transitioning}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void changeStatus(

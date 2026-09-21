@@ -69,20 +69,20 @@ export function FindingCard({
   return (
     <div
       className={cn(
-        'space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900',
+        'space-y-3 rounded-lg border border-border bg-card p-4',
         className,
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
               Finding {index + 1}
             </span>
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <h4 className="text-sm font-semibold text-foreground">
               {finding.area}
             </h4>
-            <span className="text-sm text-slate-500 dark:text-slate-400">- {finding.pest_type}</span>
+            <span className="text-sm text-muted-foreground">- {finding.pest_type}</span>
             <RiskLevelBadge level={finding.severity} />
           </div>
         </div>
@@ -92,7 +92,7 @@ export function FindingCard({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={onDelete}
             aria-label={`Delete finding ${index + 1}`}
           >
@@ -103,10 +103,10 @@ export function FindingCard({
 
       {finding.description ? (
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             What was found
           </p>
-          <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+          <p className="whitespace-pre-wrap text-sm text-foreground">
             {finding.description}
           </p>
         </div>
@@ -114,10 +114,10 @@ export function FindingCard({
 
       {finding.recommendation ? (
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Recommendation
           </p>
-          <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+          <p className="whitespace-pre-wrap text-sm text-foreground">
             {finding.recommendation}
           </p>
         </div>
@@ -128,20 +128,20 @@ export function FindingCard({
           {attached.map((photo) => (
             <div key={photo.id} className="group relative">
               {photo.missing ? (
-                <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 dark:border-slate-600">
+                <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-input text-muted-foreground/70">
                   <ImageOff className="h-5 w-5" />
                 </div>
               ) : (
                 <button
                   type="button"
                   onClick={() => onViewPhoto?.(photo)}
-                  className="block overflow-hidden rounded-md border border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 dark:border-slate-700"
+                  className="block overflow-hidden rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <img
                     src={getPhotoUrl(jobId, photo.id)}
                     alt={photo.filename}
                     loading="lazy"
-                    className="h-20 w-20 bg-slate-100 object-cover transition-transform group-hover:scale-105 dark:bg-slate-800"
+                    className="h-20 w-20 bg-muted object-cover transition-transform group-hover:scale-105"
                   />
                 </button>
               )}
@@ -152,10 +152,10 @@ export function FindingCard({
                   onClick={() => void handleRemovePhoto(photo.id)}
                   disabled={removingId === photo.id}
                   aria-label={`Remove ${photo.filename}`}
-                  className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition-opacity hover:bg-red-700 disabled:opacity-50"
+                  className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm transition-opacity hover:bg-destructive/90 disabled:opacity-50"
                 >
                   {removingId === photo.id ? (
-                    <Spinner size="sm" className="h-3 w-3 text-white" />
+                    <Spinner size="sm" className="h-3 w-3 text-current" />
                   ) : (
                     <Trash2 className="h-3 w-3" />
                   )}

@@ -72,27 +72,27 @@ export function NotificationBell() {
           unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
         }
         aria-expanded={open}
-        className="relative rounded-md p-2 text-slate-600 transition-colors hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="relative rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white">
             {badge}
           </span>
         ) : null}
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2.5 dark:border-slate-800">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card shadow-lg">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+            <span className="text-sm font-semibold text-foreground">
               Notifications
             </span>
             <button
               type="button"
               disabled={unreadCount === 0}
               onClick={() => void markAllRead().catch(() => {})}
-              className="flex items-center gap-1 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:text-slate-400 dark:text-emerald-400 dark:disabled:text-slate-600"
+              className="flex items-center gap-1 text-xs font-medium text-primary disabled:cursor-not-allowed disabled:text-muted-foreground/70"
             >
               <CheckCheck className="h-3.5 w-3.5" />
               Mark all read
@@ -101,12 +101,12 @@ export function NotificationBell() {
 
           <div className="max-h-[400px] overflow-y-auto">
             {isLoading ? (
-              <div className="flex items-center justify-center gap-3 py-10 text-sm text-slate-500 dark:text-slate-400">
+              <div className="flex items-center justify-center gap-3 py-10 text-sm text-muted-foreground">
                 <Spinner size="sm" />
                 Loading...
               </div>
             ) : notifications.length === 0 ? (
-              <p className="px-3 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+              <p className="px-3 py-10 text-center text-sm text-muted-foreground">
                 No notifications
               </p>
             ) : (
@@ -116,7 +116,7 @@ export function NotificationBell() {
                   type="button"
                   onClick={() => openNotification(item)}
                   className={cn(
-                    'flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/70',
+                    'flex w-full items-start gap-3 border-b border-border px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-muted/50',
                     item.is_read ? '' : 'bg-blue-50 dark:bg-blue-950/30',
                   )}
                 >
@@ -124,16 +124,16 @@ export function NotificationBell() {
                   <span className="min-w-0 flex-1">
                     <span
                       className={cn(
-                        'block truncate text-sm text-slate-900 dark:text-slate-100',
+                        'block truncate text-sm text-foreground',
                         item.is_read ? 'font-normal' : 'font-semibold',
                       )}
                     >
                       {item.title}
                     </span>
-                    <span className="mt-0.5 line-clamp-2 block text-sm text-slate-600 dark:text-slate-400">
+                    <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">
                       {item.message}
                     </span>
-                    <span className="mt-1 block text-xs text-slate-400">
+                    <span className="mt-1 block text-xs text-muted-foreground/70">
                       {timeAgo(item.created_at)}
                     </span>
                   </span>
@@ -145,7 +145,7 @@ export function NotificationBell() {
           <Link
             to="/notifications"
             onClick={() => setOpen(false)}
-            className="block border-t border-slate-200 px-3 py-2.5 text-center text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-slate-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+            className="block border-t border-border px-3 py-2.5 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/10"
           >
             View all
           </Link>

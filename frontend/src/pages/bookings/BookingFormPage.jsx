@@ -3,7 +3,13 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertCircle, ArrowLeft, CalendarClock, Save, Search } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  CalendarClock,
+  Save,
+  Search,
+} from 'lucide-react'
 
 import { listCustomers } from '@/api/customers'
 import { getQuote, listQuotes } from '@/api/quotes'
@@ -14,6 +20,7 @@ import {
   updateBooking,
 } from '@/api/bookings'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
@@ -54,7 +61,7 @@ const DEFAULT_SERVICE_TYPE = 'General Pest Control'
 const NONE = ''
 
 const SELECT_CLASSES =
-  'flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+  'flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60'
 
 const bookingSchema = z
   .object({
@@ -406,11 +413,11 @@ export function BookingFormPage() {
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <p className="font-medium text-slate-900 dark:text-slate-100">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="font-medium text-foreground">
               Could not open this booking
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{loadError}</p>
+            <p className="text-sm text-muted-foreground">{loadError}</p>
           </CardContent>
         </Card>
       </div>
@@ -422,30 +429,19 @@ export function BookingFormPage() {
 
   return (
     <div className="space-y-6">
-      <Button
-        variant="ghost"
-        className="-ml-2"
-        onClick={() => navigate(isEdit && id ? `/bookings/${id}` : '/bookings')}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {isEdit ? 'Back to booking' : 'Back to bookings'}
-      </Button>
-
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          {isEdit ? 'Edit booking' : 'New booking'}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {isEdit
-            ? 'Update the schedule, assignment and service details for this booking.'
-            : 'Schedule a service visit, assign a technician and capture the on-site details.'}
-        </p>
-      </div>
+      <PageHeader
+        backTo={isEdit && id ? `/bookings/${id}` : '/bookings'}
+        backLabel={isEdit ? 'Back to booking' : 'Back to bookings'}
+        title={isEdit ? 'Edit booking' : 'New booking'}
+        description={isEdit
+        ? 'Update the schedule, assignment and service details for this booking.'
+        : 'Schedule a service visit, assign a technician and capture the on-site details.'}
+      />
 
       {submitError ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{submitError}</span>
@@ -461,7 +457,7 @@ export function BookingFormPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                 <Input
                   value={customerSearch}
                   onChange={(event) => setCustomerSearch(event.target.value)}
@@ -742,15 +738,15 @@ export function BookingFormPage() {
                             className={cn(
                               'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
                               checked
-                                ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
-                                : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-input text-foreground hover:bg-muted/50',
                             )}
                           >
                             <input
                               type="checkbox"
                               checked={checked}
                               onChange={() => togglePestType(pest)}
-                              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600"
+                              className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
                             />
                             <span className="truncate">{pest}</span>
                           </label>
@@ -854,7 +850,7 @@ export function BookingFormPage() {
 
             <Button type="submit" disabled={submitting}>
               {submitting ? (
-                <Spinner size="sm" className="text-white" />
+                <Spinner size="sm" className="text-current" />
               ) : isEdit ? (
                 <Save className="h-4 w-4" />
               ) : (

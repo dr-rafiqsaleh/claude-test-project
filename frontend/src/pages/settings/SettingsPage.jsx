@@ -23,6 +23,7 @@ import {
 } from '@/api/settings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -130,21 +131,21 @@ function Field({ label, htmlFor, hint, className, children }) {
     <div className={cn('space-y-1.5', className)}>
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint ? <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   )
 }
 
 function SaveBar({ saving, onSave, dirty }) {
   return (
-    <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+    <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
       {dirty ? (
         <span className="text-sm text-amber-600 dark:text-amber-400">Unsaved changes</span>
       ) : null}
       <Button disabled={saving} onClick={onSave}>
         {saving ? (
           <>
-            <Spinner size="sm" className="text-white" />
+            <Spinner size="sm" className="text-current" />
             Saving...
           </>
         ) : (
@@ -296,12 +297,12 @@ export function SettingsPage() {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-          <AlertCircle className="h-10 w-10 text-red-500" />
+          <AlertCircle className="h-10 w-10 text-destructive" />
           <div>
-            <p className="font-medium text-slate-900 dark:text-slate-100">
+            <p className="font-medium text-foreground">
               Could not load settings
             </p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
           </div>
           <Button variant="outline" onClick={() => void load()}>
             Try again
@@ -313,17 +314,17 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          Settings
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Company details, document defaults and branding. These feed every quote, invoice and
-          inspection report QKil generates.
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description={
+          <>
+            Company details, document defaults and branding. These feed every quote, invoice and
+            inspection report QKil generates.
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
+      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.key
@@ -337,8 +338,8 @@ export function SettingsPage() {
               className={cn(
                 'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-muted',
               )}
             >
               <Icon className="h-4 w-4" />
@@ -422,7 +423,7 @@ export function SettingsPage() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Address</h3>
+              <h3 className="text-sm font-semibold text-foreground">Address</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Street" htmlFor="address_street" className="sm:col-span-2">
                   <Input
@@ -472,13 +473,13 @@ export function SettingsPage() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Logo</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <h3 className="text-sm font-semibold text-foreground">Logo</h3>
+              <p className="text-xs text-muted-foreground">
                 Shown in the header of every generated PDF. PNG, JPEG or WebP, up to 2 MB.
               </p>
 
               <div className="flex flex-wrap items-center gap-4">
-                <div className="flex h-24 w-44 items-center justify-center overflow-hidden rounded-md border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex h-24 w-44 items-center justify-center overflow-hidden rounded-md border border-dashed border-input bg-muted/50">
                   {showLogo ? (
                     <img
                       src={logoSrc}
@@ -490,7 +491,7 @@ export function SettingsPage() {
                       }}
                     />
                   ) : (
-                    <span className="flex flex-col items-center gap-1 text-xs text-slate-400">
+                    <span className="flex flex-col items-center gap-1 text-xs text-muted-foreground/70">
                       <ImageOff className="h-6 w-6" />
                       No logo
                     </span>
@@ -526,7 +527,7 @@ export function SettingsPage() {
                       variant="outline"
                       onClick={() => void handleRemoveLogo()}
                       disabled={saving}
-                      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                       Remove logo
@@ -750,7 +751,7 @@ export function SettingsPage() {
               </Field>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
               <Button
                 variant="outline"
                 onClick={() =>
@@ -763,7 +764,7 @@ export function SettingsPage() {
               <Button disabled={saving} onClick={() => void save()}>
                 {saving ? (
                   <>
-                    <Spinner size="sm" className="text-white" />
+                    <Spinner size="sm" className="text-current" />
                     Saving...
                   </>
                 ) : (
@@ -785,14 +786,14 @@ export function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-muted-foreground">
               User management lives on its own page, where you can create accounts, change roles
               and deactivate people who have left.
             </p>
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-800/50">
-              <p className="font-medium text-slate-900 dark:text-slate-100">Roles</p>
-              <ul className="mt-2 space-y-1.5 text-slate-600 dark:text-slate-400">
+            <div className="rounded-md border border-border bg-muted/50 p-4 text-sm">
+              <p className="font-medium text-foreground">Roles</p>
+              <ul className="mt-2 space-y-1.5 text-muted-foreground">
                 <li>
                   <Badge variant="default" className="mr-2">
                     Admin
@@ -840,7 +841,7 @@ export function SettingsPage() {
                     type="color"
                     value={form.primary_color}
                     onChange={(event) => set('primary_color', event.target.value)}
-                    className="h-10 w-16 cursor-pointer rounded-md border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-900"
+                    className="h-10 w-16 cursor-pointer rounded-md border border-input bg-card p-1"
                   />
                   <Input
                     value={form.primary_color}
@@ -860,8 +861,8 @@ export function SettingsPage() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Preview</h3>
-              <div className="flex flex-wrap items-center gap-4 rounded-md border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/50">
+              <h3 className="text-sm font-semibold text-foreground">Preview</h3>
+              <div className="flex flex-wrap items-center gap-4 rounded-md border border-border bg-muted/50 p-5">
                 <span
                   className="inline-flex h-10 items-center rounded-md px-4 text-sm font-medium text-white shadow-sm"
                   style={{ backgroundColor: form.primary_color }}
@@ -885,7 +886,7 @@ export function SettingsPage() {
                   style={{ backgroundColor: form.primary_color }}
                 />
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Colour changes apply to PDF documents. The app UI uses the default emerald theme.
               </p>
             </div>

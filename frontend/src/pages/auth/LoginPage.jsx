@@ -67,7 +67,7 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo size={48} textClassName="text-2xl text-white" />
-          <p className="text-sm text-slate-400">Pest control management</p>
+          <p className="text-sm text-muted-foreground/70">Pest control management</p>
         </div>
 
         <Card className="shadow-xl">
@@ -80,7 +80,7 @@ export function LoginPage() {
             {formError ? (
               <div
                 role="alert"
-                className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
               >
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{formError}</span>
@@ -130,7 +130,7 @@ export function LoginPage() {
                           <button
                             type="button"
                             onClick={() => setShowPassword((v) => !v)}
-                            className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center text-muted-foreground/70 hover:text-muted-foreground"
                             aria-label={showPassword ? 'Hide password' : 'Show password'}
                             tabIndex={-1}
                           >
@@ -146,7 +146,7 @@ export function LoginPage() {
                 <Button type="submit" className="w-full" disabled={submitting}>
                   {submitting ? (
                     <>
-                      <Spinner size="sm" className="text-white" />
+                      <Spinner size="sm" className="text-current" />
                       Signing in...
                     </>
                   ) : (
@@ -161,7 +161,7 @@ export function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
+        <p className="mt-6 text-center text-xs text-muted-foreground">
           QKil Phase 8 &middot; Need access? Contact your administrator.
         </p>
       </div>

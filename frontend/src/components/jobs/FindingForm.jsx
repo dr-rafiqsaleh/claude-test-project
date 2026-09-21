@@ -80,12 +80,12 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
   return (
     <div
       className={cn(
-        'space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 dark:border-emerald-900 dark:bg-emerald-950/20',
+        'space-y-4 rounded-lg border border-primary/30 bg-primary/6 p-4',
         className,
       )}
     >
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">New finding</h4>
+        <h4 className="text-sm font-semibold text-foreground">New finding</h4>
         {onCancel ? (
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onCancel}>
             <X className="h-4 w-4" />
@@ -180,7 +180,7 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
         />
       </FormField>
 
-      {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button

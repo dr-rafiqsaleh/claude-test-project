@@ -3,10 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertCircle, ArrowLeft, Save } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  Save,
+} from 'lucide-react'
 
 import { createCustomer, getCustomer, updateCustomer } from '@/api/customers'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
@@ -183,9 +188,9 @@ export function CustomerFormPage() {
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <p className="font-medium text-slate-900 dark:text-slate-100">Could not load customer</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{loadError}</p>
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="font-medium text-foreground">Could not load customer</p>
+            <p className="text-sm text-muted-foreground">{loadError}</p>
           </CardContent>
         </Card>
       </div>
@@ -196,30 +201,19 @@ export function CustomerFormPage() {
 
   return (
     <div className="space-y-6">
-      <Button
-        variant="ghost"
-        className="-ml-2"
-        onClick={() => navigate(isEdit && id ? `/customers/${id}` : '/customers')}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {isEdit ? 'Back to customer' : 'Back to customers'}
-      </Button>
-
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          {isEdit ? 'Edit customer' : 'New customer'}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {isEdit
-            ? 'Update the contact and address details for this customer.'
-            : 'Add a new customer to the QKil database.'}
-        </p>
-      </div>
+      <PageHeader
+        backTo={isEdit && id ? `/customers/${id}` : '/customers'}
+        backLabel={isEdit ? 'Back to customer' : 'Back to customers'}
+        title={isEdit ? 'Edit customer' : 'New customer'}
+        description={isEdit
+        ? 'Update the contact and address details for this customer.'
+        : 'Add a new customer to the QKil database.'}
+      />
 
       {submitError ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{submitError}</span>
@@ -450,7 +444,7 @@ export function CustomerFormPage() {
             <Button type="submit" disabled={submitting}>
               {submitting ? (
                 <>
-                  <Spinner size="sm" className="text-white" />
+                  <Spinner size="sm" className="text-current" />
                   Saving...
                 </>
               ) : (

@@ -14,7 +14,7 @@ export function Spinner({ size = 'md', className, label = 'Loading' }) {
     <Loader2
       role="status"
       aria-label={label}
-      className={cn('animate-spin text-emerald-600', sizeMap[size], className)}
+      className={cn('animate-spin text-primary', sizeMap[size], className)}
     />
   )
 }
@@ -24,7 +24,7 @@ export function LoadingState({ message = 'Loading...', className }) {
   return (
     <div className={cn('flex flex-col items-center justify-center gap-3 py-16', className)}>
       <Spinner size="lg" />
-      <p className="text-sm text-slate-500 dark:text-slate-400">{message}</p>
+      <p className="text-sm text-muted-foreground">{message}</p>
     </div>
   )
 }

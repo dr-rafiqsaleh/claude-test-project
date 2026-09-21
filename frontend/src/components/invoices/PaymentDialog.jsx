@@ -101,7 +101,7 @@ export function PaymentDialog({ open, onOpenChange, invoice, onSubmit }) {
           <DialogTitle>Record a payment</DialogTitle>
           <DialogDescription>
             {invoice.invoice_number} &middot; balance due{' '}
-            <span className="font-medium text-slate-900 dark:text-slate-100">
+            <span className="font-medium text-foreground">
               {formatCurrency(amountDue)}
             </span>
           </DialogDescription>
@@ -111,7 +111,7 @@ export function PaymentDialog({ open, onOpenChange, invoice, onSubmit }) {
           {error ? (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
@@ -186,7 +186,7 @@ export function PaymentDialog({ open, onOpenChange, invoice, onSubmit }) {
             </Button>
             <Button type="submit" disabled={submitting || !amountValid}>
               {submitting ? (
-                <Spinner size="sm" className="text-white" />
+                <Spinner size="sm" className="text-current" />
               ) : (
                 <Banknote className="h-4 w-4" />
               )}

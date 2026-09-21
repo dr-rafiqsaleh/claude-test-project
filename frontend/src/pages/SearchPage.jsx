@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertCircle, ArrowRight, Search, SearchX } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowRight,
+  Search,
+  SearchX,
+} from 'lucide-react'
 
 import { SearchResultIconChip } from '@/components/search/SearchResultIcon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useSearch, MIN_QUERY_LENGTH } from '@/hooks/useSearch'
@@ -35,20 +41,20 @@ function ResultRow({ item }) {
   return (
     <Link
       to={item.url}
-      className="group flex items-center gap-3 border-b border-slate-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
+      className="group flex items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-b-0 hover:bg-muted/50"
     >
       <SearchResultIconChip type={item.type} />
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-slate-900 dark:text-slate-100">{item.title}</p>
+        <p className="truncate font-medium text-foreground">{item.title}</p>
         {item.subtitle ? (
-          <p className="truncate text-sm text-slate-500 dark:text-slate-400">{item.subtitle}</p>
+          <p className="truncate text-sm text-muted-foreground">{item.subtitle}</p>
         ) : null}
       </div>
 
       <StatusBadge status={item.status} />
 
-      <span className="hidden shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 group-hover:underline sm:flex dark:text-emerald-400">
+      <span className="hidden shrink-0 items-center gap-1 text-sm font-medium text-primary group-hover:underline sm:flex">
         View
         <ArrowRight className="h-3.5 w-3.5" />
       </span>
@@ -58,13 +64,13 @@ function ResultRow({ item }) {
 
 function SkeletonRow() {
   return (
-    <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
-      <div className="h-9 w-9 shrink-0 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+    <div className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0">
+      <div className="h-9 w-9 shrink-0 animate-pulse rounded-md bg-muted" />
       <div className="flex-1 space-y-2">
-        <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100 dark:bg-slate-800/60" />
+        <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
       </div>
-      <div className="h-5 w-16 animate-pulse rounded-full bg-slate-100 dark:bg-slate-800/60" />
+      <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
     </div>
   )
 }
@@ -74,8 +80,8 @@ function LoadingSkeleton() {
     <div className="space-y-6">
       {[0, 1].map((group) => (
         <Card key={group} className="overflow-hidden">
-          <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-            <div className="h-4 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+          <div className="border-b border-border px-4 py-3">
+            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
           </div>
           {[0, 1, 2].map((row) => (
             <SkeletonRow key={row} />
@@ -124,21 +130,21 @@ export function SearchPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          Search
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Look across customers, quotes, bookings, jobs{isTechnician ? '' : ' and invoices'} in one
-          place.
-        </p>
-      </div>
+      <PageHeader
+        title="Search"
+        description={
+          <>
+            Look across customers, quotes, bookings, jobs{isTechnician ? '' : ' and invoices'} in one
+            place.
+          </>
+        }
+      />
 
       <Card>
         <CardContent className="space-y-4 p-4">
           <form onSubmit={submit}>
             <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 autoFocus
                 value={query}
@@ -164,13 +170,13 @@ export function SearchPage() {
                   className={cn(
                     'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
                     isActive
-                      ? 'border-emerald-600 bg-emerald-600 text-white'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800',
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-input bg-card text-foreground hover:bg-muted/50 dark:bg-transparent',
                   )}
                 >
                   {type === ALL ? 'All' : SEARCH_TYPE_LABELS[type]}
                   {trimmed.length >= MIN_QUERY_LENGTH && count > 0 ? (
-                    <span className={cn('ml-1.5', isActive ? 'text-emerald-100' : 'text-slate-400')}>
+                    <span className={cn('ml-1.5', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground/70')}>
                       {count}
                     </span>
                   ) : null}
@@ -184,10 +190,10 @@ export function SearchPage() {
       {tooShort ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <Search className="h-6 w-6 text-slate-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Search className="h-6 w-6 text-muted-foreground/70" />
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-muted-foreground">
               Type at least {MIN_QUERY_LENGTH} characters to search.
             </p>
           </CardContent>
@@ -195,14 +201,14 @@ export function SearchPage() {
       ) : trimmed.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <Search className="h-6 w-6 text-slate-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Search className="h-6 w-6 text-muted-foreground/70" />
             </div>
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
+              <p className="font-medium text-foreground">
                 Start typing to search
               </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Try a customer name, a phone number, or a record number like INV-0001.
               </p>
             </div>
@@ -213,10 +219,10 @@ export function SearchPage() {
       ) : error ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
+            <AlertCircle className="h-10 w-10 text-destructive" />
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Search failed</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
+              <p className="font-medium text-foreground">Search failed</p>
+              <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
             </div>
             <Button variant="outline" onClick={retry}>
               Try again
@@ -226,14 +232,14 @@ export function SearchPage() {
       ) : groups.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <SearchX className="h-7 w-7 text-slate-400" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+              <SearchX className="h-7 w-7 text-muted-foreground/70" />
             </div>
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
+              <p className="font-medium text-foreground">
                 No results for &ldquo;{trimmed}&rdquo;
               </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Check the spelling, or try a shorter search term.
               </p>
             </div>
@@ -246,15 +252,15 @@ export function SearchPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-900 dark:text-slate-100">{totalCount}</span>{' '}
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{totalCount}</span>{' '}
             result{totalCount === 1 ? '' : 's'} for &ldquo;{trimmed}&rdquo;
           </p>
 
           {groups.map((type) => (
             <Card key={type} className="overflow-hidden">
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <h2 className="text-sm font-semibold text-foreground">
                   {SEARCH_TYPE_LABELS[type]} ({results[type].length})
                 </h2>
               </div>

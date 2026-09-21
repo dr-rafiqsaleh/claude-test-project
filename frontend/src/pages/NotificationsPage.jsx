@@ -1,10 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDistanceToNow, isThisWeek, isToday, isYesterday } from 'date-fns'
-import { AlertCircle, BellOff, CheckCheck, Trash2 } from 'lucide-react'
+import {
+  AlertCircle,
+  BellOff,
+  CheckCheck,
+  Trash2,
+} from 'lucide-react'
 
 import { NotificationIcon, notificationCategory } from '@/components/notifications/NotificationIcon'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import { LoadingState } from '@/components/ui/spinner'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
@@ -101,27 +107,20 @@ export function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            Notifications
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {unreadCount > 0
-              ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.`
-              : 'Reminders about bookings, invoices, jobs and quotes.'}
-          </p>
-        </div>
-
-        <Button
+      <PageHeader
+        title="Notifications"
+        description={unreadCount > 0
+        ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.`
+        : 'Reminders about bookings, invoices, jobs and quotes.'}
+        actions={<Button
           variant="outline"
           disabled={busy || unreadCount === 0}
           onClick={() => void handleMarkAllRead()}
         >
           <CheckCheck className="h-4 w-4" />
           Mark all read
-        </Button>
-      </div>
+        </Button>}
+      />
 
       <div className="flex flex-wrap gap-2">
         {NOTIFICATION_FILTERS.map((tab) => {
@@ -142,13 +141,13 @@ export function NotificationsPage() {
               className={cn(
                 'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
                 isActive
-                  ? 'border-emerald-600 bg-emerald-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800',
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-input bg-card text-foreground hover:bg-muted/50 dark:bg-transparent',
               )}
             >
               {tab.label}
               {count > 0 ? (
-                <span className={cn('ml-1.5', isActive ? 'text-emerald-100' : 'text-slate-400')}>
+                <span className={cn('ml-1.5', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground/70')}>
                   {count}
                 </span>
               ) : null}
@@ -164,12 +163,12 @@ export function NotificationsPage() {
       ) : error ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
+            <AlertCircle className="h-10 w-10 text-destructive" />
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
+              <p className="font-medium text-foreground">
                 Could not load notifications
               </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
             </div>
             <Button variant="outline" onClick={() => void refresh()}>
               Try again
@@ -179,12 +178,12 @@ export function NotificationsPage() {
       ) : visible.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <BellOff className="h-7 w-7 text-slate-400" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+              <BellOff className="h-7 w-7 text-muted-foreground/70" />
             </div>
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">No notifications</p>
-              <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">
+              <p className="font-medium text-foreground">No notifications</p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {EMPTY_COPY[filter] ?? EMPTY_COPY.all}
               </p>
             </div>
@@ -194,7 +193,7 @@ export function NotificationsPage() {
         <div className="space-y-6">
           {grouped.map(([label, items]) => (
             <section key={label} className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
                 {label}
               </h2>
 
@@ -217,16 +216,16 @@ export function NotificationsPage() {
                       >
                         <p
                           className={cn(
-                            'text-sm text-slate-900 dark:text-slate-100',
+                            'text-sm text-foreground',
                             item.is_read ? 'font-normal' : 'font-semibold',
                           )}
                         >
                           {item.title}
                         </p>
-                        <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                           {item.message}
                         </p>
-                        <p className="mt-1.5 text-xs text-slate-400">{timeAgo(item.created_at)}</p>
+                        <p className="mt-1.5 text-xs text-muted-foreground/70">{timeAgo(item.created_at)}</p>
                       </button>
 
                       <div className="flex shrink-0 items-center gap-1">
@@ -240,7 +239,7 @@ export function NotificationsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-red-600"
+                          className="h-8 w-8 text-muted-foreground/70 hover:text-destructive"
                           aria-label="Delete notification"
                           onClick={() => void handleDelete(item)}
                         >

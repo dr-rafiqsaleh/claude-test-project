@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertCircle,
   Banknote,
-  ChevronLeft,
-  ChevronRight,
   Download,
   Eye,
   MoreHorizontal,
@@ -31,6 +28,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -71,19 +69,19 @@ const ALL = '__all__'
 /** One chip in the revenue summary bar. */
 function StatChip({ label, value, loading, tone = 'default' }) {
   const tones = {
-    default: 'text-slate-900 dark:text-slate-100',
-    emerald: 'text-emerald-700 dark:text-emerald-400',
+    default: 'text-foreground',
+    emerald: 'text-primary',
     amber: 'text-amber-700 dark:text-amber-400',
-    red: 'text-red-600 dark:text-red-400',
+    red: 'text-destructive',
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
       {loading ? (
-        <div className="mt-2 h-7 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+        <div className="mt-2 h-7 w-24 animate-pulse rounded bg-muted" />
       ) : (
         <p className={cn('mt-1 text-xl font-semibold tracking-tight', tones[tone])}>{value}</p>
       )}
@@ -206,22 +204,13 @@ export function InvoicesPage() {
     navigate('/invoices')
   }
 
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            Invoices
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Bill completed work, chase what is owing and record payments as they land.
-          </p>
-        </div>
-
-        {canWrite ? (
+      <PageHeader
+        title="Invoices"
+        description="Bill completed work, chase what is owing and record payments as they land."
+        actions={canWrite ? (
           <Button asChild>
             <Link to="/invoices/new">
               <Plus className="h-4 w-4" />
@@ -229,7 +218,7 @@ export function InvoicesPage() {
             </Link>
           </Button>
         ) : null}
-      </div>
+      />
 
       {/* Revenue summary ------------------------------------------------- */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -268,8 +257,8 @@ export function InvoicesPage() {
               className={cn(
                 'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 statusFilter === ALL
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80',
               )}
             >
               All
@@ -282,8 +271,8 @@ export function InvoicesPage() {
                 className={cn(
                   'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                   statusFilter === status
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80',
                 )}
               >
                 {INVOICE_STATUS_LABELS[status]}
@@ -298,7 +287,7 @@ export function InvoicesPage() {
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -312,7 +301,7 @@ export function InvoicesPage() {
               <div>
                 <label
                   htmlFor="invoice-date-from"
-                  className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
                 >
                   Issued from
                 </label>
@@ -327,7 +316,7 @@ export function InvoicesPage() {
               <div>
                 <label
                   htmlFor="invoice-date-to"
-                  className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
                 >
                   Issued to
                 </label>
@@ -346,8 +335,8 @@ export function InvoicesPage() {
               className={cn(
                 'flex h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors',
                 overdueOnly
-                  ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300'
-                  : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
+                  ? 'border-destructive/30 bg-destructive/10 text-destructive'
+                  : 'border-input text-muted-foreground hover:bg-muted/50',
               )}
             >
               <input
@@ -355,7 +344,7 @@ export function InvoicesPage() {
                 type="checkbox"
                 checked={overdueOnly}
                 onChange={(event) => setOverdueOnly(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-600"
+                className="h-4 w-4 rounded border-input text-destructive focus:ring-destructive"
               />
               Overdue only
             </label>
@@ -382,34 +371,15 @@ export function InvoicesPage() {
         {loading ? (
           <LoadingState message="Loading invoices..." />
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
-                Could not load invoices
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
-            </div>
-            <Button variant="outline" onClick={() => void refetch()}>
-              Try again
-            </Button>
-          </div>
+          <ErrorState title="Could not load invoices" message={error.message} onRetry={refetch} />
         ) : invoices.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-              <Receipt className="h-6 w-6 text-slate-400" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">
-                {isFiltered ? 'No invoices match your filters' : 'No invoices yet'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {isFiltered
-                  ? 'Try a different search term or clear the filters.'
-                  : 'Invoices are raised automatically when a job is completed, or you can create one by hand.'}
-              </p>
-            </div>
-            {isFiltered ? (
+          <EmptyState
+            icon={Receipt}
+            title={isFiltered ? 'No invoices match your filters' : 'No invoices yet'}
+            description={isFiltered
+            ? 'Try a different search term or clear the filters.'
+            : 'Invoices are raised automatically when a job is completed, or you can create one by hand.'}
+            action={isFiltered ? (
               <Button variant="outline" onClick={clearFilters}>
                 Clear filters
               </Button>
@@ -421,7 +391,7 @@ export function InvoicesPage() {
                 </Link>
               </Button>
             ) : null}
-          </div>
+          />
         ) : (
           <>
             <Table>
@@ -458,40 +428,40 @@ export function InvoicesPage() {
                       )}
                       onClick={() => navigate(`/invoices/${invoice.id}`)}
                     >
-                      <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                      <TableCell className="font-medium text-foreground">
                         {invoice.invoice_number}
                       </TableCell>
-                      <TableCell className="text-slate-600 dark:text-slate-400">
+                      <TableCell className="text-muted-foreground">
                         {invoice.customer_name ?? '--'}
                       </TableCell>
-                      <TableCell className="hidden text-slate-600 dark:text-slate-400 lg:table-cell">
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">
                         {invoice.job_number ?? '--'}
                       </TableCell>
-                      <TableCell className="hidden text-slate-600 dark:text-slate-400 md:table-cell">
+                      <TableCell className="hidden text-muted-foreground md:table-cell">
                         {formatDate(invoice.issue_date)}
                       </TableCell>
                       <TableCell
                         className={cn(
                           'hidden md:table-cell',
                           overdue
-                            ? 'font-medium text-red-600 dark:text-red-400'
-                            : 'text-slate-600 dark:text-slate-400',
+                            ? 'font-medium text-destructive'
+                            : 'text-muted-foreground',
                         )}
                       >
                         {formatDate(invoice.due_date)}
                       </TableCell>
-                      <TableCell className="text-right font-medium text-slate-900 dark:text-slate-100">
+                      <TableCell className="text-right font-medium text-foreground">
                         {formatCurrency(invoice.total)}
                       </TableCell>
-                      <TableCell className="hidden text-right text-emerald-700 lg:table-cell dark:text-emerald-400">
+                      <TableCell className="hidden text-right text-primary lg:table-cell">
                         {formatCurrency(invoice.amount_paid)}
                       </TableCell>
                       <TableCell
                         className={cn(
                           'text-right font-medium',
                           invoice.amount_due > 0
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-emerald-700 dark:text-emerald-400',
+                            ? 'text-destructive'
+                            : 'text-primary',
                         )}
                       >
                         {formatCurrency(invoice.amount_due)}
@@ -554,7 +524,7 @@ export function InvoicesPage() {
                               {isAdmin && cancellable ? (
                                 <DropdownMenuItem
                                   onSelect={() => setPendingCancel(invoice)}
-                                  className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                 >
                                   <XCircle className="h-4 w-4" />
                                   Cancel invoice
@@ -564,7 +534,7 @@ export function InvoicesPage() {
                               {isAdmin && isDraft ? (
                                 <DropdownMenuItem
                                   onSelect={() => setPendingDelete(invoice)}
-                                  className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                   Delete
@@ -580,37 +550,7 @@ export function InvoicesPage() {
               </TableBody>
             </Table>
 
-            <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row dark:border-slate-800">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Showing <span className="font-medium">{rangeStart}</span>-
-                <span className="font-medium">{rangeEnd}</span> of{' '}
-                <span className="font-medium">{total}</span>
-              </p>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="px-2 text-sm text-slate-600 dark:text-slate-400">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </>
         )}
       </Card>
@@ -643,7 +583,7 @@ export function InvoicesPage() {
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void confirmDelete()
@@ -674,7 +614,7 @@ export function InvoicesPage() {
             <AlertDialogCancel disabled={busy}>Keep invoice</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void confirmCancel()

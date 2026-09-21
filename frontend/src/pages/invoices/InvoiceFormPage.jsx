@@ -3,13 +3,22 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertCircle, ArrowLeft, Plus, Save, Search, Send, Trash2 } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  Plus,
+  Save,
+  Search,
+  Send,
+  Trash2,
+} from 'lucide-react'
 
 import { listCustomers } from '@/api/customers'
 import { createInvoice, getInvoice, updateInvoice, updateInvoiceStatus } from '@/api/invoices'
 import { listJobs } from '@/api/jobs'
 import { listQuotes } from '@/api/quotes'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
@@ -374,11 +383,11 @@ export function InvoiceFormPage() {
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
-            <p className="font-medium text-slate-900 dark:text-slate-100">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="font-medium text-foreground">
               Could not open this invoice
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{loadError}</p>
+            <p className="text-sm text-muted-foreground">{loadError}</p>
           </CardContent>
         </Card>
       </div>
@@ -388,34 +397,23 @@ export function InvoiceFormPage() {
   const submitting = form.formState.isSubmitting
   const itemsError = form.formState.errors.items?.message
   const selectClasses =
-    'flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+    'flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60'
 
   return (
     <div className="space-y-6">
-      <Button
-        variant="ghost"
-        className="-ml-2"
-        onClick={() => navigate(isEdit && id ? `/invoices/${id}` : '/invoices')}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {isEdit ? 'Back to invoice' : 'Back to invoices'}
-      </Button>
-
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          {isEdit ? 'Edit invoice' : 'New invoice'}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {isEdit
-            ? 'Update the line items and details on this invoice.'
-            : 'Bill a customer for completed work, then save it as a draft or send it straight away.'}
-        </p>
-      </div>
+      <PageHeader
+        backTo={isEdit && id ? `/invoices/${id}` : '/invoices'}
+        backLabel={isEdit ? 'Back to invoice' : 'Back to invoices'}
+        title={isEdit ? 'Edit invoice' : 'New invoice'}
+        description={isEdit
+        ? 'Update the line items and details on this invoice.'
+        : 'Bill a customer for completed work, then save it as a draft or send it straight away.'}
+      />
 
       {submitError ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{submitError}</span>
@@ -436,7 +434,7 @@ export function InvoiceFormPage() {
             <CardContent className="space-y-4">
               {!isEdit ? (
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                   <Input
                     value={customerSearch}
                     onChange={(event) => setCustomerSearch(event.target.value)}
@@ -601,7 +599,7 @@ export function InvoiceFormPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               {itemsError ? (
-                <p className="text-xs font-medium text-red-600 dark:text-red-400">{itemsError}</p>
+                <p className="text-xs font-medium text-destructive">{itemsError}</p>
               ) : null}
 
               {fields.map((fieldItem, index) => {
@@ -615,10 +613,10 @@ export function InvoiceFormPage() {
                 return (
                   <div
                     key={fieldItem.id}
-                    className="rounded-lg border border-slate-200 p-4 dark:border-slate-800"
+                    className="rounded-lg border border-border p-4"
                   >
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      <p className="text-sm font-semibold text-foreground">
                         Item {index + 1}
                       </p>
                       <Button
@@ -627,7 +625,7 @@ export function InvoiceFormPage() {
                         size="sm"
                         disabled={fields.length <= 1}
                         onClick={() => remove(index)}
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
                         Remove
@@ -721,7 +719,7 @@ export function InvoiceFormPage() {
 
                       <FormItem>
                         <FormLabel>Line total (inc. VAT)</FormLabel>
-                        <div className="flex h-10 items-center rounded-md border border-dashed border-slate-300 px-3 text-sm font-medium text-slate-900 dark:border-slate-700 dark:text-slate-100">
+                        <div className="flex h-10 items-center rounded-md border border-dashed border-input px-3 text-sm font-medium text-foreground">
                           {formatCurrency(lineTotal)}
                         </div>
                       </FormItem>
@@ -730,27 +728,27 @@ export function InvoiceFormPage() {
                 )
               })}
 
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                <Label className="text-xs uppercase tracking-wide text-slate-500">
+              <div className="rounded-lg border border-border bg-muted/50 p-4">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                   Live totals
                 </Label>
                 <dl className="mt-3 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-slate-500 dark:text-slate-400">Subtotal</dt>
-                    <dd className="font-medium text-slate-900 dark:text-slate-100">
+                    <dt className="text-muted-foreground">Subtotal</dt>
+                    <dd className="font-medium text-foreground">
                       {formatCurrency(totals.subtotal)}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-500 dark:text-slate-400">VAT</dt>
-                    <dd className="font-medium text-slate-900 dark:text-slate-100">
+                    <dt className="text-muted-foreground">VAT</dt>
+                    <dd className="font-medium text-foreground">
                       {formatCurrency(totals.taxAmount)}
                     </dd>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-base">
-                    <dt className="font-semibold text-slate-900 dark:text-slate-100">Total due</dt>
-                    <dd className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    <dt className="font-semibold text-foreground">Total due</dt>
+                    <dd className="font-semibold text-primary">
                       {formatCurrency(totals.total)}
                     </dd>
                   </div>
@@ -847,7 +845,7 @@ export function InvoiceFormPage() {
 
             <Button type="submit" disabled={submitting} onClick={() => setSendAfterSave(true)}>
               {submitting && sendAfterSave ? (
-                <Spinner size="sm" className="text-white" />
+                <Spinner size="sm" className="text-current" />
               ) : (
                 <Send className="h-4 w-4" />
               )}

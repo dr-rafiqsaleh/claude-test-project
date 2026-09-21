@@ -139,8 +139,8 @@ export const BOOKING_STATUS_COLORS = {
   scheduled: 'bg-indigo-100 text-indigo-800',
   confirmed: 'bg-sky-100 text-sky-800',
   in_progress: 'bg-amber-100 text-amber-800',
-  completed: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-red-100 text-red-800',
+  completed: 'bg-primary/15 text-primary',
+  cancelled: 'bg-destructive/15 text-destructive',
 }
 
 /** Hex colours used by FullCalendar events, mirroring the backend palette. */
@@ -229,8 +229,8 @@ export const JOB_STATUS_LABELS = {
 export const JOB_STATUS_COLORS = {
   pending: 'bg-gray-100 text-gray-800',
   in_progress: 'bg-amber-100 text-amber-800',
-  completed: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-red-100 text-red-800',
+  completed: 'bg-primary/15 text-primary',
+  cancelled: 'bg-destructive/15 text-destructive',
 }
 
 /** Statuses where the inspection report can still be edited. */
@@ -249,10 +249,10 @@ export const RISK_LEVEL_LABELS = {
 }
 
 export const RISK_LEVEL_COLORS = {
-  low: 'bg-emerald-100 text-emerald-800',
+  low: 'bg-primary/15 text-primary',
   medium: 'bg-yellow-100 text-yellow-800',
   high: 'bg-orange-100 text-orange-800',
-  critical: 'bg-red-100 text-red-800',
+  critical: 'bg-destructive/15 text-destructive',
 }
 
 /** Hex swatches mirroring the backend PDF palette. */
@@ -322,9 +322,9 @@ export const INVOICE_STATUS_LABELS = {
 export const INVOICE_STATUS_COLORS = {
   draft: 'bg-gray-100 text-gray-700',
   sent: 'bg-blue-100 text-blue-800',
-  paid: 'bg-emerald-100 text-emerald-800',
+  paid: 'bg-primary/15 text-primary',
   partially_paid: 'bg-teal-100 text-teal-800',
-  overdue: 'bg-red-100 text-red-800',
+  overdue: 'bg-destructive/15 text-destructive',
   cancelled: 'bg-gray-100 text-gray-500 line-through',
 }
 
@@ -455,9 +455,9 @@ export const NOTIFICATION_FILTERS = [
 export const NOTIFICATION_ACCENT = {
   bookings: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
   invoices: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  jobs: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  jobs: 'bg-primary/15 text-primary',
   quotes: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
-  system: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  system: 'bg-muted text-muted-foreground',
 }
 
 /* -------------------------------------------------------------------------

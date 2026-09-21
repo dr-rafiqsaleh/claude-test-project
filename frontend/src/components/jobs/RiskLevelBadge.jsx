@@ -3,10 +3,10 @@ import { RISK_LEVEL_COLORS, RISK_LEVEL_LABELS } from '@/lib/constants'
 
 /** Dark-mode companion classes for each risk level. */
 const DARK_CLASSES = {
-  low: 'dark:bg-emerald-900/40 dark:text-emerald-300',
+  low: '',
   medium: 'dark:bg-yellow-900/40 dark:text-yellow-300',
   high: 'dark:bg-orange-900/40 dark:text-orange-300',
-  critical: 'dark:bg-red-900/40 dark:text-red-300',
+  critical: '',
 }
 
 /** Pill showing a finding's severity, or a job's overall risk level. */
@@ -18,8 +18,8 @@ export function RiskLevelBadge({ level, className, size = 'sm' }) {
       className={cn(
         'inline-flex items-center rounded-full border border-transparent font-medium',
         size === 'lg' ? 'px-4 py-1.5 text-sm font-semibold' : 'px-2.5 py-0.5 text-xs',
-        RISK_LEVEL_COLORS[level] ?? 'bg-slate-100 text-slate-700',
-        DARK_CLASSES[level] ?? 'dark:bg-slate-800 dark:text-slate-300',
+        RISK_LEVEL_COLORS[level] ?? 'bg-muted text-foreground',
+        DARK_CLASSES[level] ?? '',
         className,
       )}
     >

@@ -138,7 +138,7 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
       <Input
         ref={inputRef}
         type="search"
@@ -164,7 +164,7 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
             setQuery('')
             inputRef.current?.focus()
           }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground/70 hover:bg-muted hover:text-muted-foreground"
           aria-label="Clear search"
         >
           <X className="h-4 w-4" />
@@ -174,18 +174,18 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
       {showRecent || showResults ? (
         <div
           id="header-search-results"
-          className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[26rem] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+          className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[26rem] overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
         >
           {showRecent ? (
             <>
               <div className="flex items-center justify-between px-3 py-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
                   Recent searches
                 </span>
                 <button
                   type="button"
                   onClick={clearRecent}
-                  className="text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  className="text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
                   Clear
                 </button>
@@ -195,9 +195,9 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
                   key={term}
                   type="button"
                   onClick={() => goToResults(term)}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/50"
                 >
-                  <Clock className="h-4 w-4 shrink-0 text-slate-400" />
+                  <Clock className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                   <span className="truncate">{term}</span>
                 </button>
               ))}
@@ -206,19 +206,19 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
 
           {showResults ? (
             isLoading ? (
-              <div className="flex items-center gap-3 px-3 py-6 text-sm text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-3 px-3 py-6 text-sm text-muted-foreground">
                 <Spinner size="sm" />
                 Searching...
               </div>
             ) : groups.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 No results for &ldquo;{trimmed}&rdquo;
               </div>
             ) : (
               <>
                 {groups.map((type) => (
-                  <div key={type} className="border-b border-slate-100 last:border-b-0 dark:border-slate-800">
-                    <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <div key={type} className="border-b border-border last:border-b-0">
+                    <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
                       {SEARCH_TYPE_LABELS[type]}
                     </p>
                     {results[type].map((item) => (
@@ -226,15 +226,15 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
                         key={`${item.type}-${item.id}`}
                         type="button"
                         onClick={() => openResult(item)}
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/50"
                       >
                         <SearchResultIconChip type={item.type} size="sm" />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                          <span className="block truncate text-sm font-medium text-foreground">
                             {item.title}
                           </span>
                           {item.subtitle ? (
-                            <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                            <span className="block truncate text-xs text-muted-foreground">
                               {item.subtitle}
                             </span>
                           ) : null}
@@ -247,7 +247,7 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
                 <button
                   type="button"
                   onClick={() => goToResults()}
-                  className="flex w-full items-center justify-between gap-2 border-t border-slate-100 px-3 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-slate-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                  className="flex w-full items-center justify-between gap-2 border-t border-border px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
                 >
                   <span className="truncate">
                     See all {totalCount} result{totalCount === 1 ? '' : 's'} for &ldquo;{trimmed}

@@ -22,8 +22,8 @@ export function RoleGuard({ allow, children, redirectTo }) {
     <div className="flex items-start justify-center py-10">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-950">
-            <ShieldAlert className="h-6 w-6 text-red-600 dark:text-red-400" />
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/15">
+            <ShieldAlert className="h-6 w-6 text-destructive" />
           </div>
           <CardTitle>403 - Access denied</CardTitle>
           <CardDescription>

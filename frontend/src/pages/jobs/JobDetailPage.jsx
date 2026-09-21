@@ -44,6 +44,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { DetailField, PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -62,30 +63,15 @@ import {
 import { useAuthStore } from '@/store/authStore'
 import { JOB_STATUS, RISK_LEVELS, RISK_LEVEL_LABELS } from '@/lib/constants'
 
-function Field({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
-        <Icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          {label}
-        </p>
-        <p className="break-words text-sm font-medium text-slate-900 dark:text-slate-100">{value}</p>
-      </div>
-    </div>
-  )
-}
 
 /** Subtle "Saving..." / "Saved" indicator shown next to the job number. */
 function SaveIndicator({ state }) {
   if (state === 'idle') return null
 
   const map = {
-    saving: { label: 'Saving...', className: 'text-slate-500' },
-    saved: { label: 'Saved', className: 'text-emerald-600' },
-    error: { label: 'Not saved', className: 'text-red-600' },
+    saving: { label: 'Saving...', className: 'text-muted-foreground' },
+    saved: { label: 'Saved', className: 'text-primary' },
+    error: { label: 'Not saved', className: 'text-destructive' },
   }
   const entry = map[state] ?? map.saved
 
@@ -322,10 +308,10 @@ export function JobDetailPage() {
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500" />
+            <AlertCircle className="h-10 w-10 text-destructive" />
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Job not found</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="font-medium text-foreground">Job not found</p>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {error?.message ?? 'This job may have been removed.'}
               </p>
             </div>
@@ -351,107 +337,105 @@ export function JobDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" className="-ml-2" onClick={() => navigate('/jobs')}>
-        <ArrowLeft className="h-4 w-4" />
-        Back to jobs
-      </Button>
-
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-              {job.job_number}
-            </h1>
+      <PageHeader
+        backTo="/jobs"
+        backLabel="Back to jobs"
+        title={job.job_number}
+        badge={
+          <>
             <JobStatusBadge status={job.status} />
             {job.overall_risk_level ? (
               <RiskLevelBadge level={job.overall_risk_level} />
             ) : null}
             <SaveIndicator state={saveState} />
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          </>
+        }
+        description={
+          <>
             {job.customer_name ?? 'Unknown customer'} · {job.service_type} ·{' '}
             {job.technician_name ?? 'Unassigned'}
-          </p>
-        </div>
+          </>
+        }
+        actions={
+          <>
+            {editable ? (
+              <Button asChild variant="outline">
+                <Link to={`/jobs/${job.id}/report`}>
+                  <Smartphone className="h-4 w-4" />
+                  Field form
+                </Link>
+              </Button>
+            ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          {editable ? (
-            <Button asChild variant="outline">
-              <Link to={`/jobs/${job.id}/report`}>
-                <Smartphone className="h-4 w-4" />
-                Field form
-              </Link>
-            </Button>
-          ) : null}
+            {canStart ? (
+              <Button
+                disabled={transitioning}
+                onClick={() => void changeStatus(JOB_STATUS.IN_PROGRESS)}
+              >
+                {transitioning ? (
+                  <Spinner size="sm" className="text-current" />
+                ) : (
+                  <PlayCircle className="h-4 w-4" />
+                )}
+                Start visit
+              </Button>
+            ) : null}
 
-          {canStart ? (
-            <Button
-              disabled={transitioning}
-              onClick={() => void changeStatus(JOB_STATUS.IN_PROGRESS)}
-            >
-              {transitioning ? (
-                <Spinner size="sm" className="text-white" />
-              ) : (
-                <PlayCircle className="h-4 w-4" />
-              )}
-              Start visit
-            </Button>
-          ) : null}
+            {isInProgress ? (
+              <Button
+                disabled={transitioning || !canComplete}
+                title={
+                  canComplete
+                    ? undefined
+                    : 'Record at least one finding or some inspection notes first'
+                }
+                onClick={() => void changeStatus(JOB_STATUS.COMPLETED)}
+              >
+                {transitioning ? (
+                  <Spinner size="sm" className="text-current" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Complete visit
+              </Button>
+            ) : null}
 
-          {isInProgress ? (
-            <Button
-              disabled={transitioning || !canComplete}
-              title={
-                canComplete
-                  ? undefined
-                  : 'Record at least one finding or some inspection notes first'
-              }
-              onClick={() => void changeStatus(JOB_STATUS.COMPLETED)}
-            >
-              {transitioning ? (
-                <Spinner size="sm" className="text-white" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
-              Complete visit
-            </Button>
-          ) : null}
+            {isCompleted ? (
+              <Button disabled={downloading} onClick={() => void handleDownload()}>
+                {downloading ? (
+                  <Spinner size="sm" className="text-current" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {downloading ? 'Preparing...' : 'Download report'}
+              </Button>
+            ) : null}
 
-          {isCompleted ? (
-            <Button disabled={downloading} onClick={() => void handleDownload()}>
-              {downloading ? (
-                <Spinner size="sm" className="text-white" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              {downloading ? 'Preparing...' : 'Download report'}
-            </Button>
-          ) : null}
+            {isCompleted && job.invoice_id ? (
+              <Button asChild variant="outline">
+                <Link to={`/invoices/${job.invoice_id}`}>
+                  <Receipt className="h-4 w-4" />
+                  View invoice
+                </Link>
+              </Button>
+            ) : null}
 
-          {isCompleted && job.invoice_id ? (
-            <Button asChild variant="outline">
-              <Link to={`/invoices/${job.invoice_id}`}>
-                <Receipt className="h-4 w-4" />
-                View invoice
-              </Link>
-            </Button>
-          ) : null}
+            {isCompleted && !job.invoice_id && canWrite ? (
+              <Button variant="outline" disabled={invoicing} onClick={() => void handleCreateInvoice()}>
+                {invoicing ? <Spinner size="sm" /> : <Receipt className="h-4 w-4" />}
+                {invoicing ? 'Creating...' : 'Create invoice'}
+              </Button>
+            ) : null}
 
-          {isCompleted && !job.invoice_id && canWrite ? (
-            <Button variant="outline" disabled={invoicing} onClick={() => void handleCreateInvoice()}>
-              {invoicing ? <Spinner size="sm" /> : <Receipt className="h-4 w-4" />}
-              {invoicing ? 'Creating...' : 'Create invoice'}
-            </Button>
-          ) : null}
-
-          {isAdmin && !isCompleted && !isCancelled ? (
-            <Button variant="destructive" disabled={transitioning} onClick={() => setCancelOpen(true)}>
-              <XCircle className="h-4 w-4" />
-              Cancel
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            {isAdmin && !isCompleted && !isCancelled ? (
+              <Button variant="destructive" disabled={transitioning} onClick={() => setCancelOpen(true)}>
+                <XCircle className="h-4 w-4" />
+                Cancel
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       {/* Section 1 - Job info ------------------------------------------- */}
       <div className="grid gap-6 lg:grid-cols-3">
@@ -462,20 +446,20 @@ export function JobDetailPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field icon={ClipboardList} label="Service type" value={job.service_type} />
-              <Field
+              <DetailField icon={ClipboardList} label="Service type" value={job.service_type} />
+              <DetailField
                 icon={Wrench}
                 label="Technician"
                 value={job.technician_name ?? 'Unassigned'}
               />
-              <Field
+              <DetailField
                 icon={CalendarClock}
                 label="Scheduled"
                 value={`${formatBookingDateTime(job.scheduled_start)} - ${formatBookingDateTime(
                   job.scheduled_end,
                 )}`}
               />
-              <Field
+              <DetailField
                 icon={Timer}
                 label="Actual"
                 value={
@@ -486,19 +470,19 @@ export function JobDetailPage() {
                     : 'Not started'
                 }
               />
-              <Field icon={Timer} label="Time on site" value={formatDuration(job.duration_minutes)} />
+              <DetailField icon={Timer} label="Time on site" value={formatDuration(job.duration_minutes)} />
               {job.booking_number ? (
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800">
-                    <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Booking
                     </p>
                     <Link
                       to={`/bookings/${job.booking_id}`}
-                      className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                      className="text-sm font-medium text-primary hover:underline"
                     >
                       {job.booking_number}
                     </Link>
@@ -511,8 +495,8 @@ export function JobDetailPage() {
 
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <Bug className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <Bug className="h-4 w-4 text-muted-foreground" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Target pests
                 </p>
               </div>
@@ -521,14 +505,14 @@ export function JobDetailPage() {
                   {job.pest_types.map((pest) => (
                     <span
                       key={pest}
-                      className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground"
                     >
                       {pest}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-slate-500 dark:text-slate-400">None recorded.</p>
+                <p className="text-sm text-muted-foreground">None recorded.</p>
               )}
             </div>
           </CardContent>
@@ -539,9 +523,9 @@ export function JobDetailPage() {
             <CardTitle className="text-base">Customer</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <Field icon={UserIcon} label="Name" value={job.customer_name ?? '--'} />
-            <Field icon={Phone} label="Phone" value={job.customer_phone ?? '--'} />
-            <Field icon={MapPin} label="Service address" value={addressLine(job)} />
+            <DetailField icon={UserIcon} label="Name" value={job.customer_name ?? '--'} />
+            <DetailField icon={Phone} label="Phone" value={job.customer_phone ?? '--'} />
+            <DetailField icon={MapPin} label="Service address" value={addressLine(job)} />
             <Button asChild variant="outline" size="sm" className="w-full">
               <Link to={`/customers/${job.customer_id}`}>View customer</Link>
             </Button>
@@ -588,7 +572,7 @@ export function JobDetailPage() {
               />
             ))
           ) : !showFindingForm ? (
-            <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            <p className="py-6 text-center text-sm text-muted-foreground">
               No findings recorded yet.
             </p>
           ) : null}
@@ -625,7 +609,7 @@ export function JobDetailPage() {
               />
             ))
           ) : !showTreatmentForm ? (
-            <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            <p className="py-6 text-center text-sm text-muted-foreground">
               No treatments recorded yet.
             </p>
           ) : null}
@@ -769,7 +753,7 @@ export function JobDetailPage() {
             {!(isCompleted && !canWrite) ? (
               <Button disabled={savingSignature} onClick={() => void handleSaveSignatures()}>
                 {savingSignature ? (
-                  <Spinner size="sm" className="text-white" />
+                  <Spinner size="sm" className="text-current" />
                 ) : (
                   <PenLine className="h-4 w-4" />
                 )}
@@ -794,7 +778,7 @@ export function JobDetailPage() {
           <CardContent>
             <Button disabled={downloading} onClick={() => void handleDownload()}>
               {downloading ? (
-                <Spinner size="sm" className="text-white" />
+                <Spinner size="sm" className="text-current" />
               ) : (
                 <Download className="h-4 w-4" />
               )}
@@ -831,7 +815,7 @@ export function JobDetailPage() {
             <AlertDialogCancel disabled={transitioning}>Keep job</AlertDialogCancel>
             <AlertDialogAction
               disabled={transitioning}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault()
                 void changeStatus(JOB_STATUS.CANCELLED)

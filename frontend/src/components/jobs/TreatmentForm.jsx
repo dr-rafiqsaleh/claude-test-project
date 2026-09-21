@@ -95,7 +95,7 @@ export function TreatmentForm({ onAdd, onCancel, large = false, className }) {
       )}
     >
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">New treatment</h4>
+        <h4 className="text-sm font-semibold text-foreground">New treatment</h4>
         {onCancel ? (
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onCancel}>
             <X className="h-4 w-4" />
@@ -186,7 +186,7 @@ export function TreatmentForm({ onAdd, onCancel, large = false, className }) {
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Areas treated
         </p>
         <div className="flex flex-wrap gap-2">
@@ -202,8 +202,8 @@ export function TreatmentForm({ onAdd, onCancel, large = false, className }) {
                   'rounded-full border px-3 font-medium transition-colors',
                   large ? 'py-2 text-sm' : 'py-1 text-xs',
                   selected
-                    ? 'border-emerald-600 bg-emerald-600 text-white'
-                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input bg-card text-muted-foreground hover:bg-muted/50',
                 )}
               >
                 {area}
@@ -213,7 +213,7 @@ export function TreatmentForm({ onAdd, onCancel, large = false, className }) {
         </div>
       </div>
 
-      {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button
