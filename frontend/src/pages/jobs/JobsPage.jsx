@@ -114,10 +114,10 @@ export function JobsPage() {
     setWorking(true)
     try {
       await remove(pendingDelete.id)
-      toastSuccess('Job deleted', `${pendingDelete.job_number} was removed.`)
+      toastSuccess('Report deleted', `${pendingDelete.job_number} was removed.`)
       setPendingDelete(null)
     } catch (err) {
-      toastError('Could not delete job', toApiError(err).message)
+      toastError('Could not delete report', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -158,7 +158,7 @@ export function JobsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Jobs"
+        title="Visit reports"
         description={user?.role === UserRole.TECHNICIAN
         ? 'Your on-site work and inspection reports.'
         : 'Track on-site work, inspection reports and sign-offs.'}
@@ -190,9 +190,9 @@ export function JobsPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by job number, customer or service..."
+                placeholder="Search by report number, customer or service..."
                 className="pl-9"
-                aria-label="Search jobs"
+                aria-label="Search reports"
               />
             </div>
 
@@ -256,13 +256,13 @@ export function JobsPage() {
 
       <Card className="overflow-hidden">
         {loading ? (
-          <LoadingState message="Loading jobs..." />
+          <LoadingState message="Loading reports..." />
         ) : error ? (
-          <ErrorState title="Could not load jobs" message={error.message} onRetry={refetch} />
+          <ErrorState title="Could not load reports" message={error.message} onRetry={refetch} />
         ) : jobs.length === 0 ? (
           <EmptyState
             icon={ClipboardList}
-            title={isFiltered ? 'No jobs match your filters' : 'No jobs yet'}
+            title={isFiltered ? 'No reports match your filters' : 'No reports yet'}
             description={isFiltered
             ? 'Try a different search term or clear the filters.'
             : "A visit's report opens as soon as the visit is started from its booking."}
@@ -277,7 +277,7 @@ export function JobsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Job #</TableHead>
+                  <TableHead>Report #</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead className="hidden lg:table-cell">Technician</TableHead>
                   <TableHead className="hidden md:table-cell">Service type</TableHead>
@@ -412,7 +412,7 @@ export function JobsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this report?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
                 ? `${pendingDelete.job_number} and its photos will be permanently deleted. Only pending jobs can be removed, and this cannot be undone.`
@@ -420,7 +420,7 @@ export function JobsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={working}>Keep job</AlertDialogCancel>
+            <AlertDialogCancel disabled={working}>Keep report</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
               className="bg-destructive hover:bg-destructive/90"
@@ -429,7 +429,7 @@ export function JobsPage() {
                 void confirmDelete()
               }}
             >
-              {working ? 'Deleting...' : 'Delete job'}
+              {working ? 'Deleting...' : 'Delete report'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

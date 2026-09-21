@@ -1,52 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { format } from 'date-fns'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { addDays, endOfDay, format, startOfDay } from 'date-fns'
 import {
   AlertTriangle,
   ArrowRight,
-  CalendarClock,
+  CalendarCheck,
+  CalendarPlus,
+  CheckCircle2,
   ClipboardList,
+  FileText,
+  MapPin,
+  Phone,
+  PlayCircle,
   Receipt,
-  Users,
-  Wallet,
+  Send,
 } from 'lucide-react'
 
-import { getCalendarEvents } from '@/api/bookings'
-import { listCustomers } from '@/api/customers'
-import { listInvoices, getInvoiceSummary } from '@/api/invoices'
-import { listJobs } from '@/api/jobs'
-import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge'
+import { listBookings, updateBookingStatus } from '@/api/bookings'
+import { getInvoiceSummary, listInvoices } from '@/api/invoices'
+import { listQuotes } from '@/api/quotes'
+import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { EmptyState, PageHeader } from '@/components/ui/page'
+import { Spinner } from '@/components/ui/spinner'
+import { toastError } from '@/components/ui/use-toast'
+import { toApiError } from '@/lib/api'
+import { BOOKING_STATUS, UserRole } from '@/lib/constants'
+import { cn, formatAddress, formatCurrency, formatTime } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import { cn, formatBookingDateTime, formatCurrency } from '@/lib/utils'
-import { BOOKING_STATUS, JOB_STATUS, ROLE_LABELS } from '@/lib/constants'
 
 /** How many months of history the revenue chart covers. */
 const CHART_MONTHS = 6
-
 /** Cap on the pages of invoices pulled in to build the chart. */
 const MAX_CHART_PAGES = 5
 const CHART_PAGE_SIZE = 100
+
+// The chart library is heavy and only office staff see it, so technicians' phones never download it.
+const RevenueCard = lazy(() => import('@/components/dashboard/RevenueCard'))
 
 function greeting() {
   const hour = new Date().getHours()
@@ -55,8 +46,305 @@ function greeting() {
   return 'Good evening'
 }
 
-/** The first day of the month, `monthsAgo` months back. */
-function monthStart(monthsAgo = 0) {
+function firstName(user) {
+  return user?.full_name?.split(' ')[0] ?? ''
+}
+
+/** Exact local-day bounds, so "today" is right under BST as well as GMT. */
+function dayRange(offsetDays = 0, spanDays = 1) {
+  const from = startOfDay(addDays(new Date(), offsetDays))
+  const to = endOfDay(addDays(from, spanDays - 1))
+  return { date_from: from.toISOString(), date_to: to.toISOString() }
+}
+
+const byStart = (a, b) => new Date(a.scheduled_start) - new Date(b.scheduled_start)
+
+function visitAddress(visit) {
+  return visit.service_address ? formatAddress(visit.service_address) : visit.customer_address
+}
+
+const isOpen = (visit) =>
+  visit.status === BOOKING_STATUS.SCHEDULED || visit.status === BOOKING_STATUS.CONFIRMED
+
+function Skeleton({ className }) {
+  return <div className={cn('animate-pulse rounded-md bg-muted', className)} />
+}
+
+function Section({ title, count, action, children }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-foreground">
+          {title}
+          {count ? <span className="ml-2 text-sm font-normal text-muted-foreground">{count}</span> : null}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+// --------------------------------------------------------------------------
+// Technician: today's visits, one tap to start or carry on
+// --------------------------------------------------------------------------
+
+function VisitCard({ visit, onStart, starting }) {
+  const address = visitAddress(visit)
+  const reportPath = visit.job_id ? `/jobs/${visit.job_id}/report` : null
+
+  return (
+    <Card className="overflow-hidden">
+      <Link to={`/bookings/${visit.id}`} className="flex gap-4 p-4 transition-colors duration-150 hover:bg-muted/50">
+        <div className="w-14 shrink-0">
+          <p className="text-lg font-semibold leading-tight text-foreground">{formatTime(visit.scheduled_start)}</p>
+          <p className="text-xs text-muted-foreground">to {formatTime(visit.scheduled_end)}</p>
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate font-medium text-foreground">{visit.customer_name}</p>
+            <BookingStatusBadge status={visit.status} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {visit.service_type}
+            {visit.pest_types?.length ? ` · ${visit.pest_types.join(', ')}` : ''}
+          </p>
+          {address ? <p className="text-sm text-muted-foreground">{address}</p> : null}
+        </div>
+      </Link>
+
+      <div className="flex gap-2 border-t border-border p-3">
+        {address ? (
+          <Button asChild variant="outline" className="h-12 flex-1">
+            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noreferrer">
+              <MapPin className="h-4 w-4" />
+              Map
+            </a>
+          </Button>
+        ) : null}
+        {visit.customer_phone ? (
+          <Button asChild variant="outline" className="h-12 flex-1">
+            <a href={`tel:${visit.customer_phone.replace(/\s/g, '')}`}>
+              <Phone className="h-4 w-4" />
+              Call
+            </a>
+          </Button>
+        ) : null}
+        {isOpen(visit) && onStart ? (
+          <Button className="h-12 flex-[2]" disabled={starting} onClick={() => onStart(visit)}>
+            {starting ? <Spinner size="sm" className="text-current" /> : <PlayCircle className="h-4 w-4" />}
+            Start visit
+          </Button>
+        ) : null}
+        {visit.status === BOOKING_STATUS.IN_PROGRESS && reportPath ? (
+          <Button asChild className="h-12 flex-[2]">
+            <Link to={reportPath}>
+              <ClipboardList className="h-4 w-4" />
+              Continue report
+            </Link>
+          </Button>
+        ) : null}
+        {visit.status === BOOKING_STATUS.COMPLETED ? (
+          <p className="flex h-12 flex-[2] items-center justify-center gap-2 text-sm font-medium text-primary">
+            <CheckCircle2 className="h-4 w-4" />
+            Done
+          </p>
+        ) : null}
+      </div>
+    </Card>
+  )
+}
+
+function TechnicianToday({ user }) {
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [today, setToday] = useState([])
+  const [unfinished, setUnfinished] = useState([])
+  const [upcoming, setUpcoming] = useState([])
+  const [startingId, setStartingId] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      // The API returns only this technician's own visits.
+      const [todayRes, openRes, upcomingRes] = await Promise.allSettled([
+        listBookings({ ...dayRange(0), page_size: 100 }),
+        listBookings({ status: BOOKING_STATUS.IN_PROGRESS, page_size: 50 }),
+        listBookings({ ...dayRange(1, 7), page_size: 20 }),
+      ])
+      if (cancelled) return
+      const todays = todayRes.status === 'fulfilled' ? [...todayRes.value.items].sort(byStart) : []
+      const todayIds = new Set(todays.map((visit) => visit.id))
+      setToday(todays)
+      // Reports still open from earlier days - easy to forget, so they come first.
+      setUnfinished(
+        openRes.status === 'fulfilled'
+          ? openRes.value.items.filter((visit) => !todayIds.has(visit.id)).sort(byStart)
+          : [],
+      )
+      setUpcoming(
+        upcomingRes.status === 'fulfilled'
+          ? upcomingRes.value.items.filter((visit) => visit.status !== BOOKING_STATUS.CANCELLED).sort(byStart)
+          : [],
+      )
+      setLoading(false)
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function startVisit(visit) {
+    setStartingId(visit.id)
+    try {
+      const updated = await updateBookingStatus(visit.id, BOOKING_STATUS.IN_PROGRESS)
+      if (updated.job_id) navigate(`/jobs/${updated.job_id}/report`)
+    } catch (err) {
+      toastError('Could not start the visit', toApiError(err).message)
+      setStartingId(null)
+    }
+  }
+
+  const remaining = today.filter(
+    (visit) => visit.status !== BOOKING_STATUS.COMPLETED && visit.status !== BOOKING_STATUS.CANCELLED,
+  )
+  const dateLabel = format(new Date(), 'EEEE d MMMM')
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-8">
+      <PageHeader
+        title={`${greeting()}, ${firstName(user)}`}
+        description={
+          loading
+            ? dateLabel
+            : `${dateLabel} · ${
+                remaining.length === 0
+                  ? 'nothing left today'
+                  : `${remaining.length} visit${remaining.length === 1 ? '' : 's'} to go`
+              }`
+        }
+      />
+
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+        </div>
+      ) : (
+        <>
+          {unfinished.length > 0 ? (
+            <Section title="Reports to finish" count={unfinished.length}>
+              <div className="space-y-3">
+                {unfinished.map((visit) => (
+                  <VisitCard key={visit.id} visit={visit} />
+                ))}
+              </div>
+            </Section>
+          ) : null}
+
+          <Section title="Today" count={today.length || null}>
+            {today.length === 0 ? (
+              <Card>
+                <EmptyState
+                  icon={CalendarCheck}
+                  title="No visits today"
+                  description="Anything booked for you will appear here."
+                />
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {today.map((visit) => (
+                  <VisitCard
+                    key={visit.id}
+                    visit={visit}
+                    onStart={startVisit}
+                    starting={startingId === visit.id}
+                  />
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {upcoming.length > 0 ? (
+            <Section
+              title="Coming up"
+              action={
+                <Button asChild variant="link" size="sm" className="h-auto p-0">
+                  <Link to="/bookings">
+                    Full schedule
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              }
+            >
+              <Card>
+                <ul className="divide-y divide-border">
+                  {upcoming.map((visit) => (
+                    <li key={visit.id}>
+                      <Link
+                        to={`/bookings/${visit.id}`}
+                        className="flex items-center gap-4 px-4 py-3 transition-colors duration-150 hover:bg-muted/50"
+                      >
+                        <div className="w-20 shrink-0">
+                          <p className="text-sm font-medium text-foreground">
+                            {format(new Date(visit.scheduled_start), 'EEE d MMM')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatTime(visit.scheduled_start)}</p>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-foreground">{visit.customer_name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{visit.service_type}</p>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </Section>
+          ) : null}
+        </>
+      )}
+    </div>
+  )
+}
+
+// --------------------------------------------------------------------------
+// Office and admin: what needs doing, today's visits, money
+// --------------------------------------------------------------------------
+
+function AttentionCard({ icon: Icon, label, value, hint, to, urgent, loading }) {
+  return (
+    <Link
+      to={to}
+      className="group rounded-lg border border-border bg-card p-4 transition-colors duration-150 hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <Icon
+          className={cn('h-4 w-4', urgent ? 'text-destructive' : 'text-muted-foreground/70')}
+          aria-hidden="true"
+        />
+      </div>
+      {loading ? (
+        <Skeleton className="mt-3 h-8 w-12" />
+      ) : (
+        <p className={cn('mt-2 text-3xl font-semibold tracking-tight', urgent ? 'text-destructive' : 'text-foreground')}>
+          {value}
+        </p>
+      )}
+      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+        {hint}
+        <ArrowRight
+          className="h-3 w-3 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          aria-hidden="true"
+        />
+      </p>
+    </Link>
+  )
+}
+
+function monthStart(monthsAgo) {
   const date = new Date()
   date.setDate(1)
   date.setHours(0, 0, 0, 0)
@@ -64,33 +352,24 @@ function monthStart(monthsAgo = 0) {
   return date
 }
 
-function monthKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
-/** Bucket invoices into the last six months of invoiced vs collected revenue. */
+/** Bucket invoices into the chart window: invoiced vs collected per month. */
 function buildRevenueSeries(invoices) {
   const buckets = []
   const index = new Map()
-
   for (let offset = CHART_MONTHS - 1; offset >= 0; offset -= 1) {
     const start = monthStart(offset)
     const bucket = { month: format(start, 'MMM'), invoiced: 0, collected: 0 }
     buckets.push(bucket)
-    index.set(monthKey(start), bucket)
+    index.set(format(start, 'yyyy-MM'), bucket)
   }
-
   for (const invoice of invoices) {
     const issued = new Date(invoice.issue_date)
     if (Number.isNaN(issued.getTime())) continue
-
-    const bucket = index.get(monthKey(issued))
+    const bucket = index.get(format(issued, 'yyyy-MM'))
     if (!bucket) continue
-
     bucket.invoiced += Number(invoice.total ?? 0)
     bucket.collected += Number(invoice.amount_paid ?? 0)
   }
-
   return buckets.map((bucket) => ({
     ...bucket,
     invoiced: Math.round(bucket.invoiced * 100) / 100,
@@ -98,406 +377,237 @@ function buildRevenueSeries(invoices) {
   }))
 }
 
-/** Pull every invoice issued in the chart window, a page at a time. */
+/** Every invoice issued in the chart window, a page at a time. */
 async function fetchChartInvoices() {
   const dateFrom = monthStart(CHART_MONTHS - 1).toISOString()
   const collected = []
-
   for (let page = 1; page <= MAX_CHART_PAGES; page += 1) {
     // Sequential by design: each page depends on the total from the last one.
     // eslint-disable-next-line no-await-in-loop
     const data = await listInvoices({ page, page_size: CHART_PAGE_SIZE, date_from: dateFrom })
     collected.push(...(data.items ?? []))
-
     if (collected.length >= (data.total ?? 0) || (data.items ?? []).length === 0) break
   }
-
   return collected
 }
 
-function StatSkeleton() {
-  return <div className="h-8 w-20 animate-pulse rounded bg-muted" />
-}
-
-function RowSkeleton({ className }) {
-  return <div className={cn('h-4 animate-pulse rounded bg-muted', className)} />
-}
-
-function StatCard({ label, value, icon: Icon, hint, to, linkLabel, loading, tone = 'default' }) {
-  const tones = {
-    default: 'text-foreground',
-    emerald: 'text-primary',
-    red: 'text-destructive',
-  }
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {label}
-        </CardTitle>
-        <Icon className={cn('h-4 w-4', tone === 'red' ? 'text-destructive' : 'text-primary')} />
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <StatSkeleton />
-        ) : (
-          <span className={cn('text-3xl font-semibold tracking-tight', tones[tone])}>{value}</span>
-        )}
-        <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
-        {to ? (
-          <Button asChild variant="link" size="sm" className="mt-2 h-auto p-0">
-            <Link to={to}>
-              {linkLabel}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
-  )
-}
-
-export function DashboardPage() {
-  const user = useAuthStore((state) => state.user)
-  const canSeeInvoices = useAuthStore((state) => state.canWrite())
-
+function OfficeToday({ user }) {
   const [loading, setLoading] = useState(true)
-  const [customerCount, setCustomerCount] = useState(null)
-  const [activeBookingCount, setActiveBookingCount] = useState(null)
-  const [pendingJobCount, setPendingJobCount] = useState(null)
+  const [visits, setVisits] = useState([])
+  const [reportsDue, setReportsDue] = useState(null)
+  const [awaitingReply, setAwaitingReply] = useState(null)
   const [summary, setSummary] = useState(null)
-  const [revenue, setRevenue] = useState([])
-  const [revenueFailed, setRevenueFailed] = useState(false)
-  const [recentInvoices, setRecentInvoices] = useState([])
-  const [upcomingBookings, setUpcomingBookings] = useState([])
+  const [revenue, setRevenue] = useState({ state: 'loading', series: [] })
 
   useEffect(() => {
     let cancelled = false
-
-    async function loadDashboard() {
-      const now = new Date()
-      const horizon = new Date(now)
-      horizon.setDate(horizon.getDate() + 60)
-
-      // Technicians have no access to invoicing, so those calls are skipped
-      // rather than fired and rejected with a 403.
-      const noAccess = () => Promise.reject(new Error('Invoices are not available to your role'))
-      const invoiceRequests = canSeeInvoices
-        ? [getInvoiceSummary(), listInvoices({ page: 1, page_size: 5 }), fetchChartInvoices()]
-        : [noAccess(), noAccess(), noAccess()]
-
-      const [customers, jobs, bookings, invoiceSummary, latestInvoices, chartInvoices] =
-        await Promise.allSettled([
-          listCustomers({ page: 1, page_size: 1, is_active: true }),
-          listJobs({ page: 1, page_size: 1, status: JOB_STATUS.PENDING }),
-          getCalendarEvents(now.toISOString(), horizon.toISOString()),
-          ...invoiceRequests,
-        ])
-
+    async function load() {
+      const [todayRes, dueRes, quotesRes, summaryRes] = await Promise.allSettled([
+        listBookings({ ...dayRange(0), page_size: 100 }),
+        listBookings({ status: BOOKING_STATUS.IN_PROGRESS, page_size: 1 }),
+        listQuotes({ status: 'sent', page_size: 1 }),
+        getInvoiceSummary(),
+      ])
       if (cancelled) return
-
-      setCustomerCount(customers.status === 'fulfilled' ? customers.value.total : null)
-      setPendingJobCount(jobs.status === 'fulfilled' ? jobs.value.total : null)
-
-      // Active bookings = anything still scheduled or confirmed in the window.
-      if (bookings.status === 'fulfilled' && Array.isArray(bookings.value)) {
-        const events = bookings.value
-        const active = events.filter((event) => {
-          const status = event.extendedProps?.status
-          return status === BOOKING_STATUS.SCHEDULED || status === BOOKING_STATUS.CONFIRMED
-        })
-        setActiveBookingCount(active.length)
-        setUpcomingBookings(active.slice(0, 5))
-      } else {
-        setActiveBookingCount(null)
-        setUpcomingBookings([])
-      }
-
-      setSummary(invoiceSummary.status === 'fulfilled' ? invoiceSummary.value : null)
-      setRecentInvoices(
-        latestInvoices.status === 'fulfilled' ? (latestInvoices.value.items ?? []) : [],
-      )
-
-      if (chartInvoices.status === 'fulfilled') {
-        setRevenue(buildRevenueSeries(chartInvoices.value))
-        setRevenueFailed(false)
-      } else {
-        setRevenue(buildRevenueSeries([]))
-        setRevenueFailed(true)
-      }
-
+      setVisits(todayRes.status === 'fulfilled' ? [...todayRes.value.items].sort(byStart) : [])
+      setReportsDue(dueRes.status === 'fulfilled' ? dueRes.value.total : null)
+      setAwaitingReply(quotesRes.status === 'fulfilled' ? quotesRes.value.total : null)
+      setSummary(summaryRes.status === 'fulfilled' ? summaryRes.value : null)
       setLoading(false)
-    }
 
-    void loadDashboard()
+      // The chart is the slowest piece; it fills in last without holding up the rest.
+      try {
+        const invoices = await fetchChartInvoices()
+        if (!cancelled) setRevenue({ state: 'ready', series: buildRevenueSeries(invoices) })
+      } catch {
+        if (!cancelled) setRevenue({ state: 'failed', series: [] })
+      }
+    }
+    void load()
     return () => {
       cancelled = true
     }
-  }, [canSeeInvoices])
+  }, [])
 
-  const hasRevenue = useMemo(
-    () => revenue.some((row) => row.invoiced > 0 || row.collected > 0),
-    [revenue],
+  const show = (value) => (value === null || value === undefined ? '--' : value)
+  const drafts = summary ? (summary.invoice_count_by_status?.draft ?? 0) : null
+  const overdueCount = summary ? (summary.overdue_count ?? 0) : null
+  const remaining = visits.filter(
+    (visit) => visit.status !== BOOKING_STATUS.COMPLETED && visit.status !== BOOKING_STATUS.CANCELLED,
+  )
+  const technicianCount = useMemo(
+    () => new Set(visits.map((visit) => visit.technician_name).filter(Boolean)).size,
+    [visits],
   )
 
-  const dash = (value) => (value === null || value === undefined ? '--' : String(value))
-  const money = (value) =>
-    value === null || value === undefined ? '--' : formatCurrency(value)
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        title={
+        title={`${greeting()}, ${firstName(user)}`}
+        description={format(new Date(), 'EEEE d MMMM')}
+        actions={
           <>
-            {greeting()}
-            {user ? `, ${user.full_name.split(' ')[0]}` : ''}
-          </>
-        }
-        description={
-          <>
-            {user ? `Signed in as ${ROLE_LABELS[user.role]}.` : ''} Here is where things stand today.
+            <Button asChild variant="outline">
+              <Link to="/quotes/new">
+                <FileText className="h-4 w-4" />
+                New quote
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/bookings/new">
+                <CalendarPlus className="h-4 w-4" />
+                Book a visit
+              </Link>
+            </Button>
           </>
         }
       />
 
-      {/* Row 1 - stat cards ---------------------------------------------- */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          label="Total customers"
-          value={dash(customerCount)}
-          icon={Users}
-          hint="Active records in your database"
-          to="/customers"
-          linkLabel="View customers"
-          loading={loading}
-        />
-        <StatCard
-          label="Active bookings"
-          value={dash(activeBookingCount)}
-          icon={CalendarClock}
-          hint="Scheduled or confirmed in the next 60 days"
-          to="/bookings?view=calendar"
-          linkLabel="Open the calendar"
-          loading={loading}
-        />
-        <StatCard
-          label="Pending jobs"
-          value={dash(pendingJobCount)}
-          icon={ClipboardList}
-          hint="Waiting on a technician to start"
-          to="/jobs"
-          linkLabel="View jobs"
-          loading={loading}
-        />
-        <StatCard
-          label="Outstanding"
-          value={money(summary?.total_outstanding)}
-          icon={Wallet}
-          hint="Invoiced but not yet collected"
-          to={canSeeInvoices ? '/invoices' : undefined}
-          linkLabel="View invoices"
-          loading={loading}
-        />
-        <StatCard
-          label="Overdue"
-          value={money(summary?.total_overdue)}
-          icon={AlertTriangle}
-          hint={
-            summary?.overdue_count
-              ? `${summary.overdue_count} invoice(s) past their due date`
-              : 'Nothing past its due date'
-          }
-          to={canSeeInvoices ? '/invoices?overdue=1' : undefined}
-          linkLabel="Chase payments"
-          loading={loading}
-          tone={(summary?.total_overdue ?? 0) > 0 ? 'red' : 'default'}
-        />
-      </div>
+      <Section title="Needs attention">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <AttentionCard
+            icon={ClipboardList}
+            label="Reports due"
+            value={show(reportsDue)}
+            hint="Visits started, report not filed"
+            to="/bookings?status=in_progress"
+            loading={loading}
+          />
+          <AttentionCard
+            icon={FileText}
+            label="Awaiting reply"
+            value={show(awaitingReply)}
+            hint="Quotes sent to customers"
+            to="/quotes?status=sent"
+            loading={loading}
+          />
+          <AttentionCard
+            icon={Send}
+            label="Ready to send"
+            value={show(drafts)}
+            hint="Draft invoices"
+            to="/invoices?status=draft"
+            loading={loading}
+          />
+          <AttentionCard
+            icon={AlertTriangle}
+            label="Overdue"
+            value={summary ? formatCurrency(summary.total_overdue ?? 0) : '--'}
+            hint={overdueCount ? `${overdueCount} invoice${overdueCount === 1 ? '' : 's'} past due` : 'Nothing past due'}
+            to="/invoices?overdue=1"
+            urgent={(summary?.total_overdue ?? 0) > 0}
+            loading={loading}
+          />
+        </div>
+      </Section>
 
-      {/* Row 2 - revenue chart -------------------------------------------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue</CardTitle>
-          <CardDescription>
-            Invoiced against collected over the last {CHART_MONTHS} months.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="h-[300px] animate-pulse rounded-md bg-muted" />
-          ) : !canSeeInvoices || revenueFailed ? (
-            <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-center">
-              <Receipt className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                {canSeeInvoices
-                  ? 'Revenue figures are unavailable right now.'
-                  : 'Revenue figures are only visible to office staff and admins.'}
-              </p>
-            </div>
-          ) : !hasRevenue ? (
-            <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-center">
-              <Receipt className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                No invoices raised in the last {CHART_MONTHS} months.
-              </p>
-            </div>
-          ) : (
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenue} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e2e8f0' }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `£${Number(value).toLocaleString('en-GB')}`}
-                    width={80}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => [formatCurrency(value), name]}
-                    contentStyle={{
-                      borderRadius: 8,
-                      border: '1px solid #e2e8f0',
-                      fontSize: 12,
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="invoiced" name="Invoiced" fill="#64748b" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="collected" name="Collected" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Row 3 - recent invoices + upcoming bookings ---------------------- */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-start justify-between space-y-0">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
             <div>
-              <CardTitle>Recent invoices</CardTitle>
-              <CardDescription>The five most recently issued.</CardDescription>
+              <CardTitle className="text-base">Today&apos;s visits</CardTitle>
+              <CardDescription>
+                {loading
+                  ? 'Loading...'
+                  : visits.length === 0
+                    ? 'Nothing booked today.'
+                    : `${visits.length} booked across ${technicianCount} technician${technicianCount === 1 ? '' : 's'} · ${remaining.length} still to do`}
+              </CardDescription>
             </div>
-            {canSeeInvoices ? (
-              <Button asChild variant="link" size="sm" className="h-auto p-0">
-                <Link to="/invoices">
-                  View all
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            ) : null}
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="space-y-3 p-6">
-                <RowSkeleton className="w-full" />
-                <RowSkeleton className="w-5/6" />
-                <RowSkeleton className="w-4/6" />
-              </div>
-            ) : recentInvoices.length === 0 ? (
-              <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-                {canSeeInvoices ? 'No invoices raised yet.' : '--'}
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-16 text-right">&nbsp;</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentInvoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className="font-medium text-foreground">
-                        {invoice.invoice_number}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {invoice.customer_name ?? '--'}
-                      </TableCell>
-                      <TableCell className="text-right text-foreground">
-                        {formatCurrency(invoice.total)}
-                      </TableCell>
-                      <TableCell>
-                        <InvoiceStatusBadge status={invoice.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild variant="link" size="sm" className="h-auto p-0">
-                          <Link to={`/invoices/${invoice.id}`}>View</Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between space-y-0">
-            <div>
-              <CardTitle>Upcoming bookings</CardTitle>
-              <CardDescription>The next five service visits.</CardDescription>
-            </div>
-            <Button asChild variant="link" size="sm" className="h-auto p-0">
-              <Link to="/bookings">
-                View all
+            <Button asChild variant="link" size="sm" className="h-auto shrink-0 p-0">
+              <Link to="/bookings?view=calendar">
+                Schedule
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {loading ? (
-              <div className="space-y-4">
-                <RowSkeleton className="w-full" />
-                <RowSkeleton className="w-5/6" />
-                <RowSkeleton className="w-4/6" />
+              <div className="space-y-3 px-6 pb-6">
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
               </div>
-            ) : upcomingBookings.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                Nothing scheduled in the next 60 days.
-              </p>
+            ) : visits.length === 0 ? (
+              <EmptyState
+                icon={CalendarCheck}
+                title="No visits today"
+                className="py-10"
+                action={
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/bookings/new">Book a visit</Link>
+                  </Button>
+                }
+              />
             ) : (
-              <ul className="divide-y divide-border">
-                {upcomingBookings.map((event) => (
-                  <li key={event.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
-                      <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        {formatBookingDateTime(event.start)}
+              <ul className="divide-y divide-border border-t border-border">
+                {visits.map((visit) => (
+                  <li key={visit.id}>
+                    <Link
+                      to={`/bookings/${visit.id}`}
+                      className="flex items-center gap-4 px-6 py-3 transition-colors duration-150 hover:bg-muted/50"
+                    >
+                      <p className="w-12 shrink-0 text-sm font-medium tabular-nums text-foreground">
+                        {formatTime(visit.scheduled_start)}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {event.extendedProps?.customer_name ?? 'Unknown customer'} &middot;{' '}
-                        {event.extendedProps?.service_type ?? '--'} &middot;{' '}
-                        {event.extendedProps?.technician_name ?? 'Unassigned'}
-                      </p>
-                    </div>
-                    <Button asChild variant="link" size="sm" className="h-auto shrink-0 p-0">
-                      <Link to={`/bookings/${event.id}`}>Open</Link>
-                    </Button>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{visit.customer_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {visit.service_type} · {visit.technician_name ?? 'Unassigned'}
+                        </p>
+                      </div>
+                      <BookingStatusBadge status={visit.status} />
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Money</CardTitle>
+            <CardDescription>Across all invoices.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {[
+              { label: 'Outstanding', value: summary?.total_outstanding },
+              { label: 'Collected this month', value: summary?.collected_this_month },
+              { label: 'Invoiced to date', value: summary?.total_invoiced },
+            ].map((row) => (
+              <div key={row.label}>
+                <p className="text-sm text-muted-foreground">{row.label}</p>
+                {loading ? (
+                  <Skeleton className="mt-1 h-7 w-28" />
+                ) : (
+                  <p className="text-2xl font-semibold tracking-tight text-foreground">
+                    {row.value === null || row.value === undefined ? '--' : formatCurrency(row.value)}
+                  </p>
+                )}
+              </div>
+            ))}
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/invoices">
+                <Receipt className="h-4 w-4" />
+                Go to invoices
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      <Suspense fallback={<Skeleton className="h-[380px]" />}>
+        <RevenueCard series={revenue.series} state={revenue.state} months={CHART_MONTHS} />
+      </Suspense>
     </div>
   )
+}
+
+/** "Today": what this person needs to do now. Technicians and office see different things. */
+export function DashboardPage() {
+  const user = useAuthStore((state) => state.user)
+  return user?.role === UserRole.TECHNICIAN ? <TechnicianToday user={user} /> : <OfficeToday user={user} />
 }
 
 export default DashboardPage

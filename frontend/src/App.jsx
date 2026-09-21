@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 
 import { getMe } from '@/api/auth'
@@ -7,32 +7,34 @@ import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
 import { RoleGuard } from '@/components/layout/RoleGuard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { LoadingState } from '@/components/ui/spinner'
 import { Toaster } from '@/components/ui/toaster'
 import { refreshAccessToken } from '@/lib/api'
 import { readRefreshToken, useAuthStore } from '@/store/authStore'
 import { UserRole } from '@/lib/constants'
 
-import DashboardPage from '@/pages/DashboardPage'
-import NotificationsPage from '@/pages/NotificationsPage'
-import SearchPage from '@/pages/SearchPage'
-import LoginPage from '@/pages/auth/LoginPage'
-import BookingDetailPage from '@/pages/bookings/BookingDetailPage'
-import BookingFormPage from '@/pages/bookings/BookingFormPage'
-import BookingsPage from '@/pages/bookings/BookingsPage'
-import CustomerDetailPage from '@/pages/customers/CustomerDetailPage'
-import CustomerFormPage from '@/pages/customers/CustomerFormPage'
-import CustomersPage from '@/pages/customers/CustomersPage'
-import InvoiceDetailPage from '@/pages/invoices/InvoiceDetailPage'
-import InvoiceFormPage from '@/pages/invoices/InvoiceFormPage'
-import InvoicesPage from '@/pages/invoices/InvoicesPage'
-import JobDetailPage from '@/pages/jobs/JobDetailPage'
-import JobReportFormPage from '@/pages/jobs/JobReportFormPage'
-import JobsPage from '@/pages/jobs/JobsPage'
-import QuoteDetailPage from '@/pages/quotes/QuoteDetailPage'
-import QuoteFormPage from '@/pages/quotes/QuoteFormPage'
-import QuotesPage from '@/pages/quotes/QuotesPage'
-import SettingsPage from '@/pages/settings/SettingsPage'
-import UsersPage from '@/pages/users/UsersPage'
+// Pages load on first visit, so a phone downloads only the screens it opens.
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
+const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'))
+const SearchPage = lazy(() => import('@/pages/SearchPage'))
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
+const BookingDetailPage = lazy(() => import('@/pages/bookings/BookingDetailPage'))
+const BookingFormPage = lazy(() => import('@/pages/bookings/BookingFormPage'))
+const BookingsPage = lazy(() => import('@/pages/bookings/BookingsPage'))
+const CustomerDetailPage = lazy(() => import('@/pages/customers/CustomerDetailPage'))
+const CustomerFormPage = lazy(() => import('@/pages/customers/CustomerFormPage'))
+const CustomersPage = lazy(() => import('@/pages/customers/CustomersPage'))
+const InvoiceDetailPage = lazy(() => import('@/pages/invoices/InvoiceDetailPage'))
+const InvoiceFormPage = lazy(() => import('@/pages/invoices/InvoiceFormPage'))
+const InvoicesPage = lazy(() => import('@/pages/invoices/InvoicesPage'))
+const JobDetailPage = lazy(() => import('@/pages/jobs/JobDetailPage'))
+const JobReportFormPage = lazy(() => import('@/pages/jobs/JobReportFormPage'))
+const JobsPage = lazy(() => import('@/pages/jobs/JobsPage'))
+const QuoteDetailPage = lazy(() => import('@/pages/quotes/QuoteDetailPage'))
+const QuoteFormPage = lazy(() => import('@/pages/quotes/QuoteFormPage'))
+const QuotesPage = lazy(() => import('@/pages/quotes/QuotesPage'))
+const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
+const UsersPage = lazy(() => import('@/pages/users/UsersPage'))
 
 const WRITE_ROLES = [UserRole.ADMIN, UserRole.OFFICE_STAFF]
 
@@ -105,7 +107,14 @@ export function App() {
   return (
     <>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/login"
+          element={
+            <Suspense fallback={<LoadingState className="min-h-dvh" />}>
+              <LoginPage />
+            </Suspense>
+          }
+        />
 
         <Route
           element={

@@ -238,7 +238,7 @@ export function JobDetailPage() {
       setJob(updated)
       toastSuccess('Visit updated', `${job.job_number} is now ${status.replace('_', ' ')}.`)
     } catch (err) {
-      toastError('Could not update this job', toApiError(err).message)
+      toastError('Could not update this visit', toApiError(err).message)
     } finally {
       setTransitioning(false)
       setCancelOpen(false)
@@ -296,7 +296,7 @@ export function JobDetailPage() {
   }
 
   if (loading) {
-    return <LoadingState message="Loading job..." />
+    return <LoadingState message="Loading report..." />
   }
 
   if (error || !job || !summary) {
@@ -304,15 +304,15 @@ export function JobDetailPage() {
       <div className="space-y-4">
         <Button variant="ghost" className="-ml-2" onClick={() => navigate('/jobs')}>
           <ArrowLeft className="h-4 w-4" />
-          Back to jobs
+          Back to schedule
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <AlertCircle className="h-10 w-10 text-destructive" />
             <div>
-              <p className="font-medium text-foreground">Job not found</p>
+              <p className="font-medium text-foreground">Report not found</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {error?.message ?? 'This job may have been removed.'}
+                {error?.message ?? 'This report may have been removed.'}
               </p>
             </div>
             <Button variant="outline" onClick={() => void refetch()}>
@@ -338,8 +338,8 @@ export function JobDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        backTo="/jobs"
-        backLabel="Back to jobs"
+        backTo={`/bookings/${job.booking_id}`}
+        backLabel="Back to visit"
         title={job.job_number}
         badge={
           <>
@@ -441,8 +441,8 @@ export function JobDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Job information</CardTitle>
-            <CardDescription>Copied from the booking when the job was opened.</CardDescription>
+            <CardTitle>Visit details</CardTitle>
+            <CardDescription>From the visit this report belongs to.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
@@ -676,7 +676,7 @@ export function JobDetailPage() {
             disabled={!editable}
             onChange={(checked) => updateSummary('follow_up_required', checked, { immediate: true })}
             label="Follow-up required"
-            description="Flag this job so the office books a return visit."
+            description="Flag this visit so the office books a return visit."
           />
 
           {summary.follow_up_required ? (
@@ -805,14 +805,14 @@ export function JobDetailPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this job?</AlertDialogTitle>
+            <AlertDialogTitle>Cancel this visit?</AlertDialogTitle>
             <AlertDialogDescription>
               {job.job_number} will be marked as cancelled. Cancelled jobs cannot be reopened, and
               their report can no longer be edited.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={transitioning}>Keep job</AlertDialogCancel>
+            <AlertDialogCancel disabled={transitioning}>Keep visit</AlertDialogCancel>
             <AlertDialogAction
               disabled={transitioning}
               className="bg-destructive hover:bg-destructive/90"
@@ -821,7 +821,7 @@ export function JobDetailPage() {
                 void changeStatus(JOB_STATUS.CANCELLED)
               }}
             >
-              {transitioning ? 'Cancelling...' : 'Cancel job'}
+              {transitioning ? 'Cancelling...' : 'Cancel visit'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

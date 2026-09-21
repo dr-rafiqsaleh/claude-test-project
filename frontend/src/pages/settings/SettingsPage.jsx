@@ -751,16 +751,7 @@ export function SettingsPage() {
               </Field>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  toastSuccess('Coming soon', 'Connection testing arrives with email sending.')
-                }
-              >
-                Test connection
-              </Button>
-
+            <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
               <Button disabled={saving} onClick={() => void save()}>
                 {saving ? (
                   <>

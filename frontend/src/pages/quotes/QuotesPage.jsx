@@ -75,7 +75,8 @@ export function QuotesPage() {
   const customerId = searchParams.get('customer_id') ?? ''
 
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState(ANY)
+  // A status can arrive in the link, e.g. from Today's "Awaiting reply".
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || ANY)
   const [page, setPage] = useState(1)
   const [pendingDelete, setPendingDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)

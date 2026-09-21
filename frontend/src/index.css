@@ -2,10 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens. Every colour in the app comes from these; change them here to
+ * restyle everything. Minimal, flat and high-contrast: every text/background
+ * pair below meets WCAG AA (4.5:1) in both themes.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    color-scheme: light;
+
+    --background: 210 40% 98%; /* #F8FAFC app canvas */
+    --foreground: 222 47% 11%; /* #0F172A */
 
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -13,68 +20,67 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Emerald-600 accent used for primary actions */
-    --primary: 160 84% 32%;
+    /* QKil green, deepened from emerald-600 so white text passes AA (5.5:1) */
+    --primary: 163 94% 24%; /* #047857 */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 210 40% 96%; /* #F1F5F9 */
+    --muted-foreground: 215 19% 35%; /* #475569, 7.2:1 on the canvas */
 
-    --accent: 160 84% 95%;
-    --accent-foreground: 160 84% 22%;
+    --accent: 152 81% 96%; /* #ECFDF5 soft green for selected states */
+    --accent-foreground: 163 88% 20%; /* #065F46 */
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 72% 51%; /* #DC2626 */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 160 84% 32%;
+    --border: 214 32% 91%; /* #E2E8F0 */
+    --input: 213 27% 84%; /* #CBD5E1 */
+    --ring: 163 94% 24%;
 
-    /* Slate-900 sidebar */
-    --sidebar: 222 47% 11%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-muted: 215 20% 65%;
-    --sidebar-active: 160 84% 32%;
+    --radius: 0.625rem;
 
-    --radius: 0.5rem;
+    /* Chart series, validated for colour-vision deficiency on the card surface
+       (dataviz validate_palette.js: all checks pass in both themes). */
+    --chart-invoiced: #2a78d6;
+    --chart-collected: #047857;
   }
 
   .dark {
-    --background: 222 47% 8%;
+    color-scheme: dark;
+
+    --background: 220 49% 8%; /* #0B1220 */
     --foreground: 210 40% 96%;
 
-    --card: 222 47% 11%;
+    --card: 221 39% 11%; /* #111827 */
     --card-foreground: 210 40% 96%;
 
-    --popover: 222 47% 11%;
+    --popover: 221 39% 11%;
     --popover-foreground: 210 40% 96%;
 
-    --primary: 160 84% 39%;
-    --primary-foreground: 222 47% 8%;
+    --primary: 158 64% 52%; /* #34D399 */
+    --primary-foreground: 145 80% 10%;
 
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 96%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 217 33% 17%; /* #1E293B */
+    --muted-foreground: 215 20% 65%; /* #94A3B8 */
 
-    --accent: 217 33% 17%;
-    --accent-foreground: 160 84% 60%;
+    --accent: 165 58% 10%;
+    --accent-foreground: 156 72% 67%;
 
-    --destructive: 0 63% 45%;
-    --destructive-foreground: 210 40% 96%;
+    --destructive: 0 84% 60%; /* #EF4444 */
+    --destructive-foreground: 0 0% 4%;
 
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 160 84% 39%;
+    --border: 217 32% 18%;
+    --input: 215 25% 27%;
+    --ring: 158 64% 52%;
 
-    --sidebar: 222 47% 6%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-muted: 215 20% 55%;
-    --sidebar-active: 160 84% 39%;
+    --chart-invoiced: #3987e5;
+    --chart-collected: #199e70;
   }
 }
 
@@ -91,10 +97,9 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'cv11' 1;
   }
 
-  /* Slimmer scrollbars to match the dense admin UI */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -105,48 +110,53 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-slate-300 dark:bg-slate-700;
+    @apply rounded-full bg-input;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-600;
+    @apply bg-muted-foreground/50;
+  }
+
+  /* Honour the device's reduced-motion setting everywhere. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-/* FullCalendar theming so the booking calendar matches the admin UI. */
+/* FullCalendar theming, from the same tokens so it follows light and dark. */
 .qkil-calendar {
-  --fc-border-color: theme('colors.slate.200');
+  --fc-border-color: hsl(var(--border));
   --fc-page-bg-color: transparent;
-  --fc-neutral-bg-color: theme('colors.slate.50');
-  --fc-today-bg-color: theme('colors.emerald.50');
-  --fc-now-indicator-color: theme('colors.emerald.600');
+  --fc-neutral-bg-color: hsl(var(--muted));
+  --fc-today-bg-color: hsl(var(--accent));
+  --fc-now-indicator-color: hsl(var(--primary));
   --fc-event-border-color: transparent;
   --fc-small-font-size: 0.75rem;
 }
 
-.dark .qkil-calendar {
-  --fc-border-color: theme('colors.slate.800');
-  --fc-neutral-bg-color: theme('colors.slate.900');
-  --fc-today-bg-color: rgb(6 78 59 / 0.25);
-  --fc-now-indicator-color: theme('colors.emerald.400');
-}
-
 .qkil-calendar .fc {
-  @apply text-slate-900 dark:text-slate-100;
+  @apply text-foreground;
 }
 
 .qkil-calendar .fc .fc-col-header-cell-cushion,
 .qkil-calendar .fc .fc-daygrid-day-number {
-  @apply px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 no-underline dark:text-slate-400;
+  @apply px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground no-underline;
 }
 
 .qkil-calendar .fc .fc-timegrid-slot-label-cushion,
 .qkil-calendar .fc .fc-timegrid-axis-cushion {
-  @apply text-[11px] text-slate-400;
+  @apply text-[11px] text-muted-foreground;
 }
 
 .qkil-calendar .fc .fc-event {
-  @apply cursor-pointer overflow-hidden rounded-md border-0 px-1 py-0.5 text-white shadow-sm;
+  @apply cursor-pointer overflow-hidden rounded-md border-0 px-1 py-0.5 text-white;
 }
 
 .qkil-calendar .fc .fc-event:hover {

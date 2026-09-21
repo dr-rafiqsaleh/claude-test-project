@@ -3,12 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertCircle, Eye, EyeOff, LogIn } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Eye, EyeOff, LogIn } from 'lucide-react'
 
 import { login as loginRequest } from '@/api/auth'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
   FormControl,
@@ -26,6 +25,12 @@ const loginSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
 })
+
+const BRAND_POINTS = [
+  'Book visits and assign technicians in a few taps',
+  'Photo inspection reports filed on site, signed on the phone',
+  'Invoices raised the moment a visit is completed',
+]
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -63,107 +68,122 @@ export function LoginPage() {
   const submitting = form.formState.isSubmitting
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Logo size={48} textClassName="text-2xl text-white" />
-          <p className="text-sm text-muted-foreground/70">Pest control management</p>
+    <div className="grid min-h-dvh bg-background lg:grid-cols-2">
+      {/* Brand panel: what QKil is for, on screens with room for it */}
+      <div className="hidden flex-col justify-between bg-primary p-12 text-primary-foreground lg:flex">
+        <Logo size={40} textClassName="text-xl text-primary-foreground" />
+        <div className="max-w-md space-y-6">
+          <h2 className="text-3xl font-semibold leading-tight tracking-tight">
+            Every visit, from first quote to paid invoice.
+          </h2>
+          <ul className="space-y-3 text-base text-primary-foreground/85">
+            {BRAND_POINTS.map((point) => (
+              <li key={point} className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                {point}
+              </li>
+            ))}
+          </ul>
         </div>
+        <p className="text-sm text-primary-foreground/70">Pest control management for UK operators</p>
+      </div>
 
-        <Card className="shadow-xl">
-          <CardHeader>
-            <CardTitle>Sign in</CardTitle>
-            <CardDescription>Enter your QKil credentials to continue.</CardDescription>
-          </CardHeader>
+      <div className="flex items-center justify-center px-4 py-12 sm:px-6">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 lg:hidden">
+            <Logo size={40} subtitle="Pest Control" />
+          </div>
 
-          <CardContent>
-            {formError ? (
-              <div
-                role="alert"
-                className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            ) : null}
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Enter your QKil email and password.</p>
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field, fieldState }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="email"
-                          autoComplete="email"
-                          placeholder="you@qkil.co.uk"
-                          hasError={Boolean(fieldState.error)}
-                          disabled={submitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          {formError ? (
+            <div
+              role="alert"
+              className="mt-6 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          ) : null}
 
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field, fieldState }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            {...field}
-                            type={showPassword ? 'text' : 'password'}
-                            autoComplete="current-password"
-                            placeholder="••••••••"
-                            className="pr-10"
-                            hasError={Boolean(fieldState.error)}
-                            disabled={submitting}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword((v) => !v)}
-                            className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center text-muted-foreground/70 hover:text-muted-foreground"
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
-                            tabIndex={-1}
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          <div className="mt-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field, fieldState }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@qkil.co.uk"
+                      className="h-11"
+                      hasError={Boolean(fieldState.error)}
+                      disabled={submitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-                <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? (
-                    <>
-                      <Spinner size="sm" className="text-current" />
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      <LogIn className="h-4 w-4" />
-                      Sign in
-                    </>
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field, fieldState }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        {...field}
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        className="h-11 pr-11"
+                        hasError={Boolean(fieldState.error)}
+                        disabled={submitting}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          QKil Phase 8 &middot; Need access? Contact your administrator.
-        </p>
+            <Button type="submit" className="h-11 w-full" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Spinner size="sm" className="text-current" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4" />
+                  Sign in
+                </>
+              )}
+            </Button>
+          </form>
+        </Form>
+          </div>
+
+          <p className="mt-8 text-sm text-muted-foreground">Need access? Ask your administrator to add you.</p>
+        </div>
       </div>
     </div>
   )

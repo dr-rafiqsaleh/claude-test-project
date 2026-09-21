@@ -13,9 +13,9 @@ export function LogoMark({ className, size = 32 }) {
       aria-label="QKil"
       className={cn('shrink-0', className)}
     >
-      <rect width="24" height="24" rx="6" className="fill-emerald-600" />
+      <rect width="24" height="24" rx="6" className="fill-primary" />
       <g
-        stroke="white"
+        className="stroke-primary-foreground"
         strokeWidth="1.4"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -24,7 +24,7 @@ export function LogoMark({ className, size = 32 }) {
         {/* antennae */}
         <path d="M9.2 5.4 10.6 7.2M14.8 5.4 13.4 7.2" />
         {/* body */}
-        <ellipse cx="12" cy="13" rx="3.2" ry="5" fill="rgba(255,255,255,0.15)" />
+        <ellipse cx="12" cy="13" rx="3.2" ry="5" className="fill-primary-foreground/15" />
         <path d="M12 8.2v9.6" />
         {/* legs */}
         <path d="M8.9 10.6 6.2 9.4M8.8 13.2H5.9M8.9 15.8l-2.7 1.3M15.1 10.6l2.7-1.2M15.2 13.2h2.9M15.1 15.8l2.7 1.3" />

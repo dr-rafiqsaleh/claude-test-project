@@ -130,7 +130,7 @@ export const ALL_BOOKING_STATUSES = [
 export const BOOKING_STATUS_LABELS = {
   scheduled: 'Scheduled',
   confirmed: 'Confirmed',
-  in_progress: 'In Progress',
+  in_progress: 'In progress',
   completed: 'Completed',
   cancelled: 'Cancelled',
 }
@@ -221,13 +221,13 @@ export const ALL_JOB_STATUSES = [
 
 export const JOB_STATUS_LABELS = {
   pending: 'Pending',
-  in_progress: 'In Progress',
+  in_progress: 'In progress',
   completed: 'Completed',
   cancelled: 'Cancelled',
 }
 
 export const JOB_STATUS_COLORS = {
-  pending: 'bg-gray-100 text-gray-800',
+  pending: 'bg-muted text-foreground',
   in_progress: 'bg-amber-100 text-amber-800',
   completed: 'bg-primary/15 text-primary',
   cancelled: 'bg-destructive/15 text-destructive',
@@ -314,18 +314,18 @@ export const INVOICE_STATUS_LABELS = {
   draft: 'Draft',
   sent: 'Sent',
   paid: 'Paid',
-  partially_paid: 'Part Paid',
+  partially_paid: 'Part paid',
   overdue: 'Overdue',
   cancelled: 'Cancelled',
 }
 
 export const INVOICE_STATUS_COLORS = {
-  draft: 'bg-gray-100 text-gray-700',
+  draft: 'bg-muted text-foreground',
   sent: 'bg-blue-100 text-blue-800',
   paid: 'bg-primary/15 text-primary',
   partially_paid: 'bg-teal-100 text-teal-800',
   overdue: 'bg-destructive/15 text-destructive',
-  cancelled: 'bg-gray-100 text-gray-500 line-through',
+  cancelled: 'bg-muted text-muted-foreground line-through',
 }
 
 export const PAYMENT_METHODS = {
@@ -373,8 +373,8 @@ export const SEARCH_TYPES = ['customers', 'quotes', 'bookings', 'jobs', 'invoice
 export const SEARCH_TYPE_LABELS = {
   customers: 'Customers',
   quotes: 'Quotes',
-  bookings: 'Bookings',
-  jobs: 'Jobs',
+  bookings: 'Visits',
+  jobs: 'Reports',
   invoices: 'Invoices',
 }
 
@@ -445,9 +445,9 @@ export const NOTIFICATION_CATEGORY = {
 export const NOTIFICATION_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'unread', label: 'Unread' },
-  { key: 'bookings', label: 'Bookings' },
+  { key: 'bookings', label: 'Visits' },
   { key: 'invoices', label: 'Invoices' },
-  { key: 'jobs', label: 'Jobs' },
+  { key: 'jobs', label: 'Reports' },
   { key: 'quotes', label: 'Quotes' },
 ]
 

@@ -98,7 +98,8 @@ export function InvoicesPage() {
   const customerId = searchParams.get('customer_id') ?? ''
 
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState(ALL)
+  // A status can arrive in the link, e.g. from Today's "Ready to send".
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || ALL)
   // The dashboard's "Overdue" card deep-links here with ?overdue=1.
   const [overdueOnly, setOverdueOnly] = useState(searchParams.get('overdue') === '1')
   const [dateFrom, setDateFrom] = useState('')

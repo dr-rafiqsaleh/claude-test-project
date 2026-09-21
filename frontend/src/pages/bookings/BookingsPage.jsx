@@ -100,7 +100,8 @@ export function BookingsPage() {
   const customerId = searchParams.get('customer_id') ?? ''
 
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState(ANY)
+  // A status can arrive in the link, e.g. from Today's "Reports due".
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || ANY)
   const [technicianFilter, setTechnicianFilter] = useState(ANY)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -142,10 +143,10 @@ export function BookingsPage() {
     setWorking(true)
     try {
       await remove(pendingDelete.id)
-      toastSuccess('Booking deleted', `${pendingDelete.booking_number} was removed.`)
+      toastSuccess('Visit deleted', `${pendingDelete.booking_number} was removed.`)
       setPendingDelete(null)
     } catch (err) {
-      toastError('Could not delete booking', toApiError(err).message)
+      toastError('Could not delete visit', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -156,10 +157,10 @@ export function BookingsPage() {
     setWorking(true)
     try {
       await updateStatus(pendingCancel.id, BOOKING_STATUS.CANCELLED)
-      toastSuccess('Booking cancelled', `${pendingCancel.booking_number} is now cancelled.`)
+      toastSuccess('Visit cancelled', `${pendingCancel.booking_number} is now cancelled.`)
       setPendingCancel(null)
     } catch (err) {
-      toastError('Could not cancel booking', toApiError(err).message)
+      toastError('Could not cancel visit', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -188,9 +189,9 @@ export function BookingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Bookings"
+        title="Schedule"
         description={user?.role === UserRole.TECHNICIAN
-        ? 'The jobs scheduled for you.'
+        ? 'Your visits, as a list or on the calendar.'
         : 'Schedule technicians and keep the service calendar up to date.'}
         actions={<div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-md border border-input p-0.5">
@@ -226,7 +227,7 @@ export function BookingsPage() {
             <Button asChild>
               <Link to="/bookings/new">
                 <Plus className="h-4 w-4" />
-                New booking
+                Book a visit
               </Link>
             </Button>
           ) : null}
@@ -249,9 +250,9 @@ export function BookingsPage() {
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search by booking number, customer or service..."
+                    placeholder="Search by visit number, customer or service..."
                     className="pl-9"
-                    aria-label="Search bookings"
+                    aria-label="Search visits"
                   />
                 </div>
 
@@ -329,16 +330,16 @@ export function BookingsPage() {
 
           <Card className="overflow-hidden">
             {loading ? (
-              <LoadingState message="Loading bookings..." />
+              <LoadingState message="Loading visits..." />
             ) : error ? (
-              <ErrorState title="Could not load bookings" message={error.message} onRetry={refetch} />
+              <ErrorState title="Could not load visits" message={error.message} onRetry={refetch} />
             ) : bookings.length === 0 ? (
               <EmptyState
                 icon={CalendarClock}
-                title={isFiltered ? 'No bookings match your filters' : 'No bookings yet'}
+                title={isFiltered ? 'No visits match your filters' : 'No visits booked yet'}
                 description={isFiltered
                 ? 'Try a different search term or clear the filters.'
-                : 'Schedule your first booking to get started.'}
+                : 'Book your first visit to get started.'}
                 action={isFiltered ? (
                   <Button variant="outline" onClick={clearFilters}>
                     Clear filters
@@ -347,7 +348,7 @@ export function BookingsPage() {
                   <Button asChild>
                     <Link to="/bookings/new">
                       <Plus className="h-4 w-4" />
-                      New booking
+                      Book a visit
                     </Link>
                   </Button>
                 ) : null}
@@ -357,7 +358,7 @@ export function BookingsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Booking #</TableHead>
+                      <TableHead>Visit #</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead className="hidden lg:table-cell">Technician</TableHead>
                       <TableHead className="hidden md:table-cell">Service type</TableHead>
@@ -472,7 +473,7 @@ export function BookingsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this booking?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this visit?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
                 ? `${pendingDelete.booking_number} will be permanently deleted. Only scheduled or cancelled bookings can be removed, and this cannot be undone.`
@@ -480,7 +481,7 @@ export function BookingsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={working}>Keep booking</AlertDialogCancel>
+            <AlertDialogCancel disabled={working}>Keep visit</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
               className="bg-destructive hover:bg-destructive/90"
@@ -489,7 +490,7 @@ export function BookingsPage() {
                 void confirmDelete()
               }}
             >
-              {working ? 'Deleting...' : 'Delete booking'}
+              {working ? 'Deleting...' : 'Delete visit'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -503,7 +504,7 @@ export function BookingsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+            <AlertDialogTitle>Cancel this visit?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingCancel
                 ? `${pendingCancel.booking_number} will be marked as cancelled. Cancelled bookings cannot be reactivated.`
@@ -511,7 +512,7 @@ export function BookingsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={working}>Keep booking</AlertDialogCancel>
+            <AlertDialogCancel disabled={working}>Keep visit</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
               className="bg-destructive hover:bg-destructive/90"
@@ -520,7 +521,7 @@ export function BookingsPage() {
                 void confirmCancel()
               }}
             >
-              {working ? 'Cancelling...' : 'Cancel booking'}
+              {working ? 'Cancelling...' : 'Cancel visit'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -676,7 +677,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
             dayMaxEventRows={4}
             eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
             slotLabelFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
-            noEventsText="No bookings in this period"
+            noEventsText="No visits in this period"
           />
         </div>
 

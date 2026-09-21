@@ -42,11 +42,11 @@ function timeAgo(value) {
 }
 
 const EMPTY_COPY = {
-  all: 'You have no notifications yet. Reminders about bookings, invoices and follow-ups will land here.',
+  all: 'You have no notifications yet. Reminders about visits, invoices and follow-ups will land here.',
   unread: 'Nothing unread. You are all caught up.',
-  bookings: 'No booking reminders right now.',
+  bookings: 'No visit reminders right now.',
   invoices: 'No invoice alerts right now.',
-  jobs: 'No job notifications right now.',
+  jobs: 'No report notifications right now.',
   quotes: 'No quote notifications right now.',
 }
 
@@ -111,7 +111,7 @@ export function NotificationsPage() {
         title="Notifications"
         description={unreadCount > 0
         ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.`
-        : 'Reminders about bookings, invoices, jobs and quotes.'}
+        : 'Reminders about visits, reports, invoices and quotes.'}
         actions={<Button
           variant="outline"
           disabled={busy || unreadCount === 0}

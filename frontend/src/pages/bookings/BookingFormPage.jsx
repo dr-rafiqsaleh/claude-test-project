@@ -202,7 +202,7 @@ export function BookingFormPage() {
           if (cancelled) return
 
           if (!EDITABLE_BOOKING_STATUSES.includes(booking.status)) {
-            setLoadError('Only scheduled or confirmed bookings can be edited.')
+            setLoadError('Only scheduled or confirmed visits can be edited.')
             return
           }
 
@@ -229,7 +229,7 @@ export function BookingFormPage() {
           applyQuote(quote)
         }
       } catch (err) {
-        if (!cancelled) setLoadError(toApiError(err, 'Could not open the booking form').message)
+        if (!cancelled) setLoadError(toApiError(err, 'Could not open the visit form').message)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -377,7 +377,7 @@ export function BookingFormPage() {
     try {
       if (isEdit && id) {
         const updated = await updateBooking(id, { ...payload, quote_id: values.quote_id || null })
-        toastSuccess('Booking updated', `${updated.booking_number} was saved.`)
+        toastSuccess('Visit updated', `${updated.booking_number} was saved.`)
         navigate(`/bookings/${id}`)
         return
       }
@@ -391,17 +391,17 @@ export function BookingFormPage() {
         created = await createBooking(payload)
       }
 
-      toastSuccess('Booking created', `${created.booking_number} has been scheduled.`)
+      toastSuccess('Visit booked', `${created.booking_number} has been scheduled.`)
       navigate(`/bookings/${created.id}`)
     } catch (err) {
-      const apiError = toApiError(err, 'Could not save this booking')
+      const apiError = toApiError(err, 'Could not save this visit')
       setSubmitError(apiError.message)
       toastError('Save failed', apiError.message)
     }
   }
 
   if (loading) {
-    return <LoadingState message="Loading booking form..." />
+    return <LoadingState message="Loading..." />
   }
 
   if (loadError) {
@@ -409,7 +409,7 @@ export function BookingFormPage() {
       <div className="space-y-4">
         <Button variant="ghost" className="-ml-2" onClick={() => navigate('/bookings')}>
           <ArrowLeft className="h-4 w-4" />
-          Back to bookings
+          Back to schedule
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
@@ -431,10 +431,10 @@ export function BookingFormPage() {
     <div className="space-y-6">
       <PageHeader
         backTo={isEdit && id ? `/bookings/${id}` : '/bookings'}
-        backLabel={isEdit ? 'Back to booking' : 'Back to bookings'}
-        title={isEdit ? 'Edit booking' : 'New booking'}
+        backLabel={isEdit ? 'Back to visit' : 'Back to schedule'}
+        title={isEdit ? 'Edit visit' : 'Book a visit'}
         description={isEdit
-        ? 'Update the schedule, assignment and service details for this booking.'
+        ? 'Update the schedule, assignment and service details for this visit.'
         : 'Schedule a service visit, assign a technician and capture the on-site details.'}
       />
 
@@ -856,7 +856,7 @@ export function BookingFormPage() {
               ) : (
                 <CalendarClock className="h-4 w-4" />
               )}
-              {isEdit ? 'Save booking' : 'Schedule booking'}
+              {isEdit ? 'Save visit' : 'Book visit'}
             </Button>
           </div>
         </form>

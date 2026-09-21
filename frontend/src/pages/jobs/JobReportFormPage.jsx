@@ -53,7 +53,7 @@ function Step({ number, title, description, icon: Icon, children, muted = false 
       )}
     >
       <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
           {Icon ? <Icon className="h-4 w-4" /> : number}
         </div>
         <div className="min-w-0">
@@ -139,7 +139,7 @@ export function JobReportFormPage() {
       setJob(updated)
       toastSuccess('Visit started', 'Your start time has been recorded.')
     } catch (err) {
-      toastError('Could not start the job', toApiError(err).message)
+      toastError('Could not start the visit', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -215,7 +215,7 @@ export function JobReportFormPage() {
       setSignatures({ customer: null, technician: null })
       toastSuccess('Visit completed', 'The inspection report is ready.')
     } catch (err) {
-      toastError('Could not complete the job', toApiError(err).message)
+      toastError('Could not complete the visit', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -234,22 +234,22 @@ export function JobReportFormPage() {
   }
 
   if (loading) {
-    return <LoadingState message="Loading job..." />
+    return <LoadingState message="Loading report..." />
   }
 
   if (error || !job || !summary) {
     return (
       <div className="mx-auto max-w-2xl space-y-4 p-4">
-        <Button variant="ghost" className="-ml-2" onClick={() => navigate('/jobs')}>
+        <Button variant="ghost" className="-ml-2" onClick={() => navigate('/dashboard')}>
           <ArrowLeft className="h-4 w-4" />
-          Back to jobs
+          Back to today
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <AlertCircle className="h-10 w-10 text-destructive" />
-            <p className="font-medium text-foreground">Job not found</p>
+            <p className="font-medium text-foreground">Report not found</p>
             <p className="text-sm text-muted-foreground">
-              {error?.message ?? 'This job may have been removed.'}
+              {error?.message ?? 'This report may have been removed.'}
             </p>
             <Button variant="outline" onClick={() => void refetch()}>
               Try again
@@ -307,8 +307,8 @@ export function JobReportFormPage() {
               <Button variant="outline" onClick={() => navigate(`/jobs/${job.id}`)}>
                 View job details
               </Button>
-              <Button variant="ghost" onClick={() => navigate('/jobs')}>
-                Back to jobs
+              <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+                Back to today
               </Button>
             </div>
           </CardContent>
@@ -320,7 +320,7 @@ export function JobReportFormPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 pb-16 pt-4">
       {/* Step 1 - Job summary ------------------------------------------- */}
-      <Step number={1} title="Job summary" icon={ClipboardList} description={job.job_number}>
+      <Step number={1} title="Visit summary" icon={ClipboardList} description={job.job_number}>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <JobStatusBadge status={job.status} />
@@ -537,7 +537,7 @@ export function JobReportFormPage() {
             disabled={!editable || isPending}
             onChange={(checked) => updateSummary('follow_up_required', checked, { immediate: true })}
             label="Follow-up required"
-            description="Flag this job so the office books a return visit."
+            description="Flag this visit so the office books a return visit."
           />
 
           {summary.follow_up_required ? (
@@ -575,7 +575,7 @@ export function JobReportFormPage() {
       <Step
         number={6}
         title="Sign off"
-        description="Capture both signatures, then complete the job."
+        description="Capture both signatures, then complete the visit."
         muted={isPending}
       >
         <div className="space-y-6">

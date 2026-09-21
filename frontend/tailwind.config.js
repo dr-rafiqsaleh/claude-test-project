@@ -45,12 +45,6 @@ export default {
           DEFAULT: 'hsl(var(--card) / <alpha-value>)',
           foreground: 'hsl(var(--card-foreground) / <alpha-value>)',
         },
-        sidebar: {
-          DEFAULT: 'hsl(var(--sidebar) / <alpha-value>)',
-          foreground: 'hsl(var(--sidebar-foreground) / <alpha-value>)',
-          muted: 'hsl(var(--sidebar-muted) / <alpha-value>)',
-          active: 'hsl(var(--sidebar-active) / <alpha-value>)',
-        },
       },
       borderRadius: {
         lg: 'var(--radius)',
