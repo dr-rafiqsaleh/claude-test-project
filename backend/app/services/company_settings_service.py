@@ -14,6 +14,7 @@ from app.models.company_settings import (
     CompanySettings,
     Product,
 )
+from app.models.counter import INVOICE_COUNTER, Counter
 from app.schemas.company_settings import CompanySettingsUpdate
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 class InvalidLogoError(Exception):
     """Raised when an uploaded logo fails validation (type or size)."""
+
+
+class SettingsError(Exception):
+    """Raised when a settings change cannot be applied as asked."""
 
 
 def build_settings_payload(settings: CompanySettings) -> dict:
@@ -32,8 +37,13 @@ def build_settings_payload(settings: CompanySettings) -> dict:
     return {
         "id": str(settings.id),
         "company_name": settings.company_name,
+        "legal_name": settings.legal_name,
         "company_number": settings.company_number,
         "vat_number": settings.vat_number,
+        "vat_registered": settings.vat_registered,
+        "bank_account_name": settings.bank_account_name,
+        "bank_sort_code": settings.bank_sort_code,
+        "bank_account_number": settings.bank_account_number,
         "phone": settings.phone,
         "email": settings.email,
         "website": settings.website,
@@ -70,6 +80,13 @@ def build_settings_payload(settings: CompanySettings) -> dict:
     }
 
 
+async def settings_payload(settings: CompanySettings) -> dict:
+    """`build_settings_payload` plus the number the next invoice will get."""
+    payload = build_settings_payload(settings)
+    payload["next_invoice_number"] = await Counter.peek_next(INVOICE_COUNTER)
+    return payload
+
+
 async def get_settings() -> CompanySettings:
     """Fetch the singleton, creating it with defaults the first time round."""
     existing = await CompanySettings.find_one({})
@@ -100,6 +117,16 @@ async def update_settings(
     settings = await get_settings()
     payload = data.model_dump(exclude_unset=True)
 
+    next_invoice = payload.pop("next_invoice_number", None)
+    if next_invoice is not None:
+        # Checked first, so a refused number leaves every other setting unsaved too.
+        if not await Counter.move_next_to(INVOICE_COUNTER, next_invoice):
+            used = await Counter.peek_next(INVOICE_COUNTER) - 1
+            raise SettingsError(
+                f"Invoice number {used} has already been used, so the next invoice "
+                f"must be number {used + 1} or higher"
+            )
+
     if "products" in payload:
         # The list arrives whole; new products get an id here. Reports copy a
         # product's details when it is used, so editing the list never changes
@@ -124,6 +151,7 @@ async def update_settings(
         # A cleared required field falls back to whatever is already stored.
         if value is None and field in {
             "company_name",
+            "vat_registered",
             "address_country",
             "default_invoice_terms",
             "invoice_prefix",
@@ -208,8 +236,15 @@ async def get_settings_for_pdf() -> dict:
 
     return {
         "company_name": settings.company_name or "QKil Pest Control",
+        "legal_name": settings.legal_name or "",
         "company_number": settings.company_number or "",
-        "vat_number": settings.vat_number or "",
+        # A VAT number means nothing on a document until the business is registered.
+        "vat_number": (settings.vat_number or "") if settings.vat_registered else "",
+        "vat_registered": settings.vat_registered,
+        "vat_rate": settings.vat_rate,
+        "bank_account_name": settings.bank_account_name or "",
+        "bank_sort_code": settings.bank_sort_code or "",
+        "bank_account_number": settings.bank_account_number or "",
         "phone": settings.phone or "",
         "email": settings.email or "",
         "website": settings.website or "",

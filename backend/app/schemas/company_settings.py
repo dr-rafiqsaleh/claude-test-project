@@ -1,5 +1,6 @@
 """Company settings request/response schemas."""
 
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -49,12 +50,25 @@ class ProductSchema(BaseModel):
         return _clean_optional(value)
 
 
+def _digits(value: str) -> str:
+    return re.sub(r"[\s-]", "", value)
+
+
 class CompanySettingsUpdate(BaseModel):
     """Partial update - every field is optional."""
 
     company_name: Optional[str] = Field(None, min_length=1, max_length=160)
+    legal_name: Optional[str] = Field(None, max_length=160)
     company_number: Optional[str] = Field(None, max_length=40)
     vat_number: Optional[str] = Field(None, max_length=40)
+    vat_registered: Optional[bool] = None
+
+    bank_account_name: Optional[str] = Field(None, max_length=120)
+    bank_sort_code: Optional[str] = Field(None, max_length=20)
+    bank_account_number: Optional[str] = Field(None, max_length=20)
+
+    #: The number the next invoice will get. It can only move forward.
+    next_invoice_number: Optional[int] = Field(None, ge=1, le=9_999_999)
 
     phone: Optional[str] = Field(None, max_length=40)
     email: Optional[str] = Field(None, max_length=160)
@@ -91,14 +105,48 @@ class CompanySettingsUpdate(BaseModel):
 
     primary_color: Optional[str] = Field(None, max_length=9)
 
+    @field_validator("legal_name", "bank_account_name")
+    @classmethod
+    def _strip_text(cls, value: Optional[str]) -> Optional[str]:
+        return _clean_optional(value)
+
+    @field_validator("bank_sort_code")
+    @classmethod
+    def _check_sort_code(cls, value: Optional[str]) -> Optional[str]:
+        cleaned = _clean_optional(value)
+        if cleaned is None:
+            return None
+        digits = _digits(cleaned)
+        if not re.fullmatch(r"\d{6}", digits):
+            raise ValueError("A sort code is 6 digits, e.g. 12-34-56")
+        return f"{digits[:2]}-{digits[2:4]}-{digits[4:]}"
+
+    @field_validator("bank_account_number")
+    @classmethod
+    def _check_account_number(cls, value: Optional[str]) -> Optional[str]:
+        cleaned = _clean_optional(value)
+        if cleaned is None:
+            return None
+        digits = _digits(cleaned)
+        if not re.fullmatch(r"\d{7,8}", digits):
+            raise ValueError("A UK account number is 8 digits")
+        return digits.zfill(8)  # 7-digit accounts are written with a leading 0
+
 
 class CompanySettingsResponse(BaseModel):
     """Full settings, minus the base64 logo (served from its own endpoint)."""
 
     id: str
     company_name: str
+    legal_name: Optional[str] = None
     company_number: Optional[str] = None
     vat_number: Optional[str] = None
+    vat_registered: bool = False
+
+    bank_account_name: Optional[str] = None
+    bank_sort_code: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    next_invoice_number: int = 1
 
     phone: Optional[str] = None
     email: Optional[str] = None

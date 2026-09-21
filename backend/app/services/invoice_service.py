@@ -49,12 +49,15 @@ from app.schemas.invoice import (
 
 logger = logging.getLogger(__name__)
 
-#: Fallback bank details, used until the company settings document is filled in.
-#: Everything else customer-facing reads from `company_settings_service`.
-DEFAULT_PAYMENT_INSTRUCTIONS = (
-    "Bank transfer - Sort Code: 20-00-00  Account No: 12345678  "
-    "Account Name: QKil Pest Control Ltd. Please quote the invoice number as the reference."
-)
+#: Width of the text column: A4 less 18mm margins, less the 6pt padding
+#: reportlab's page frame keeps on each side, so tables line up with text.
+CONTENT_WIDTH = A4[0] - 36 * mm - 12
+
+
+def _columns(*widths: float) -> List[float]:
+    """Column widths in the given proportions, filling the text column."""
+    total = sum(widths)
+    return [CONTENT_WIDTH * width / total for width in widths]
 
 #: Allowed status transitions for the invoice lifecycle.
 ALLOWED_TRANSITIONS: Dict[InvoiceStatus, Set[InvoiceStatus]] = {
@@ -170,7 +173,7 @@ def compute_item(item_data: "InvoiceItemSchema | InvoiceItem | dict") -> Invoice
         description = str(item_data.get("description", "")).strip()
         quantity = float(item_data.get("quantity", 1) or 0)
         unit_price = float(item_data.get("unit_price", 0) or 0)
-        tax_rate = float(item_data.get("tax_rate", 0.20) or 0)
+        tax_rate = float(item_data.get("tax_rate", 0) or 0)
     else:
         description = str(item_data.description).strip()
         quantity = float(item_data.quantity or 0)
@@ -323,6 +326,33 @@ async def _load_payment_users(invoice: Invoice) -> Dict[str, User]:
 
 
 # ---------------------------------------------------------------------------
+# VAT
+# ---------------------------------------------------------------------------
+
+
+async def _vat_registered() -> bool:
+    """Whether invoices may charge VAT: only once the business is VAT registered."""
+    from app.services.company_settings_service import get_settings  # noqa: PLC0415
+
+    return (await get_settings()).vat_registered
+
+
+def _without_vat(items: List[InvoiceItem]) -> List[InvoiceItem]:
+    """The same lines with VAT taken off, for a business that is not registered."""
+    return [
+        compute_item(
+            {
+                "description": item.description,
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "tax_rate": 0.0,
+            }
+        )
+        for item in items
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Create
 # ---------------------------------------------------------------------------
 
@@ -351,6 +381,10 @@ async def create_invoice(
     issue_date = data.issue_date or now
     due_date = data.due_date or (issue_date + timedelta(days=DEFAULT_PAYMENT_TERM_DAYS))
 
+    items = [compute_item(item) for item in data.items]
+    if not await _vat_registered():
+        items = _without_vat(items)
+
     invoice = Invoice(
         invoice_number=await get_next_invoice_number(),
         customer_id=customer_oid,
@@ -358,7 +392,7 @@ async def create_invoice(
         quote_id=quote.id if quote else None,
         booking_id=booking_oid,
         status=data.status,
-        items=[compute_item(item) for item in data.items],
+        items=items,
         issue_date=issue_date,
         due_date=due_date,
         sent_at=now if data.status == InvoiceStatus.SENT else None,
@@ -381,75 +415,50 @@ async def create_invoice(
     return invoice, customer, job, quote
 
 
-def _line_items_from_job(job: Job, booking: Optional[Booking], quote: Optional[Quote]) -> List[InvoiceItem]:
+def _line_items_from_job(
+    job: Job,
+    booking: Optional[Booking],
+    quote: Optional[Quote],
+    vat_rate: float,
+) -> List[InvoiceItem]:
     """Build invoice line items from a completed job.
 
     Preference order:
 
     1. The accepted quote's line items, when the job traces back to one.
     2. The booking's quoted amount as a single service line.
-    3. One line for the service itself, plus one per distinct treatment applied.
+    3. A single service line for the office to price before sending.
+
+    `vat_rate` is 0 until the business is VAT registered. The products used
+    belong on the inspection report, not the bill, so they are not listed.
     """
     if quote is not None and quote.items:
+        # A registered business keeps the rate the customer was quoted.
+        quote_rate = quote.tax_rate if quote.tax_rate is not None else vat_rate
         return [
             compute_item(
                 {
                     "description": item.description,
                     "quantity": item.quantity,
                     "unit_price": item.unit_price,
-                    "tax_rate": quote.tax_rate if quote.tax_rate is not None else 0.20,
+                    "tax_rate": quote_rate if vat_rate > 0 else 0.0,
                 }
             )
             for item in quote.items
         ]
 
-    if booking is not None and booking.quoted_amount:
-        return [
-            compute_item(
-                {
-                    "description": f"Pest Control Services - {job.service_type}",
-                    "quantity": 1,
-                    "unit_price": float(booking.quoted_amount),
-                    "tax_rate": 0.20,
-                }
-            )
-        ]
-
-    items: List[InvoiceItem] = [
+    return [
         compute_item(
             {
-                "description": f"Pest Control Services - {job.service_type}",
+                "description": f"Pest control: {job.service_type}",
                 "quantity": 1,
-                "unit_price": 0.0,
-                "tax_rate": 0.20,
+                "unit_price": float(booking.quoted_amount)
+                if booking is not None and booking.quoted_amount
+                else 0.0,
+                "tax_rate": vat_rate,
             }
         )
     ]
-
-    seen: Set[str] = set()
-    for treatment in job.treatments or []:
-        label = (treatment.product_name or treatment.pest_type or "").strip()
-        if not label:
-            continue
-        key = label.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        description = f"Treatment - {treatment.pest_type}"
-        if treatment.product_name:
-            description += f" ({treatment.product_name})"
-        items.append(
-            compute_item(
-                {
-                    "description": description,
-                    "quantity": 1,
-                    "unit_price": 0.0,
-                    "tax_rate": 0.20,
-                }
-            )
-        )
-
-    return items
 
 
 async def create_invoice_from_job(
@@ -497,7 +506,8 @@ async def create_invoice_from_job(
     branding = await get_settings_for_pdf()
     term_days = int(branding.get("default_payment_terms_days") or DEFAULT_PAYMENT_TERM_DAYS)
     terms = branding.get("default_invoice_terms") or DEFAULT_TERMS
-    instructions = branding.get("default_payment_instructions") or DEFAULT_PAYMENT_INSTRUCTIONS
+    # Bank details print from settings; this carries anything extra.
+    instructions = branding.get("default_payment_instructions") or None
 
     now = datetime.utcnow()
     invoice = Invoice(
@@ -507,14 +517,11 @@ async def create_invoice_from_job(
         quote_id=quote.id if quote else None,
         booking_id=job.booking_id,
         status=InvoiceStatus.DRAFT,
-        items=_line_items_from_job(job, booking, quote),
+        items=_line_items_from_job(job, booking, quote, float(branding.get("vat_rate") or 0)),
         issue_date=now,
         due_date=now + timedelta(days=term_days),
-        notes=(
-            f"Raised automatically on completion of job "
-            f"{booking.booking_number if booking else job.job_number} "
-            f"({job.service_type})."
-        ),
+        # The job number, service, visit date and site print as references.
+        notes=None,
         terms=terms,
         payment_instructions=instructions,
         created_by=user_id,
@@ -653,6 +660,8 @@ async def update_invoice(
 
     if "items" in payload and data.items is not None:
         invoice.items = [compute_item(item) for item in data.items]
+        if not await _vat_registered():
+            invoice.items = _without_vat(invoice.items)
 
     for field in ("notes", "terms", "payment_instructions"):
         if field in payload:
@@ -1059,6 +1068,17 @@ def _build_styles(accent=EMERALD) -> dict:
     }
 
 
+def _site_line(address: Optional[dict]) -> str:
+    """A job's service address on one line, or "" when it has none of its own."""
+    if not address:
+        return ""
+    return ", ".join(
+        str(address.get(part)).strip()
+        for part in ("street", "city", "county", "postcode")
+        if address.get(part)
+    )
+
+
 def _meta_column(label: str, value: str, styles: dict) -> list:
     return [
         Paragraph(_escape(label).upper(), styles["label"]),
@@ -1084,6 +1104,11 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
     company_name = pdf_branding.company_name(branding)
     styles = _build_styles(accent)
 
+    # Only a VAT-registered business issues VAT invoices. An invoice that did
+    # charge VAT still prints as one, even if the setting changes later.
+    vat_invoice = bool(branding.get("vat_registered")) or invoice.tax_amount > 0
+    document_name = "Tax Invoice" if vat_invoice else "Invoice"
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -1092,9 +1117,9 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
         rightMargin=18 * mm,
         topMargin=16 * mm,
         bottomMargin=22 * mm,
-        title=f"Tax Invoice {invoice.invoice_number}",
+        title=f"{document_name} {invoice.invoice_number}",
         author=company_name,
-        subject=f"Tax invoice {invoice.invoice_number}",
+        subject=f"{document_name} {invoice.invoice_number}",
     )
 
     story: list = []
@@ -1111,14 +1136,14 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
 
     identity = pdf_branding.identity_line(branding)
     if identity:
-        company_block.append(Paragraph(_escape(identity), styles["small"]))
+        company_block.append(Paragraph(_escape(identity).replace("\n", "<br/>"), styles["small"]))
 
     contact_lines = pdf_branding.contact_lines(branding)
     contact_block = [
         Paragraph(_escape(line), styles["smallRight"]) for line in contact_lines
     ] or [Paragraph("", styles["smallRight"])]
 
-    header = Table([[company_block, contact_block]], colWidths=[95 * mm, 79 * mm])
+    header = Table([[company_block, contact_block]], colWidths=_columns(95, 79))
     header.setStyle(
         TableStyle(
             [
@@ -1135,7 +1160,7 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
     story.append(HRFlowable(width="100%", thickness=1.2, color=accent, spaceAfter=12))
 
     # --- Title + key dates -------------------------------------------------
-    story.append(Paragraph("TAX INVOICE", styles["docTitle"]))
+    story.append(Paragraph(document_name.upper(), styles["docTitle"]))
     story.append(Spacer(1, 8))
 
     meta = Table(
@@ -1146,7 +1171,7 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
                 _meta_column("Due date", _pdf_date(invoice.due_date), styles),
             ]
         ],
-        colWidths=[58 * mm, 58 * mm, 58 * mm],
+        colWidths=_columns(1, 1, 1),
     )
     meta.setStyle(
         TableStyle(
@@ -1190,12 +1215,20 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
         reference_block.append(
             Paragraph(f"Service: {_escape(job.service_type)}", styles["small"])
         )
+        visit_date = job.actual_end or job.actual_start or job.scheduled_start
+        reference_block.append(
+            Paragraph(f"Date of service: {_pdf_date(visit_date)}", styles["small"])
+        )
+        site = _site_line(job.service_address)
+        if site and (customer is None or site != customer.address.one_line()):
+            # Landlords and agents need to know which property the bill is for.
+            reference_block.append(Paragraph(f"Site: {_escape(site)}", styles["small"]))
     if quote is not None:
         reference_block.append(Paragraph(f"Quote: {_escape(quote.quote_number)}", styles["small"]))
     if job is None and quote is None:
         reference_block.append(Paragraph("No linked job or quote", styles["small"]))
 
-    parties = Table([[bill_block, reference_block]], colWidths=[100 * mm, 74 * mm])
+    parties = Table([[bill_block, reference_block]], colWidths=_columns(100, 74))
     parties.setStyle(
         TableStyle(
             [
@@ -1211,29 +1244,27 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
     story.append(Spacer(1, 16))
 
     # --- Line items --------------------------------------------------------
+    headings = ["Description", "Qty", "Unit price"] + (["VAT"] if vat_invoice else []) + ["Total"]
     items_data = [
         [
-            Paragraph("<b>Description</b>", styles["cell"]),
-            Paragraph("<b>Qty</b>", styles["cellRight"]),
-            Paragraph("<b>Unit price</b>", styles["cellRight"]),
-            Paragraph("<b>VAT</b>", styles["cellRight"]),
-            Paragraph("<b>Total</b>", styles["cellRight"]),
+            Paragraph(f"<b>{heading}</b>", styles["cell" if index == 0 else "cellRight"])
+            for index, heading in enumerate(headings)
         ]
     ]
     for item in invoice.items:
-        items_data.append(
-            [
-                Paragraph(_escape(item.description), styles["cell"]),
-                Paragraph(f"{item.quantity:g}", styles["cellRight"]),
-                Paragraph(_money(item.unit_price), styles["cellRight"]),
-                Paragraph(_money(item.tax_amount), styles["cellRight"]),
-                Paragraph(_money(item.total), styles["cellRight"]),
-            ]
-        )
+        row = [
+            Paragraph(_escape(item.description), styles["cell"]),
+            Paragraph(f"{item.quantity:g}", styles["cellRight"]),
+            Paragraph(_money(item.unit_price), styles["cellRight"]),
+        ]
+        if vat_invoice:
+            row.append(Paragraph(_money(item.tax_amount), styles["cellRight"]))
+        row.append(Paragraph(_money(item.total), styles["cellRight"]))
+        items_data.append(row)
 
     items_table = Table(
         items_data,
-        colWidths=[78 * mm, 16 * mm, 26 * mm, 24 * mm, 30 * mm],
+        colWidths=_columns(78, 16, 26, 24, 30) if vat_invoice else _columns(102, 16, 26, 30),
         repeatRows=1,
     )
     item_style = [
@@ -1256,42 +1287,52 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
 
     # --- Totals ------------------------------------------------------------
     balance_due = invoice.amount_due
-    item_rates = {item.tax_rate for item in invoice.items if item.tax_rate is not None}
-    if len(item_rates) == 1:
-        tax_label = f"VAT ({next(iter(item_rates)) * 100:g}%)"
-    else:
-        tax_label = "VAT total"
-    totals_rows = [
-        ["Subtotal", _money(invoice.subtotal)],
-        [tax_label, _money(invoice.tax_amount)],
+    totals_rows = []
+    if vat_invoice:
+        item_rates = {item.tax_rate for item in invoice.items if item.tax_rate is not None}
+        if len(item_rates) == 1:
+            tax_label = f"VAT ({next(iter(item_rates)) * 100:g}%)"
+        else:
+            tax_label = "VAT total"
+        totals_rows += [
+            ["Subtotal", _money(invoice.subtotal)],
+            [tax_label, _money(invoice.tax_amount)],
+        ]
+    total_row = len(totals_rows)  # rows above the total are the small print
+    totals_rows += [
         ["TOTAL DUE", _money(invoice.total)],
         ["Amount paid", _money(invoice.amount_paid)],
         ["Balance due", _money(balance_due)],
     ]
+    totals_style = [
+        ("FONTNAME", (0, total_row), (-1, total_row), "Helvetica-Bold"),
+        ("FONTSIZE", (0, total_row), (-1, total_row), 12),
+        ("TEXTCOLOR", (0, total_row), (-1, total_row), SLATE_900),
+        ("LINEABOVE", (0, total_row), (-1, total_row), 0.9, accent),
+        ("FONTNAME", (0, total_row + 1), (-1, total_row + 1), "Helvetica"),
+        ("FONTSIZE", (0, total_row + 1), (-1, total_row + 2), 9.5),
+        ("TEXTCOLOR", (0, total_row + 1), (-1, total_row + 1), EMERALD_DARK),
+        ("FONTNAME", (0, total_row + 2), (-1, total_row + 2), "Helvetica-Bold"),
+        (
+            "TEXTCOLOR",
+            (0, total_row + 2),
+            (-1, total_row + 2),
+            RED if balance_due > 0 else EMERALD_DARK,
+        ),
+        ("LINEABOVE", (0, total_row + 1), (-1, total_row + 1), 0.4, SLATE_300),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ]
+    if total_row:
+        totals_style += [
+            ("FONTNAME", (0, 0), (-1, total_row - 1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, total_row - 1), 9.5),
+            ("TEXTCOLOR", (0, 0), (-1, total_row - 1), SLATE_600),
+        ]
     totals_table = Table(totals_rows, colWidths=[42 * mm, 34 * mm], hAlign="RIGHT")
-    totals_table.setStyle(
-        TableStyle(
-            [
-                ("FONTNAME", (0, 0), (-1, 1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, 1), 9.5),
-                ("TEXTCOLOR", (0, 0), (-1, 1), SLATE_600),
-                ("FONTNAME", (0, 2), (-1, 2), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 2), (-1, 2), 12),
-                ("TEXTCOLOR", (0, 2), (-1, 2), SLATE_900),
-                ("LINEABOVE", (0, 2), (-1, 2), 0.9, accent),
-                ("FONTNAME", (0, 3), (-1, 3), "Helvetica"),
-                ("FONTSIZE", (0, 3), (-1, 4), 9.5),
-                ("TEXTCOLOR", (0, 3), (-1, 3), EMERALD_DARK),
-                ("FONTNAME", (0, 4), (-1, 4), "Helvetica-Bold"),
-                ("TEXTCOLOR", (0, 4), (-1, 4), RED if balance_due > 0 else EMERALD_DARK),
-                ("LINEABOVE", (0, 3), (-1, 3), 0.4, SLATE_300),
-                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
+    totals_table.setStyle(TableStyle(totals_style))
     story.append(totals_table)
     story.append(Spacer(1, 16))
 
@@ -1320,7 +1361,7 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
 
         payments_table = Table(
             payment_data,
-            colWidths=[30 * mm, 40 * mm, 74 * mm, 30 * mm],
+            colWidths=_columns(30, 40, 74, 30),
             repeatRows=1,
         )
         payments_table.setStyle(
@@ -1374,39 +1415,46 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
     )
     story.append(Spacer(1, 12))
 
-    # --- Payment instructions ---------------------------------------------
-    instructions_text = invoice.payment_instructions or branding.get(
-        "default_payment_instructions"
-    )
-    if instructions_text:
-        instructions = Table(
-            [
-                [
-                    Paragraph(
-                        _escape(instructions_text).replace("\n", "<br/>"),
-                        styles["small"],
-                    )
-                ]
-            ],
-            colWidths=[174 * mm],
-        )
-        instructions.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, -1), SLATE_50),
-                    ("BOX", (0, 0), (-1, -1), 0.5, SLATE_300),
-                    ("TOPPADDING", (0, 0), (-1, -1), 8),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ]
+    # --- How to pay ---------------------------------------------------------
+    if invoice.amount_due > 0 or invoice.status != InvoiceStatus.PAID:
+        pay_lines: List[str] = []
+        bank = [
+            ("Account name", branding.get("bank_account_name")),
+            ("Sort code", branding.get("bank_sort_code")),
+            ("Account number", branding.get("bank_account_number")),
+        ]
+        if any(value for _label, value in bank):
+            pay_lines.append("<b>Bank transfer</b>")
+            pay_lines += [f"{label}: {_escape(value)}" for label, value in bank if value]
+            pay_lines.append(
+                f"Please use <b>{_escape(invoice.invoice_number)}</b> as your payment reference."
             )
-        )
-        story.append(
-            KeepTogether(
-                [Paragraph("Payment instructions", styles["sectionHeading"]), instructions]
+        extra = invoice.payment_instructions or branding.get("default_payment_instructions")
+        if extra:
+            if pay_lines:
+                pay_lines.append("")
+            pay_lines.append(_escape(extra).replace("\n", "<br/>"))
+
+        if pay_lines:
+            instructions = Table(
+                [[Paragraph("<br/>".join(pay_lines), styles["small"])]],
+                colWidths=[CONTENT_WIDTH],
             )
-        )
+            instructions.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, -1), SLATE_50),
+                        ("BOX", (0, 0), (-1, -1), 0.5, SLATE_300),
+                        ("TOPPADDING", (0, 0), (-1, -1), 8),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ]
+                )
+            )
+            story.append(
+                KeepTogether([Paragraph("How to pay", styles["sectionHeading"]), instructions])
+            )
 
     def _draw_footer(canvas, document) -> None:
         """Rule + footer text on every page."""
@@ -1415,16 +1463,17 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
         y = 13 * mm
         canvas.setStrokeColor(SLATE_300)
         canvas.setLineWidth(0.5)
-        canvas.line(18 * mm, y + 6 * mm, width - 18 * mm, y + 6 * mm)
+        left, right = 18 * mm + 6, width - 18 * mm - 6  # the text column's edges
+        canvas.line(left, y + 6 * mm, right, y + 6 * mm)
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(SLATE_600)
         canvas.drawString(
-            18 * mm,
+            left,
             y,
             f"Thank you for your business.  |  {pdf_branding.footer_line(branding)}",
         )
         canvas.drawRightString(
-            width - 18 * mm, y, f"{invoice.invoice_number}  |  Page {document.page}"
+            right, y, f"{invoice.invoice_number}  |  Page {document.page}"
         )
         canvas.restoreState()
 

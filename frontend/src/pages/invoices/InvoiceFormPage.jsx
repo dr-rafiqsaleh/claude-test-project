@@ -35,16 +35,17 @@ import { Separator } from '@/components/ui/separator'
 import { LoadingState, Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
+import { useCompanySettings } from '@/hooks/useCompanySettings'
 import { toApiError } from '@/lib/api'
 import { addDaysToToday, formatCurrency, toDateInputValue } from '@/lib/utils'
 import {
   DEFAULT_INVOICE_TERMS,
   DEFAULT_INVOICE_TERM_DAYS,
-  DEFAULT_PAYMENT_INSTRUCTIONS,
   EDITABLE_INVOICE_STATUSES,
   INVOICE_STATUS,
   JOB_STATUS,
   QuoteStatus,
+  toPercent,
 } from '@/lib/constants'
 
 const itemSchema = z.object({
@@ -78,8 +79,8 @@ const invoiceSchema = z
     path: ['due_date'],
   })
 
-function emptyItem() {
-  return { description: '', quantity: 1, unit_price: '', tax_rate_percent: 20 }
+function emptyItem(taxPercent = 0) {
+  return { description: '', quantity: 1, unit_price: '', tax_rate_percent: taxPercent }
 }
 
 function lineTotals(items) {
@@ -122,6 +123,11 @@ export function InvoiceFormPage() {
   const [relatedLoading, setRelatedLoading] = useState(false)
   const [sendAfterSave, setSendAfterSave] = useState(false)
 
+  // VAT is only charged once the business is VAT registered (Settings).
+  const settings = useCompanySettings()
+  const vatRegistered = Boolean(settings?.vat_registered)
+  const vatPercent = vatRegistered ? toPercent(settings?.default_tax_rate ?? 0.2) : 0
+
   const form = useForm({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
@@ -133,18 +139,39 @@ export function InvoiceFormPage() {
       items: [emptyItem()],
       notes: '',
       terms: DEFAULT_INVOICE_TERMS,
-      payment_instructions: DEFAULT_PAYMENT_INSTRUCTIONS,
+      payment_instructions: '',
     },
     mode: 'onBlur',
   })
 
-  const { control, reset, setValue, getValues } = form
+  const { control, reset, setValue, getValues, getFieldState } = form
   const { fields, append, remove, replace } = useFieldArray({ control, name: 'items' })
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? []
   const selectedCustomerId = useWatch({ control, name: 'customer_id' })
 
   const totals = useMemo(() => lineTotals(watchedItems), [watchedItems])
+
+  // An older invoice may already carry VAT; it keeps showing it until saved.
+  const hasVatLines = watchedItems.some((item) => Number(item?.tax_rate_percent) > 0)
+  const showVat = vatRegistered || hasVatLines
+
+  // A new invoice takes its terms, payment window and VAT rate from Settings,
+  // unless the user has already changed them.
+  useEffect(() => {
+    if (!settings || isEdit) return
+    if (!getFieldState('terms').isDirty && settings.default_invoice_terms) {
+      setValue('terms', settings.default_invoice_terms)
+    }
+    if (!getFieldState('due_date').isDirty) {
+      setValue('due_date', addDaysToToday(settings.default_payment_terms_days ?? DEFAULT_INVOICE_TERM_DAYS))
+    }
+    ;(getValues('items') ?? []).forEach((_, index) => {
+      if (!getFieldState(`items.${index}.tax_rate_percent`).isDirty) {
+        setValue(`items.${index}.tax_rate_percent`, vatPercent)
+      }
+    })
+  }, [settings, isEdit, vatPercent, getFieldState, getValues, setValue])
 
   // Load the customer list (and the invoice itself when editing).
   useEffect(() => {
@@ -178,7 +205,7 @@ export function InvoiceFormPage() {
               description: item.description ?? '',
               quantity: item.quantity ?? 1,
               unit_price: item.unit_price ?? '',
-              tax_rate_percent: Math.round((item.tax_rate ?? 0.2) * 10000) / 100,
+              tax_rate_percent: toPercent(item.tax_rate),
             })),
             notes: invoice.notes ?? '',
             terms: invoice.terms ?? DEFAULT_INVOICE_TERMS,
@@ -273,7 +300,7 @@ export function InvoiceFormPage() {
       description: `Pest Control Services - ${job.service_type}`,
       quantity: 1,
       unit_price: job.quoted_amount ?? '',
-      tax_rate_percent: 20,
+      tax_rate_percent: vatPercent,
     }
 
     if (isBlank) {
@@ -291,7 +318,7 @@ export function InvoiceFormPage() {
     const quote = quotes.find((item) => item.id === quoteId)
     if (!quote || !(quote.items ?? []).length) return
 
-    const taxPercent = Math.round((quote.tax_rate ?? 0.2) * 10000) / 100
+    const taxPercent = vatRegistered ? toPercent(quote.tax_rate ?? settings?.default_tax_rate) : 0
     replace(
       quote.items.map((item) => ({
         description: item.description ?? '',
@@ -591,7 +618,12 @@ export function InvoiceFormPage() {
                   <CardTitle>Line items</CardTitle>
                   <CardDescription>Each service or product being billed.</CardDescription>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => append(emptyItem())}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append(emptyItem(vatPercent))}
+                >
                   <Plus className="h-4 w-4" />
                   Add item
                 </Button>
@@ -600,6 +632,12 @@ export function InvoiceFormPage() {
             <CardContent className="space-y-5">
               {itemsError ? (
                 <p className="text-xs font-medium text-destructive">{itemsError}</p>
+              ) : null}
+
+              {hasVatLines && settings && !vatRegistered ? (
+                <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  VAT is switched off in Settings, so saving this invoice removes its VAT.
+                </p>
               ) : null}
 
               {fields.map((fieldItem, index) => {
@@ -694,12 +732,13 @@ export function InvoiceFormPage() {
                         )}
                       />
 
+                      {showVat ? (
                       <FormField
                         control={control}
                         name={`items.${index}.tax_rate_percent`}
                         render={({ field, fieldState }) => (
                           <FormItem>
-                            <FormLabel>Tax rate (%) *</FormLabel>
+                            <FormLabel>VAT rate (%) *</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -716,9 +755,10 @@ export function InvoiceFormPage() {
                           </FormItem>
                         )}
                       />
+                      ) : null}
 
                       <FormItem>
-                        <FormLabel>Line total (inc. VAT)</FormLabel>
+                        <FormLabel>{showVat ? 'Line total (inc. VAT)' : 'Line total'}</FormLabel>
                         <div className="flex h-10 items-center rounded-md border border-dashed border-input px-3 text-sm font-medium text-foreground">
                           {formatCurrency(lineTotal)}
                         </div>
@@ -733,19 +773,23 @@ export function InvoiceFormPage() {
                   Live totals
                 </Label>
                 <dl className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Subtotal</dt>
-                    <dd className="font-medium text-foreground">
-                      {formatCurrency(totals.subtotal)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">VAT</dt>
-                    <dd className="font-medium text-foreground">
-                      {formatCurrency(totals.taxAmount)}
-                    </dd>
-                  </div>
-                  <Separator />
+                  {showVat ? (
+                    <>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Subtotal</dt>
+                        <dd className="font-medium text-foreground">
+                          {formatCurrency(totals.subtotal)}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">VAT</dt>
+                        <dd className="font-medium text-foreground">
+                          {formatCurrency(totals.taxAmount)}
+                        </dd>
+                      </div>
+                      <Separator />
+                    </>
+                  ) : null}
                   <div className="flex justify-between text-base">
                     <dt className="font-semibold text-foreground">Total due</dt>
                     <dd className="font-semibold text-primary">
@@ -806,16 +850,19 @@ export function InvoiceFormPage() {
                 name="payment_instructions"
                 render={({ field, fieldState }) => (
                   <FormItem>
-                    <FormLabel>Payment instructions</FormLabel>
+                    <FormLabel>Extra payment instructions</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
                         rows={3}
-                        placeholder="Sort Code: 20-00-00  Account No: 12345678  Account Name: QKil Pest Control Ltd"
+                        placeholder="Optional, e.g. card payments also accepted by phone"
                         hasError={Boolean(fieldState.error)}
                       />
                     </FormControl>
-                    <FormDescription>Printed in a box at the foot of the PDF.</FormDescription>
+                    <FormDescription>
+                      Your bank details from Settings print on the invoice automatically, with its
+                      number as the payment reference.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

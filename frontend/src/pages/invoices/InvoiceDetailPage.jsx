@@ -47,6 +47,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
+import { useCompanySettings } from '@/hooks/useCompanySettings'
 import { useInvoice } from '@/hooks/useInvoices'
 import { toApiError } from '@/lib/api'
 import { cn, formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
@@ -67,6 +68,7 @@ export function InvoiceDetailPage() {
   const isAdmin = useAuthStore((state) => state.isAdmin())
 
   const { invoice, loading, error, refetch, setInvoice } = useInvoice(id)
+  const settings = useCompanySettings()
 
   const [transitioning, setTransitioning] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -155,6 +157,8 @@ export function InvoiceDetailPage() {
   const overdue = invoice.is_overdue || invoice.status === INVOICE_STATUS.OVERDUE
   const balanceDue = Number(invoice.amount_due ?? 0)
   const payments = invoice.payments ?? []
+  // VAT only shows once the business is VAT registered, or on an invoice that charged it.
+  const showVat = Boolean(settings?.vat_registered) || Number(invoice.tax_amount) > 0
 
   return (
     <div className="space-y-6">
@@ -317,19 +321,23 @@ export function InvoiceDetailPage() {
           <CardContent>
             <div className="rounded-lg border border-dashed border-input bg-muted/50 p-4">
               <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Subtotal</dt>
-                  <dd className="font-medium text-foreground">
-                    {formatCurrency(invoice.subtotal)}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">VAT</dt>
-                  <dd className="font-medium text-foreground">
-                    {formatCurrency(invoice.tax_amount)}
-                  </dd>
-                </div>
-                <Separator />
+                {showVat ? (
+                  <>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Subtotal</dt>
+                      <dd className="font-medium text-foreground">
+                        {formatCurrency(invoice.subtotal)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">VAT</dt>
+                      <dd className="font-medium text-foreground">
+                        {formatCurrency(invoice.tax_amount)}
+                      </dd>
+                    </div>
+                    <Separator />
+                  </>
+                ) : null}
                 <div className="flex justify-between text-base">
                   <dt className="font-semibold text-foreground">Total</dt>
                   <dd className="font-semibold text-foreground">
@@ -375,7 +383,7 @@ export function InvoiceDetailPage() {
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Unit price</TableHead>
-                <TableHead className="text-right">VAT</TableHead>
+                {showVat ? <TableHead className="text-right">VAT</TableHead> : null}
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
@@ -391,9 +399,11 @@ export function InvoiceDetailPage() {
                   <TableCell className="text-right text-muted-foreground">
                     {formatCurrency(item.unit_price)}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {formatCurrency(item.tax_amount)}
-                  </TableCell>
+                  {showVat ? (
+                    <TableCell className="text-right text-muted-foreground">
+                      {formatCurrency(item.tax_amount)}
+                    </TableCell>
+                  ) : null}
                   <TableCell className="text-right font-medium text-foreground">
                     {formatCurrency(item.total)}
                   </TableCell>
@@ -401,25 +411,29 @@ export function InvoiceDetailPage() {
               ))}
             </TableBody>
             <TableFooter>
-              <TableRow>
-                <TableCell colSpan={4} className="text-right text-muted-foreground">
-                  Subtotal
-                </TableCell>
-                <TableCell className="text-right text-foreground">
-                  {formatCurrency(invoice.subtotal)}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell colSpan={4} className="text-right text-muted-foreground">
-                  VAT ({Math.round(Number(invoice.items?.[0]?.tax_rate ?? 0.2) * 100)}%)
-                </TableCell>
-                <TableCell className="text-right text-foreground">
-                  {formatCurrency(invoice.tax_amount)}
-                </TableCell>
-              </TableRow>
+              {showVat ? (
+                <>
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-right text-muted-foreground">
+                      Subtotal
+                    </TableCell>
+                    <TableCell className="text-right text-foreground">
+                      {formatCurrency(invoice.subtotal)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-right text-muted-foreground">
+                      VAT ({Math.round(Number(invoice.items?.[0]?.tax_rate ?? 0) * 100)}%)
+                    </TableCell>
+                    <TableCell className="text-right text-foreground">
+                      {formatCurrency(invoice.tax_amount)}
+                    </TableCell>
+                  </TableRow>
+                </>
+              ) : null}
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={showVat ? 4 : 3}
                   className="text-right text-base font-semibold text-foreground"
                 >
                   Total
@@ -554,7 +568,7 @@ export function InvoiceDetailPage() {
                 <Separator />
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Payment instructions
+                    Extra payment instructions
                   </p>
                   <p className="mt-1 whitespace-pre-line text-sm text-foreground">
                     {invoice.payment_instructions}

@@ -41,7 +41,9 @@ import {
   QUOTE_SERVICE_TYPES,
   QUOTE_UNITS,
   QuoteStatus,
+  toPercent,
 } from '@/lib/constants'
+import { useCompanySettings } from '@/hooks/useCompanySettings'
 
 const itemSchema = z.object({
   description: z.string().trim().min(1, 'Description is required').max(300),
@@ -90,12 +92,16 @@ export function QuoteFormPage() {
   const [customerSearch, setCustomerSearch] = useState('')
   const [sendAfterSave, setSendAfterSave] = useState(false)
 
+  // VAT is only charged once the business is VAT registered (Settings).
+  const settings = useCompanySettings()
+  const vatRegistered = Boolean(settings?.vat_registered)
+
   const form = useForm({
     resolver: zodResolver(quoteSchema),
     defaultValues: {
       customer_id: searchParams.get('customer_id') ?? '',
       items: [emptyItem()],
-      tax_rate_percent: 20,
+      tax_rate_percent: 0,
       valid_until: addDaysToToday(30),
       notes: '',
       terms: DEFAULT_QUOTE_TERMS,
@@ -103,7 +109,7 @@ export function QuoteFormPage() {
     mode: 'onBlur',
   })
 
-  const { control, reset } = form
+  const { control, reset, setValue, getFieldState } = form
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? []
@@ -127,6 +133,23 @@ export function QuoteFormPage() {
       total: Math.round((subtotal + taxAmount) * 100) / 100,
     }
   }, [watchedItems, watchedTaxPercent])
+
+  // An older quote may already carry VAT; it keeps showing it until saved.
+  const showVat = vatRegistered || Number(watchedTaxPercent) > 0
+
+  // A new quote takes its VAT rate, validity and terms from Settings.
+  useEffect(() => {
+    if (!settings || id) return
+    if (!getFieldState('tax_rate_percent').isDirty) {
+      setValue('tax_rate_percent', vatRegistered ? toPercent(settings.default_tax_rate ?? 0.2) : 0)
+    }
+    if (!getFieldState('valid_until').isDirty && settings.default_quote_valid_days) {
+      setValue('valid_until', addDaysToToday(settings.default_quote_valid_days))
+    }
+    if (!getFieldState('terms').isDirty && settings.default_quote_terms) {
+      setValue('terms', settings.default_quote_terms)
+    }
+  }, [settings, id, vatRegistered, getFieldState, setValue])
 
   // Load the customer list (and the quote itself when editing).
   useEffect(() => {
@@ -160,7 +183,7 @@ export function QuoteFormPage() {
               unit: item.unit ?? 'service',
               unit_price: item.unit_price ?? '',
             })),
-            tax_rate_percent: Math.round((quote.tax_rate ?? 0.2) * 10000) / 100,
+            tax_rate_percent: toPercent(quote.tax_rate),
             valid_until: toDateInputValue(quote.valid_until),
             notes: quote.notes ?? '',
             terms: quote.terms ?? DEFAULT_QUOTE_TERMS,
@@ -536,16 +559,19 @@ export function QuoteFormPage() {
           <Card>
             <CardHeader>
               <CardTitle>Pricing &amp; validity</CardTitle>
-              <CardDescription>Tax treatment and how long this quote stands.</CardDescription>
+              <CardDescription>
+                {showVat ? 'VAT and how long this quote stands.' : 'How long this quote stands.'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-5">
+                {showVat ? (
                 <FormField
                   control={control}
                   name="tax_rate_percent"
                   render={({ field, fieldState }) => (
                     <FormItem>
-                      <FormLabel>Tax rate (%) *</FormLabel>
+                      <FormLabel>VAT rate (%) *</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -557,11 +583,16 @@ export function QuoteFormPage() {
                           hasError={Boolean(fieldState.error)}
                         />
                       </FormControl>
-                      <FormDescription>UK VAT is 20%.</FormDescription>
+                      <FormDescription>
+                        {vatRegistered
+                          ? 'UK VAT is 20%.'
+                          : 'VAT is switched off in Settings, so saving removes it.'}
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                ) : null}
 
                 <FormField
                   control={control}
@@ -582,21 +613,25 @@ export function QuoteFormPage() {
               <div className="rounded-lg border border-border bg-muted/50 p-4">
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Live totals</Label>
                 <dl className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Subtotal</dt>
-                    <dd className="font-medium text-foreground">
-                      {formatCurrency(totals.subtotal)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">
-                      VAT ({Number.isFinite(Number(watchedTaxPercent)) ? Number(watchedTaxPercent) : 0}%)
-                    </dt>
-                    <dd className="font-medium text-foreground">
-                      {formatCurrency(totals.taxAmount)}
-                    </dd>
-                  </div>
-                  <Separator />
+                  {showVat ? (
+                    <>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Subtotal</dt>
+                        <dd className="font-medium text-foreground">
+                          {formatCurrency(totals.subtotal)}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">
+                          VAT ({Number.isFinite(Number(watchedTaxPercent)) ? Number(watchedTaxPercent) : 0}%)
+                        </dt>
+                        <dd className="font-medium text-foreground">
+                          {formatCurrency(totals.taxAmount)}
+                        </dd>
+                      </div>
+                      <Separator />
+                    </>
+                  ) : null}
                   <div className="flex justify-between text-base">
                     <dt className="font-semibold text-foreground">Total</dt>
                     <dd className="font-semibold text-primary">

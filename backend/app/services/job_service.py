@@ -1218,7 +1218,7 @@ def _header(job: Job, booking: Optional[Booking], branding: dict, styles: dict, 
         company_block.append(Paragraph(_escape(line), styles["small"]))
     identity = pdf_branding.identity_line(branding)
     if identity:
-        company_block.append(Paragraph(_escape(identity), styles["small"]))
+        company_block.append(Paragraph(_escape(identity).replace("\n", "<br/>"), styles["small"]))
 
     meta_block: list = [
         Paragraph("REPORT", styles["smallRight"]),

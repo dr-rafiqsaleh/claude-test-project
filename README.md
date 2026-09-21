@@ -85,7 +85,11 @@ Errors keep the shape with `success: false`; validation failures also carry
   database.
 - **Phase 5 — Invoicing & payments** ✅
   Invoices raised automatically when a job completes, partial payments, overdue
-  sweeping, dashboard revenue aggregation, tax invoice PDF.
+  sweeping, dashboard revenue aggregation. A VAT switch in Settings: until the
+  business is VAT registered nothing charges or mentions VAT; once it is,
+  invoices become tax invoices with the VAT number. Bank details, the registered
+  company name and the next invoice number are set in Settings too.
+  `python scripts/check_invoicing.py` checks it on a throwaway database.
 - **Phase 6 — Global search** ✅
   One endpoint across customers, quotes, bookings, jobs and invoices, fanned out
   in parallel with batched name resolution. Header quick-search with recent

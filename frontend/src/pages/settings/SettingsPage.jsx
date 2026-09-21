@@ -22,6 +22,7 @@ import {
   updateSettings,
   uploadLogo,
 } from '@/api/settings'
+import { CheckboxField } from '@/components/jobs/JobFormControls'
 import {
   ProductListEditor,
   isBlankProduct,
@@ -42,7 +43,7 @@ import { DEFAULT_PRIMARY_COLOR, MAX_LOGO_BYTES } from '@/lib/constants'
 
 const TABS = [
   { key: 'company', label: 'Company Profile', icon: Building2 },
-  { key: 'documents', label: 'Invoice & Quote Defaults', icon: Receipt },
+  { key: 'documents', label: 'Invoicing', icon: Receipt },
   { key: 'reports', label: 'Reports', icon: ClipboardList },
   { key: 'email', label: 'Email', icon: Mail },
   { key: 'users', label: 'Users', icon: UserCog },
@@ -52,8 +53,14 @@ const TABS = [
 /** Every field the form owns, so a partial API response cannot leave holes. */
 const EMPTY_FORM = {
   company_name: '',
+  legal_name: '',
   company_number: '',
   vat_number: '',
+  vat_registered: false,
+  bank_account_name: '',
+  bank_sort_code: '',
+  bank_account_number: '',
+  next_invoice_number: '',
   phone: '',
   email: '',
   website: '',
@@ -106,8 +113,13 @@ function toForm(settings) {
   }
 }
 
-/** Form shape -> API shape. Blank optional strings are sent as null. */
-function toPayload(form) {
+/**
+ * Form shape -> API shape. Blank optional strings are sent as null.
+ *
+ * The next invoice number is only sent when it was changed, so saving some
+ * other setting never collides with invoices raised in the meantime.
+ */
+function toPayload(form, loaded) {
   const optional = (value) => {
     const trimmed = String(value ?? '').trim()
     return trimmed === '' ? null : trimmed
@@ -115,8 +127,17 @@ function toPayload(form) {
 
   return {
     company_name: String(form.company_name ?? '').trim(),
+    legal_name: optional(form.legal_name),
     company_number: optional(form.company_number),
     vat_number: optional(form.vat_number),
+    vat_registered: Boolean(form.vat_registered),
+    bank_account_name: optional(form.bank_account_name),
+    bank_sort_code: optional(form.bank_sort_code),
+    bank_account_number: optional(form.bank_account_number),
+    ...(Number(form.next_invoice_number) &&
+    Number(form.next_invoice_number) !== loaded?.next_invoice_number
+      ? { next_invoice_number: Number(form.next_invoice_number) }
+      : {}),
     phone: optional(form.phone),
     email: optional(form.email),
     website: optional(form.website),
@@ -283,7 +304,19 @@ export function SettingsPage() {
     }
   }
 
+  /** Switching VAT on starts from the standard 20% if no rate was ever set. */
+  function setVatRegistered(registered) {
+    set('vat_registered', registered)
+    if (registered && !Number(form.default_tax_rate)) set('default_tax_rate', 20)
+  }
+
   async function save() {
+    if (form.vat_registered && !String(form.vat_number ?? '').trim()) {
+      toastError('Add your VAT number', 'A VAT invoice has to show it.')
+      setActiveTab('documents')
+      return
+    }
+
     if (!String(form.company_name ?? '').trim()) {
       toastError('Company name is required', 'It appears on every document you send.')
       setActiveTab('company')
@@ -305,7 +338,7 @@ export function SettingsPage() {
         setLogoVersion(Date.now())
       }
 
-      const updated = await updateSettings(toPayload(form))
+      const updated = await updateSettings(toPayload(form, settings))
       primeCompanySettings(updated)
       setSettings(updated)
       setForm(toForm(updated))
@@ -395,19 +428,36 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle>Company profile</CardTitle>
             <CardDescription>
-              Your legal name, company number and contact details as they appear on customer
-              documents.
+              Your names, company number and contact details as they appear on quotes, invoices
+              and reports.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Company name *" htmlFor="company_name" className="sm:col-span-2">
+              <Field
+                label="Company name *"
+                htmlFor="company_name"
+                hint="The name your customers know you by."
+              >
                 <Input
                   id="company_name"
                   value={form.company_name}
                   onChange={(event) => set('company_name', event.target.value)}
                   placeholder="QKil Pest Control"
                   hasError={!String(form.company_name ?? '').trim()}
+                />
+              </Field>
+
+              <Field
+                label="Registered company name"
+                htmlFor="legal_name"
+                hint="For a limited company, if different, e.g. Quikil Ltd. Printed as 'A trading name of ...'."
+              >
+                <Input
+                  id="legal_name"
+                  value={form.legal_name}
+                  onChange={(event) => set('legal_name', event.target.value)}
+                  placeholder="Quikil Ltd"
                 />
               </Field>
 
@@ -421,15 +471,6 @@ export function SettingsPage() {
                   value={form.company_number}
                   onChange={(event) => set('company_number', event.target.value)}
                   placeholder="12345678"
-                />
-              </Field>
-
-              <Field label="VAT Number" htmlFor="vat_number" hint="e.g. GB123456789">
-                <Input
-                  id="vat_number"
-                  value={form.vat_number}
-                  onChange={(event) => set('vat_number', event.target.value)}
-                  placeholder="GB123456789"
                 />
               </Field>
 
@@ -452,7 +493,7 @@ export function SettingsPage() {
                 />
               </Field>
 
-              <Field label="Website" htmlFor="website" className="sm:col-span-2">
+              <Field label="Website" htmlFor="website">
                 <Input
                   id="website"
                   value={form.website}
@@ -592,130 +633,219 @@ export function SettingsPage() {
       {activeTab === 'documents' ? (
         <Card>
           <CardHeader>
-            <CardTitle>Invoice &amp; quote defaults</CardTitle>
+            <CardTitle>Invoicing</CardTitle>
             <CardDescription>
-              Applied to every new document, including record-number prefixes. Existing
-              documents keep the values and numbers they were created with.
+              VAT, how customers pay you, numbering and terms. Changes apply to new quotes and
+              invoices; existing ones keep what they were created with.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Default tax rate (%)"
-                htmlFor="default_tax_rate"
-                hint="VAT in the UK is 20%."
-              >
-                <Input
-                  id="default_tax_rate"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={form.default_tax_rate}
-                  onChange={(event) => set('default_tax_rate', event.target.value)}
-                />
-              </Field>
-
-              <Field
-                label="Payment terms (days)"
-                htmlFor="default_payment_terms_days"
-                hint="Days between the issue date and the due date."
-              >
-                <Input
-                  id="default_payment_terms_days"
-                  type="number"
-                  min="0"
-                  max="365"
-                  value={form.default_payment_terms_days}
-                  onChange={(event) => set('default_payment_terms_days', event.target.value)}
-                />
-              </Field>
-
-              <Field label="Invoice prefix" htmlFor="invoice_prefix" hint="e.g. INV-0001">
-                <Input
-                  id="invoice_prefix"
-                  value={form.invoice_prefix}
-                  onChange={(event) => set('invoice_prefix', event.target.value)}
-                  maxLength={8}
-                />
-              </Field>
-
-              <Field label="Quote prefix" htmlFor="quote_prefix" hint="e.g. QTE-0001">
-                <Input
-                  id="quote_prefix"
-                  value={form.quote_prefix}
-                  onChange={(event) => set('quote_prefix', event.target.value)}
-                  maxLength={8}
-                />
-              </Field>
-
-              <Field label="Job number prefix" htmlFor="booking_prefix" hint="e.g. JOB-0001">
-                <Input
-                  id="booking_prefix"
-                  value={form.booking_prefix}
-                  onChange={(event) => set('booking_prefix', event.target.value)}
-                  maxLength={8}
-                />
-              </Field>
-
-              <Field label="Report number prefix" htmlFor="job_prefix" hint="e.g. RPT-0001">
-                <Input
-                  id="job_prefix"
-                  value={form.job_prefix}
-                  onChange={(event) => set('job_prefix', event.target.value)}
-                  maxLength={8}
-                />
-              </Field>
-
-              <Field
-                label="Quote valid for (days)"
-                htmlFor="default_quote_valid_days"
-                className="sm:col-span-2"
-              >
-                <Input
-                  id="default_quote_valid_days"
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={form.default_quote_valid_days}
-                  onChange={(event) => set('default_quote_valid_days', event.target.value)}
-                />
-              </Field>
-            </div>
-
-            <Field label="Default invoice terms" htmlFor="default_invoice_terms">
-              <Textarea
-                id="default_invoice_terms"
-                rows={3}
-                value={form.default_invoice_terms}
-                onChange={(event) => set('default_invoice_terms', event.target.value)}
-                placeholder="Payment due within 14 days. VAT registered under GB123456789."
+          <CardContent className="space-y-8">
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">VAT</h3>
+              <CheckboxField
+                id="vat_registered"
+                checked={Boolean(form.vat_registered)}
+                onChange={setVatRegistered}
+                label="VAT registered"
+                description={
+                  form.vat_registered
+                    ? 'Quotes and invoices charge VAT, and invoices are VAT invoices showing your VAT number.'
+                    : 'Leave off until you register. No quote or invoice charges VAT, and nothing mentions it.'
+                }
               />
-            </Field>
+              {form.vat_registered ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="VAT number *" htmlFor="vat_number" hint="e.g. GB123456789">
+                    <Input
+                      id="vat_number"
+                      value={form.vat_number}
+                      onChange={(event) => set('vat_number', event.target.value)}
+                      placeholder="GB123456789"
+                      hasError={!String(form.vat_number ?? '').trim()}
+                    />
+                  </Field>
+                  <Field label="VAT rate (%)" htmlFor="default_tax_rate" hint="The UK standard rate is 20%.">
+                    <Input
+                      id="default_tax_rate"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={form.default_tax_rate}
+                      onChange={(event) => set('default_tax_rate', event.target.value)}
+                    />
+                  </Field>
+                </div>
+              ) : null}
+            </section>
 
-            <Field
-              label="Default payment instructions"
-              htmlFor="default_payment_instructions"
-              hint="Bank details printed in a box at the foot of every invoice."
-            >
-              <Textarea
-                id="default_payment_instructions"
-                rows={3}
-                value={form.default_payment_instructions}
-                onChange={(event) => set('default_payment_instructions', event.target.value)}
-                placeholder="Sort Code: 20-00-00  Account No: 12345678  Account Name: QKil Pest Control Ltd"
-              />
-            </Field>
+            <section className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Bank details</h3>
+                <p className="text-xs text-muted-foreground">
+                  Printed on every invoice, with the invoice number as the payment reference.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Account name" htmlFor="bank_account_name" className="sm:col-span-3">
+                  <Input
+                    id="bank_account_name"
+                    value={form.bank_account_name}
+                    onChange={(event) => set('bank_account_name', event.target.value)}
+                    placeholder="As it appears on the account"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Sort code" htmlFor="bank_sort_code">
+                  <Input
+                    id="bank_sort_code"
+                    inputMode="numeric"
+                    value={form.bank_sort_code}
+                    onChange={(event) => set('bank_sort_code', event.target.value)}
+                    placeholder="00-00-00"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Account number" htmlFor="bank_account_number" className="sm:col-span-2">
+                  <Input
+                    id="bank_account_number"
+                    inputMode="numeric"
+                    value={form.bank_account_number}
+                    onChange={(event) => set('bank_account_number', event.target.value)}
+                    placeholder="8 digits"
+                    autoComplete="off"
+                  />
+                </Field>
+              </div>
+              <Field
+                label="Extra payment instructions"
+                htmlFor="default_payment_instructions"
+                hint="Optional. Printed under the bank details, e.g. other ways to pay."
+              >
+                <Textarea
+                  id="default_payment_instructions"
+                  rows={2}
+                  value={form.default_payment_instructions}
+                  onChange={(event) => set('default_payment_instructions', event.target.value)}
+                  placeholder="Card payments also accepted by phone."
+                />
+              </Field>
+            </section>
 
-            <Field label="Default quote terms" htmlFor="default_quote_terms">
-              <Textarea
-                id="default_quote_terms"
-                rows={3}
-                value={form.default_quote_terms}
-                onChange={(event) => set('default_quote_terms', event.target.value)}
-                placeholder="Quote valid for 30 days. VAT included."
-              />
-            </Field>
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Numbering</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Next invoice number"
+                  htmlFor="next_invoice_number"
+                  className="sm:col-span-2"
+                  hint={
+                    Number(form.next_invoice_number) > 0
+                      ? `The next invoice will be ${String(form.invoice_prefix || 'INV').toUpperCase()}-${String(
+                          Number(form.next_invoice_number),
+                        ).padStart(4, '0')}. It can only go up, so no number is ever used twice.`
+                      : 'It can only go up, so no number is ever used twice.'
+                  }
+                >
+                  <Input
+                    id="next_invoice_number"
+                    type="number"
+                    min={settings?.next_invoice_number ?? 1}
+                    step="1"
+                    value={form.next_invoice_number}
+                    onChange={(event) => set('next_invoice_number', event.target.value)}
+                    className="sm:w-40"
+                  />
+                </Field>
+
+                <Field label="Invoice prefix" htmlFor="invoice_prefix" hint="e.g. INV-0001">
+                  <Input
+                    id="invoice_prefix"
+                    value={form.invoice_prefix}
+                    onChange={(event) => set('invoice_prefix', event.target.value)}
+                    maxLength={8}
+                  />
+                </Field>
+
+                <Field label="Quote prefix" htmlFor="quote_prefix" hint="e.g. QTE-0001">
+                  <Input
+                    id="quote_prefix"
+                    value={form.quote_prefix}
+                    onChange={(event) => set('quote_prefix', event.target.value)}
+                    maxLength={8}
+                  />
+                </Field>
+
+                <Field label="Job number prefix" htmlFor="booking_prefix" hint="e.g. JOB-0001">
+                  <Input
+                    id="booking_prefix"
+                    value={form.booking_prefix}
+                    onChange={(event) => set('booking_prefix', event.target.value)}
+                    maxLength={8}
+                  />
+                </Field>
+
+                <Field label="Report number prefix" htmlFor="job_prefix" hint="e.g. RPT-0001">
+                  <Input
+                    id="job_prefix"
+                    value={form.job_prefix}
+                    onChange={(event) => set('job_prefix', event.target.value)}
+                    maxLength={8}
+                  />
+                </Field>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Terms</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Payment terms (days)"
+                  htmlFor="default_payment_terms_days"
+                  hint="Days between the invoice date and the due date."
+                >
+                  <Input
+                    id="default_payment_terms_days"
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={form.default_payment_terms_days}
+                    onChange={(event) => set('default_payment_terms_days', event.target.value)}
+                  />
+                </Field>
+
+                <Field label="Quotes valid for (days)" htmlFor="default_quote_valid_days">
+                  <Input
+                    id="default_quote_valid_days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={form.default_quote_valid_days}
+                    onChange={(event) => set('default_quote_valid_days', event.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Invoice terms" htmlFor="default_invoice_terms">
+                <Textarea
+                  id="default_invoice_terms"
+                  rows={3}
+                  value={form.default_invoice_terms}
+                  onChange={(event) => set('default_invoice_terms', event.target.value)}
+                  placeholder="Payment due within 14 days. Thank you for your business."
+                />
+              </Field>
+
+              <Field label="Quote terms" htmlFor="default_quote_terms">
+                <Textarea
+                  id="default_quote_terms"
+                  rows={3}
+                  value={form.default_quote_terms}
+                  onChange={(event) => set('default_quote_terms', event.target.value)}
+                  placeholder="Quote valid for 30 days."
+                />
+              </Field>
+            </section>
 
             <SaveBar saving={saving} dirty={dirty} onSave={() => void save()} />
           </CardContent>

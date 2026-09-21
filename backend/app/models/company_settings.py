@@ -76,7 +76,8 @@ class CompanySettings(Document):
     """Singleton settings document."""
 
     # Identity
-    company_name: str = "QKil Pest Control"
+    company_name: str = "QKil Pest Control"  # the name customers know you by
+    legal_name: Optional[str] = None  # registered company name, e.g. "Quikil Ltd"
     company_number: Optional[str] = None  # Companies House number, e.g. "12345678"
     vat_number: Optional[str] = None  # UK VAT registration, e.g. "GB123456789"
 
@@ -96,14 +97,20 @@ class CompanySettings(Document):
     logo_data: Optional[str] = None
     logo_content_type: Optional[str] = None
 
+    # VAT. Until the business registers, no quote or invoice charges VAT and
+    # invoices are plain invoices rather than VAT invoices.
+    vat_registered: bool = False
+    default_tax_rate: float = 0.20  # the VAT rate charged once registered
+
+    # Bank details, printed on every invoice
+    bank_account_name: Optional[str] = None
+    bank_sort_code: Optional[str] = None  # "12-34-56"
+    bank_account_number: Optional[str] = None
+
     # Invoice defaults
-    default_tax_rate: float = 0.20
     default_payment_terms_days: int = 14
-    default_invoice_terms: str = (
-        "Payment due within 14 days. VAT registered under GB123456789. "
-        "Thank you for your business."
-    )
-    default_payment_instructions: Optional[str] = None  # bank details
+    default_invoice_terms: str = "Payment due within 14 days. Thank you for your business."
+    default_payment_instructions: Optional[str] = None  # anything beyond the bank details
     invoice_prefix: str = "INV"
     quote_prefix: str = "QTE"
     booking_prefix: str = "JOB"  # jobs (stored as bookings)
@@ -151,6 +158,11 @@ class CompanySettings(Document):
             )
             if line
         ]
+
+    @property
+    def vat_rate(self) -> float:
+        """The VAT rate to charge: nothing at all until VAT registered."""
+        return float(self.default_tax_rate or 0) if self.vat_registered else 0.0
 
     @property
     def address_one_line(self) -> str:

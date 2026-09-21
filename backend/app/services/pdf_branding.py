@@ -55,13 +55,26 @@ def company_name(branding: dict) -> str:
 
 
 def identity_line(branding: dict) -> str:
-    """"Company No: ...  |  VAT No: ..." - empty when neither is recorded."""
-    parts = []
+    """The legal small print under the company name, e.g.
+
+    "A trading name of Quikil Ltd" and, on a second line,
+    "Company No: 12345678  |  VAT No: GB...".
+
+    Lines are separated by a newline. Empty when none of it is recorded. The
+    VAT number only appears once the business is VAT registered.
+    """
+    lines = []
+    legal_name = str(branding.get("legal_name") or "").strip()
+    if legal_name and legal_name.lower() != company_name(branding).strip().lower():
+        lines.append(f"A trading name of {legal_name}")
+    numbers = []
     if branding.get("company_number"):
-        parts.append(f"Company No: {branding['company_number']}")
+        numbers.append(f"Company No: {branding['company_number']}")
     if branding.get("vat_number"):
-        parts.append(f"VAT No: {branding['vat_number']}")
-    return "  |  ".join(parts)
+        numbers.append(f"VAT No: {branding['vat_number']}")
+    if numbers:
+        lines.append("  |  ".join(numbers))
+    return "\n".join(lines)
 
 
 def contact_lines(branding: dict) -> List[str]:

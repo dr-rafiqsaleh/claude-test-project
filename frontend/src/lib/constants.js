@@ -102,7 +102,7 @@ export const QUOTE_SERVICE_TYPES = [
   'Follow-up',
 ]
 
-export const DEFAULT_QUOTE_TERMS = 'Payment due within 14 days. VAT included.'
+export const DEFAULT_QUOTE_TERMS = 'Payment due within 14 days of the work being completed.'
 
 /* -------------------------------------------------------------------------
  * Bookings
@@ -456,13 +456,13 @@ export const PAYABLE_INVOICE_STATUSES = [
 /** Statuses an invoice can no longer move out of. */
 export const TERMINAL_INVOICE_STATUSES = [INVOICE_STATUS.PAID, INVOICE_STATUS.CANCELLED]
 
-export const DEFAULT_INVOICE_TERMS =
-  'Payment due within 14 days. VAT registered under GB123456789. ' +
-  'Thank you for your business.'
+/** Used until the company settings load; Settings holds the real wording. */
+export const DEFAULT_INVOICE_TERMS = 'Payment due within 14 days. Thank you for your business.'
 
-export const DEFAULT_PAYMENT_INSTRUCTIONS =
-  'Bank transfer - Sort Code: 20-00-00  Account No: 12345678  ' +
-  'Account Name: QKil Pest Control Ltd. Please quote the invoice number as the reference.'
+/** A VAT rate as the percentage shown in forms, e.g. 0.2 -> 20. */
+export function toPercent(rate) {
+  return Math.round(Number(rate ?? 0) * 10000) / 100
+}
 
 /** Days between the issue date and the due date on a new invoice. */
 export const DEFAULT_INVOICE_TERM_DAYS = 14

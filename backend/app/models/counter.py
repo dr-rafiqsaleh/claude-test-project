@@ -56,5 +56,28 @@ class Counter(Document):
         )
         return f"{chosen}-{value:0{width}d}"
 
+    @classmethod
+    async def peek_next(cls, name: str) -> int:
+        """The value the next `next_value` call will hand out, without taking it."""
+        document = await cls.get_motor_collection().find_one({"name": name})
+        return int(document.get("value", 0)) + 1 if document else 1
+
+    @classmethod
+    async def move_next_to(cls, name: str, next_value: int) -> bool:
+        """Make `next_value` the next number handed out.
+
+        Never goes backwards, so a number already used can never be issued
+        twice. Returns False, changing nothing, when `next_value` is behind.
+        """
+        collection = cls.get_motor_collection()
+        if await collection.find_one({"name": name}) is None:
+            await collection.insert_one({"name": name, "value": next_value - 1})
+            return True
+        result = await collection.update_one(
+            {"name": name, "value": {"$lte": next_value - 1}},
+            {"$set": {"value": next_value - 1}},
+        )
+        return result.matched_count == 1
+
     def __str__(self) -> str:
         return f"{self.name}={self.value}"

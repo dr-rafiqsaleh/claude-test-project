@@ -23,15 +23,16 @@ from app.schemas.company_settings import (
 from app.services import company_settings_service
 from app.services.company_settings_service import (
     InvalidLogoError,
-    build_settings_payload,
+    SettingsError,
+    settings_payload,
 )
 
 router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
 
-def _envelope(settings, message: str) -> CompanySettingsEnvelope:
+async def _envelope(settings, message: str) -> CompanySettingsEnvelope:
     return CompanySettingsEnvelope(
-        data=CompanySettingsResponse.model_validate(build_settings_payload(settings)),
+        data=CompanySettingsResponse.model_validate(await settings_payload(settings)),
         message=message,
         success=True,
     )
@@ -44,7 +45,7 @@ async def get_settings(
 ) -> CompanySettingsEnvelope:
     """Return the company profile, document defaults and appearance settings."""
     settings = await company_settings_service.get_settings()
-    return _envelope(settings, "Company settings retrieved")
+    return await _envelope(settings, "Company settings retrieved")
 
 
 @router.put("", response_model=CompanySettingsEnvelope, summary="Update company settings")
@@ -54,8 +55,14 @@ async def update_settings(
     current_user: User = Depends(require_admin),
 ) -> CompanySettingsEnvelope:
     """Apply a partial update. Admin only."""
-    settings = await company_settings_service.update_settings(payload, current_user.id)
-    return _envelope(settings, "Company settings saved")
+    try:
+        settings = await company_settings_service.update_settings(payload, current_user.id)
+    except SettingsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    return await _envelope(settings, "Company settings saved")
 
 
 # Declared before the GET so the multipart upload is matched first.
@@ -77,7 +84,7 @@ async def upload_logo(
             detail=str(exc),
         ) from exc
 
-    return _envelope(settings, "Logo uploaded")
+    return await _envelope(settings, "Logo uploaded")
 
 
 @router.get(
@@ -121,4 +128,4 @@ async def delete_logo(
 ) -> CompanySettingsEnvelope:
     """Clear the logo so PDFs fall back to the company name in large text."""
     settings = await company_settings_service.remove_logo(current_user.id)
-    return _envelope(settings, "Logo removed")
+    return await _envelope(settings, "Logo removed")

@@ -28,7 +28,17 @@ QUOTE_COUNTER_NAME = QUOTE_COUNTER
 
 #: Fallback terms, used until the company settings document is filled in.
 #: Company branding all reads from `company_settings_service`.
-DEFAULT_TERMS = "Payment due within 14 days. VAT included."
+DEFAULT_TERMS = "Payment due within 14 days of the work being completed."
+
+#: Width of the text column: A4 less 18mm margins, less the 6pt padding
+#: reportlab's page frame keeps on each side, so tables line up with text.
+CONTENT_WIDTH = A4[0] - 36 * mm - 12
+
+
+def _columns(*widths: float) -> List[float]:
+    """Column widths in the given proportions, filling the text column."""
+    total = sum(widths)
+    return [CONTENT_WIDTH * width / total for width in widths]
 
 #: Allowed status transitions. `expired` is handled separately (admin only, from anywhere).
 ALLOWED_TRANSITIONS: Dict[QuoteStatus, set] = {
@@ -160,9 +170,6 @@ async def create_quote(payload: QuoteCreate, created_by: PydanticObjectId) -> Tu
     if customer is None:
         raise CustomerNotFoundError("Customer not found")
 
-    items = _to_model_items(payload.items)
-    subtotal, tax_amount, total = calculate_totals(items, payload.tax_rate)
-
     # Fall back to the configured quote defaults when the caller left them out.
     from app.services.company_settings_service import (  # noqa: PLC0415
         get_settings_for_pdf,
@@ -171,6 +178,11 @@ async def create_quote(payload: QuoteCreate, created_by: PydanticObjectId) -> Tu
     branding = await get_settings_for_pdf()
     default_terms = branding.get("default_quote_terms") or DEFAULT_TERMS
 
+    # No VAT is charged until the business is VAT registered.
+    tax_rate = payload.tax_rate if branding.get("vat_registered") else 0.0
+    items = _to_model_items(payload.items)
+    subtotal, tax_amount, total = calculate_totals(items, tax_rate)
+
     now = datetime.utcnow()
     quote = Quote(
         quote_number=await get_next_quote_number(),
@@ -178,7 +190,7 @@ async def create_quote(payload: QuoteCreate, created_by: PydanticObjectId) -> Tu
         status=payload.status,
         items=items,
         subtotal=subtotal,
-        tax_rate=payload.tax_rate,
+        tax_rate=tax_rate,
         tax_amount=tax_amount,
         total=total,
         notes=payload.notes,
@@ -280,7 +292,11 @@ async def update_quote(
         quote.items = _to_model_items(payload.items)
 
     if "tax_rate" in data and data["tax_rate"] is not None:
-        quote.tax_rate = float(data["tax_rate"])
+        from app.services.company_settings_service import get_settings  # noqa: PLC0415
+
+        # No VAT is charged until the business is VAT registered.
+        vat_registered = (await get_settings()).vat_registered
+        quote.tax_rate = float(data["tax_rate"]) if vat_registered else 0.0
 
     if "notes" in data:
         quote.notes = data["notes"]
@@ -501,7 +517,7 @@ async def generate_pdf(quote_id: "PydanticObjectId | str") -> Tuple[bytes, str]:
 
     identity = pdf_branding.identity_line(branding)
     if identity:
-        company_block.append(Paragraph(identity, styles["small"]))
+        company_block.append(Paragraph(identity.replace("\n", "<br/>"), styles["small"]))
 
     meta_block = [
         Paragraph("QUOTE", styles["smallRight"]),
@@ -512,7 +528,7 @@ async def generate_pdf(quote_id: "PydanticObjectId | str") -> Tuple[bytes, str]:
         Paragraph(f"Status: {quote.status.value.title()}", styles["smallRight"]),
     ]
 
-    header = Table([[company_block, meta_block]], colWidths=[100 * mm, 74 * mm])
+    header = Table([[company_block, meta_block]], colWidths=_columns(100, 74))
     header.setStyle(
         TableStyle(
             [
@@ -568,7 +584,7 @@ async def generate_pdf(quote_id: "PydanticObjectId | str") -> Tuple[bytes, str]:
 
     items_table = Table(
         table_data,
-        colWidths=[70 * mm, 30 * mm, 24 * mm, 25 * mm, 25 * mm],
+        colWidths=_columns(70, 30, 24, 25, 25),
         repeatRows=1,
     )
     items_table.setStyle(
@@ -590,33 +606,33 @@ async def generate_pdf(quote_id: "PydanticObjectId | str") -> Tuple[bytes, str]:
     story.append(Spacer(1, 12))
 
     # --- Totals -----------------------------------------------------------
-    vat_label = f"VAT ({quote.tax_rate * 100:g}%)"
-    totals_table = Table(
-        [
+    # A quote only shows VAT when it charges some, or the business is registered.
+    show_vat = bool(branding.get("vat_registered")) or quote.tax_amount > 0
+    rows = [["Total", _money(quote.total)]]
+    if show_vat:
+        rows = [
             ["Subtotal", _money(quote.subtotal)],
-            [vat_label, _money(quote.tax_amount)],
-            ["Total", _money(quote.total)],
-        ],
-        colWidths=[35 * mm, 32 * mm],
-        hAlign="RIGHT",
-    )
-    totals_table.setStyle(
-        TableStyle(
-            [
-                ("FONTNAME", (0, 0), (-1, 1), "Helvetica"),
-                ("FONTNAME", (0, 2), (-1, 2), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 1), 9.5),
-                ("FONTSIZE", (0, 2), (-1, 2), 11),
-                ("TEXTCOLOR", (0, 0), (-1, 1), SLATE_600),
-                ("TEXTCOLOR", (0, 2), (-1, 2), SLATE_900),
-                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                ("LINEABOVE", (0, 2), (-1, 2), 0.8, accent),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
+            [f"VAT ({quote.tax_rate * 100:g}%)", _money(quote.tax_amount)],
+        ] + rows
+    last = len(rows) - 1
+    totals_style = [
+        ("FONTNAME", (0, last), (-1, last), "Helvetica-Bold"),
+        ("FONTSIZE", (0, last), (-1, last), 11),
+        ("TEXTCOLOR", (0, last), (-1, last), SLATE_900),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("LINEABOVE", (0, last), (-1, last), 0.8, accent),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ]
+    if last:
+        totals_style += [
+            ("FONTNAME", (0, 0), (-1, last - 1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, last - 1), 9.5),
+            ("TEXTCOLOR", (0, 0), (-1, last - 1), SLATE_600),
+        ]
+    totals_table = Table(rows, colWidths=[35 * mm, 32 * mm], hAlign="RIGHT")
+    totals_table.setStyle(TableStyle(totals_style))
     story.append(totals_table)
     story.append(Spacer(1, 18))
 
@@ -642,15 +658,16 @@ async def generate_pdf(quote_id: "PydanticObjectId | str") -> Tuple[bytes, str]:
         y = 13 * mm
         canvas.setStrokeColor(SLATE_300)
         canvas.setLineWidth(0.5)
-        canvas.line(18 * mm, y + 6 * mm, width - 18 * mm, y + 6 * mm)
+        left, right = 18 * mm + 6, width - 18 * mm - 6  # the text column's edges
+        canvas.line(left, y + 6 * mm, right, y + 6 * mm)
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(SLATE_600)
         canvas.drawString(
-            18 * mm,
+            left,
             y,
             f"{company_name}  |  {quote.quote_number}  |  Thank you for your business.",
         )
-        canvas.drawRightString(width - 18 * mm, y, f"Page {document.page}")
+        canvas.drawRightString(right, y, f"Page {document.page}")
         canvas.restoreState()
 
     doc.build(story, onFirstPage=_draw_footer, onLaterPages=_draw_footer)

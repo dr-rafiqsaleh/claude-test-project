@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
+import { useCompanySettings } from '@/hooks/useCompanySettings'
 import { useQuote } from '@/hooks/useQuotes'
 import { toApiError } from '@/lib/api'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
@@ -52,6 +53,7 @@ export function QuoteDetailPage() {
   const navigate = useNavigate()
   const canWrite = useAuthStore((state) => state.canWrite())
   const { quote, loading, error, refetch, setQuote } = useQuote(id)
+  const settings = useCompanySettings()
 
   const [downloading, setDownloading] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
@@ -134,6 +136,8 @@ export function QuoteDetailPage() {
   const isDraft = quote.status === QuoteStatus.DRAFT
   const isSent = quote.status === QuoteStatus.SENT
   const isAccepted = quote.status === QuoteStatus.ACCEPTED
+  // VAT only shows once the business is VAT registered, or on a quote that charged it.
+  const showVat = Boolean(settings?.vat_registered) || Number(quote.tax_amount) > 0
 
   return (
     <div className="space-y-6">
@@ -266,21 +270,25 @@ export function QuoteDetailPage() {
 
               <div className="flex justify-end border-t border-border p-4">
                 <dl className="w-full max-w-xs space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Subtotal</dt>
-                    <dd className="font-medium text-foreground">
-                      {formatCurrency(quote.subtotal)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">
-                      VAT ({Math.round(quote.tax_rate * 100)}%)
-                    </dt>
-                    <dd className="font-medium text-foreground">
-                      {formatCurrency(quote.tax_amount)}
-                    </dd>
-                  </div>
-                  <Separator />
+                  {showVat ? (
+                    <>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Subtotal</dt>
+                        <dd className="font-medium text-foreground">
+                          {formatCurrency(quote.subtotal)}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">
+                          VAT ({Math.round(quote.tax_rate * 100)}%)
+                        </dt>
+                        <dd className="font-medium text-foreground">
+                          {formatCurrency(quote.tax_amount)}
+                        </dd>
+                      </div>
+                      <Separator />
+                    </>
+                  ) : null}
                   <div className="flex justify-between text-base">
                     <dt className="font-semibold text-foreground">Total</dt>
                     <dd className="font-semibold text-primary">
