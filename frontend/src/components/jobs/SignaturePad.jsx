@@ -11,14 +11,65 @@ const CANVAS_HEIGHT = 150
 /** Nominal width. The canvas stretches to its container, capped at this. */
 const CANVAS_WIDTH = 400
 
+/** White space kept around the ink when a signature is cropped, in CSS pixels. */
+const TRIM_PADDING = 8
+
+/**
+ * The signature as a PNG cropped to its ink, so it prints at a readable size
+ * instead of as a small scribble in a large blank box. Null when nothing is
+ * drawn.
+ */
+function trimmedSignature(canvas) {
+  const context = canvas.getContext('2d')
+  if (!context) return null
+  const { width, height } = canvas
+  const pixels = context.getImageData(0, 0, width, height).data
+
+  let top = height
+  let left = width
+  let right = -1
+  let bottom = -1
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4
+      // Dark ink on the pad's white background.
+      if (pixels[index] < 200 || pixels[index + 1] < 200 || pixels[index + 2] < 200) {
+        if (x < left) left = x
+        if (x > right) right = x
+        if (y < top) top = y
+        if (y > bottom) bottom = y
+      }
+    }
+  }
+  if (right < 0) return null
+
+  const padding = Math.round(TRIM_PADDING * Math.max(window.devicePixelRatio || 1, 1))
+  left = Math.max(left - padding, 0)
+  top = Math.max(top - padding, 0)
+  right = Math.min(right + padding, width - 1)
+  bottom = Math.min(bottom + padding, height - 1)
+
+  const cropped = document.createElement('canvas')
+  cropped.width = right - left + 1
+  cropped.height = bottom - top + 1
+  const target = cropped.getContext('2d')
+  target.fillStyle = '#ffffff'
+  target.fillRect(0, 0, cropped.width, cropped.height)
+  target.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height)
+  return cropped.toDataURL('image/png')
+}
+
 /**
  * Signature capture built on signature_pad.
  *
+ * The signature is captured as it is drawn: `onSave` runs after every stroke,
+ * so there is no separate save step to forget before completing a job.
+ *
  * Props:
  *   - `label`              caption shown above the pad
- *   - `existingSignature`  a base64 PNG data URL; renders read-only when set
- *   - `onSave(dataUrl)`    called with the trimmed PNG data URL
- *   - `onClear()`          called after the pad is wiped
+ *   - `existingSignature`  a base64 PNG data URL; shown as an image when set
+ *   - `onSave(dataUrl)`    called with the PNG, cropped to the ink, after each stroke
+ *   - `onClear()`          called when the pad is wiped, or a re-sign is cancelled
  *   - `readOnly`           force read-only even without an existing signature
  */
 export function SignaturePad({
@@ -37,8 +88,11 @@ export function SignaturePad({
   // Editing starts closed when a signature already exists - the saved image is
   // shown instead, and "Re-sign" swaps back to the drawing surface.
   const [editing, setEditing] = useState(!existingSignature)
-  const [hasInk, setHasInk] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // The pad's stroke listener is set up once; this keeps it calling the latest onSave.
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
 
   const locked = readOnly || disabled
   const showPad = editing && !locked
@@ -91,19 +145,14 @@ export function SignaturePad({
     padRef.current = pad
 
     resizeCanvas(false)
-
-    // Load an existing signature so the technician can amend rather than redo.
-    if (existingSignature) {
-      const width = canvas.clientWidth || CANVAS_WIDTH
-      void pad.fromDataURL(existingSignature, { width, height: CANVAS_HEIGHT })
-      setHasInk(true)
-    } else {
-      setHasInk(false)
-    }
+    setSaved(false)
 
     const handleEnd = () => {
-      setHasInk(!pad.isEmpty())
-      setSaved(false)
+      if (pad.isEmpty()) return
+      const dataUrl = trimmedSignature(canvas)
+      if (!dataUrl) return
+      setSaved(true)
+      onSaveRef.current?.(dataUrl)
     }
     pad.addEventListener('endStroke', handleEnd)
 
@@ -123,23 +172,12 @@ export function SignaturePad({
       pad.off()
       padRef.current = null
     }
-    // `existingSignature` is intentionally read only when the pad is (re)created.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showPad, resizeCanvas])
 
   function handleClear() {
     padRef.current?.clear()
-    setHasInk(false)
     setSaved(false)
     onClear?.()
-  }
-
-  function handleSave() {
-    const pad = padRef.current
-    if (!pad || pad.isEmpty()) return
-    const dataUrl = pad.toDataURL('image/png')
-    setSaved(true)
-    onSave?.(dataUrl)
   }
 
   return (
@@ -165,14 +203,10 @@ export function SignaturePad({
             className="touch-none rounded-md border border-input bg-card"
             style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
           />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={handleClear}>
               <Eraser className="h-4 w-4" />
               Clear
-            </Button>
-            <Button type="button" size="sm" disabled={!hasInk} onClick={handleSave}>
-              <Check className="h-4 w-4" />
-              Save signature
             </Button>
             {existingSignature ? (
               <Button
@@ -180,13 +214,16 @@ export function SignaturePad({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
+                  // Keep the signature already on file, not the half-drawn one.
                   setEditing(false)
                   setSaved(false)
+                  onClear?.()
                 }}
               >
-                Cancel
+                Keep previous signature
               </Button>
             ) : null}
+            <span className="text-xs text-muted-foreground">Saved as you sign.</span>
           </div>
         </>
       ) : (

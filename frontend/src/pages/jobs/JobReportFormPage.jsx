@@ -264,6 +264,16 @@ export function JobReportFormPage() {
   const isInProgress = job.status === JOB_STATUS.IN_PROGRESS
   const isCompleted = job.status === JOB_STATUS.COMPLETED
   const hasReportContent = reportHasContent(job, fields)
+  // A report goes to the customer signed: by the technician, and by the
+  // customer unless they were not there to sign.
+  const technicianSigned = Boolean(signatures.technician || job.technician_signature)
+  const customerSigned =
+    Boolean(signatures.customer || job.customer_signature) || fields.customer_unable_to_sign
+  const missing = [
+    !hasReportContent && 'record the pest activity, a finding or the action taken',
+    !customerSigned && "get the customer's signature (or tick that they weren't available)",
+    !technicianSigned && 'sign as the technician',
+  ].filter(Boolean)
   const locked = !editable || isPending
   const sectionProps = { fields, setField, saveNow, disabled: locked, large: true }
 
@@ -571,7 +581,7 @@ export function JobReportFormPage() {
             <>
               <Button
                 className="h-14 w-full text-base"
-                disabled={working || !hasReportContent}
+                disabled={working || missing.length > 0}
                 onClick={() => void handleComplete()}
               >
                 {working ? (
@@ -581,9 +591,9 @@ export function JobReportFormPage() {
                 )}
                 {working ? 'Completing...' : 'Complete job'}
               </Button>
-              {!hasReportContent ? (
+              {missing.length > 0 ? (
                 <p className="text-center text-xs text-muted-foreground">
-                  Record the pest activity, a finding or the action taken before completing.
+                  Before completing, {missing.join(', and ')}.
                 </p>
               ) : null}
             </>
