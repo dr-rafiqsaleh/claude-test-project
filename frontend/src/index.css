@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Emerald-600 accent used for primary actions */
+    --primary: 160 84% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 160 84% 95%;
+    --accent-foreground: 160 84% 22%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 160 84% 32%;
+
+    /* Slate-900 sidebar */
+    --sidebar: 222 47% 11%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-muted: 215 20% 65%;
+    --sidebar-active: 160 84% 32%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 160 84% 39%;
+    --primary-foreground: 222 47% 8%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 160 84% 60%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 210 40% 96%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 160 84% 39%;
+
+    --sidebar: 222 47% 6%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-muted: 215 20% 55%;
+    --sidebar-active: 160 84% 39%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Slimmer scrollbars to match the dense admin UI */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300 dark:bg-slate-700;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400 dark:bg-slate-600;
+  }
+}
+
+/* FullCalendar theming so the booking calendar matches the admin UI. */
+.qkil-calendar {
+  --fc-border-color: theme('colors.slate.200');
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: theme('colors.slate.50');
+  --fc-today-bg-color: theme('colors.emerald.50');
+  --fc-now-indicator-color: theme('colors.emerald.600');
+  --fc-event-border-color: transparent;
+  --fc-small-font-size: 0.75rem;
+}
+
+.dark .qkil-calendar {
+  --fc-border-color: theme('colors.slate.800');
+  --fc-neutral-bg-color: theme('colors.slate.900');
+  --fc-today-bg-color: rgb(6 78 59 / 0.25);
+  --fc-now-indicator-color: theme('colors.emerald.400');
+}
+
+.qkil-calendar .fc {
+  @apply text-slate-900 dark:text-slate-100;
+}
+
+.qkil-calendar .fc .fc-col-header-cell-cushion,
+.qkil-calendar .fc .fc-daygrid-day-number {
+  @apply px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 no-underline dark:text-slate-400;
+}
+
+.qkil-calendar .fc .fc-timegrid-slot-label-cushion,
+.qkil-calendar .fc .fc-timegrid-axis-cushion {
+  @apply text-[11px] text-slate-400;
+}
+
+.qkil-calendar .fc .fc-event {
+  @apply cursor-pointer overflow-hidden rounded-md border-0 px-1 py-0.5 text-white shadow-sm;
+}
+
+.qkil-calendar .fc .fc-event:hover {
+  @apply opacity-90;
+}
+
+.qkil-calendar .fc .fc-daygrid-event {
+  @apply whitespace-nowrap;
+}
+
+.qkil-calendar .fc .fc-scrollgrid {
+  @apply rounded-lg;
+}
