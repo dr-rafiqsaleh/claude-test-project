@@ -481,7 +481,7 @@ export function InvoiceFormPage() {
                   name="job_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Job (optional)</FormLabel>
+                      <FormLabel>Job report (optional)</FormLabel>
                       <FormControl>
                         <select
                           {...field}

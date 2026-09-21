@@ -61,8 +61,8 @@ const EMPTY_FORM = {
   default_payment_instructions: '',
   invoice_prefix: 'INV',
   quote_prefix: 'QTE',
-  booking_prefix: 'BKG',
-  job_prefix: 'JOB',
+  booking_prefix: 'JOB',
+  job_prefix: 'RPT',
   default_quote_valid_days: 30,
   default_quote_terms: '',
   smtp_host: '',
@@ -113,8 +113,8 @@ function toPayload(form) {
     default_payment_instructions: optional(form.default_payment_instructions),
     invoice_prefix: String(form.invoice_prefix ?? 'INV').trim().toUpperCase() || 'INV',
     quote_prefix: String(form.quote_prefix ?? 'QTE').trim().toUpperCase() || 'QTE',
-    booking_prefix: String(form.booking_prefix ?? 'BKG').trim().toUpperCase() || 'BKG',
-    job_prefix: String(form.job_prefix ?? 'JOB').trim().toUpperCase() || 'JOB',
+    booking_prefix: String(form.booking_prefix ?? 'JOB').trim().toUpperCase() || 'JOB',
+    job_prefix: String(form.job_prefix ?? 'RPT').trim().toUpperCase() || 'RPT',
     default_quote_valid_days: Math.max(Number(form.default_quote_valid_days) || 1, 1),
     default_quote_terms: optional(form.default_quote_terms),
     smtp_host: optional(form.smtp_host),
@@ -609,7 +609,7 @@ export function SettingsPage() {
                 />
               </Field>
 
-              <Field label="Booking prefix" htmlFor="booking_prefix" hint="e.g. BKG-0001">
+              <Field label="Job number prefix" htmlFor="booking_prefix" hint="e.g. JOB-0001">
                 <Input
                   id="booking_prefix"
                   value={form.booking_prefix}
@@ -618,7 +618,7 @@ export function SettingsPage() {
                 />
               </Field>
 
-              <Field label="Job prefix" htmlFor="job_prefix" hint="e.g. JOB-0001">
+              <Field label="Report number prefix" htmlFor="job_prefix" hint="e.g. RPT-0001">
                 <Input
                   id="job_prefix"
                   value={form.job_prefix}

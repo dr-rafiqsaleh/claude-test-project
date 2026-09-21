@@ -202,7 +202,7 @@ export function BookingFormPage() {
           if (cancelled) return
 
           if (!EDITABLE_BOOKING_STATUSES.includes(booking.status)) {
-            setLoadError('Only scheduled or confirmed visits can be edited.')
+            setLoadError('Only scheduled or confirmed jobs can be edited.')
             return
           }
 
@@ -229,7 +229,7 @@ export function BookingFormPage() {
           applyQuote(quote)
         }
       } catch (err) {
-        if (!cancelled) setLoadError(toApiError(err, 'Could not open the visit form').message)
+        if (!cancelled) setLoadError(toApiError(err, 'Could not open the job form').message)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -377,7 +377,7 @@ export function BookingFormPage() {
     try {
       if (isEdit && id) {
         const updated = await updateBooking(id, { ...payload, quote_id: values.quote_id || null })
-        toastSuccess('Visit updated', `${updated.booking_number} was saved.`)
+        toastSuccess('Job updated', `${updated.booking_number} was saved.`)
         navigate(`/bookings/${id}`)
         return
       }
@@ -391,10 +391,10 @@ export function BookingFormPage() {
         created = await createBooking(payload)
       }
 
-      toastSuccess('Visit booked', `${created.booking_number} has been scheduled.`)
+      toastSuccess('Job booked', `${created.booking_number} has been scheduled.`)
       navigate(`/bookings/${created.id}`)
     } catch (err) {
-      const apiError = toApiError(err, 'Could not save this visit')
+      const apiError = toApiError(err, 'Could not save this job')
       setSubmitError(apiError.message)
       toastError('Save failed', apiError.message)
     }
@@ -409,7 +409,7 @@ export function BookingFormPage() {
       <div className="space-y-4">
         <Button variant="ghost" className="-ml-2" onClick={() => navigate('/bookings')}>
           <ArrowLeft className="h-4 w-4" />
-          Back to schedule
+          Back to jobs
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
@@ -431,11 +431,11 @@ export function BookingFormPage() {
     <div className="space-y-6">
       <PageHeader
         backTo={isEdit && id ? `/bookings/${id}` : '/bookings'}
-        backLabel={isEdit ? 'Back to visit' : 'Back to schedule'}
-        title={isEdit ? 'Edit visit' : 'Book a visit'}
+        backLabel={isEdit ? 'Back to job' : 'Back to jobs'}
+        title={isEdit ? 'Edit job' : 'Book a job'}
         description={isEdit
-        ? 'Update the schedule, assignment and service details for this visit.'
-        : 'Schedule a service visit, assign a technician and capture the on-site details.'}
+        ? 'Update the schedule, assignment and service details for this job.'
+        : 'Book a job, assign a technician and capture the on-site details.'}
       />
 
       {submitError ? (
@@ -453,7 +453,7 @@ export function BookingFormPage() {
           <Card>
             <CardHeader>
               <CardTitle>Customer &amp; quote</CardTitle>
-              <CardDescription>Who the visit is for, and the quote it came from.</CardDescription>
+              <CardDescription>Who the job is for, and the quote it came from.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative">
@@ -755,7 +755,7 @@ export function BookingFormPage() {
                     </div>
                     <FormDescription>
                       {selectedPestTypes.length === 0
-                        ? 'Select every pest this visit covers.'
+                        ? 'Select every pest this job covers.'
                         : `${selectedPestTypes.length} selected.`}
                     </FormDescription>
                     <FormMessage />
@@ -856,7 +856,7 @@ export function BookingFormPage() {
               ) : (
                 <CalendarClock className="h-4 w-4" />
               )}
-              {isEdit ? 'Save visit' : 'Book visit'}
+              {isEdit ? 'Save job' : 'Book job'}
             </Button>
           </div>
         </form>

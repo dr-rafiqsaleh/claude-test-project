@@ -186,7 +186,7 @@ async def _load_relations(
 
 
 async def get_next_job_number() -> str:
-    """Atomically increment the job counter and format it as JOB-0001.
+    """Atomically increment the job counter and format it as RPT-0001.
 
     The prefix comes from company settings.
     """
@@ -965,7 +965,7 @@ async def generate_report_pdf(job_id: "PydanticObjectId | str") -> Tuple[bytes, 
         bottomMargin=22 * mm,
         title=f"Pest Control Inspection Report {job.job_number}",
         author=company_name,
-        subject=f"Inspection report for job {job.job_number}",
+        subject=f"Inspection report for job {booking.booking_number if booking else job.job_number}",
     )
 
     story: list = []
@@ -1028,7 +1028,7 @@ async def generate_report_pdf(job_id: "PydanticObjectId | str") -> Tuple[bytes, 
         customer_rows.append(("Email", customer.email))
     customer_rows.append(("Service address", ", ".join(_address_lines(job, customer))))
     if booking is not None:
-        customer_rows.append(("Booking reference", booking.booking_number))
+        customer_rows.append(("Job reference", booking.booking_number))
     story.append(_kv_table(customer_rows, styles))
     story.append(Spacer(1, 12))
 

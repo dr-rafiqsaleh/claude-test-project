@@ -228,7 +228,7 @@ export function InvoiceDetailPage() {
               <Button asChild variant="outline">
                 <Link to={`/jobs/${invoice.job_id}`}>
                   <ClipboardList className="h-4 w-4" />
-                  {invoice.job_number ? `View ${invoice.job_number}` : 'View job'}
+                  View report
                 </Link>
               </Button>
             ) : null}
@@ -290,7 +290,7 @@ export function InvoiceDetailPage() {
             {invoice.job_number ? (
               <DetailField
                 icon={ClipboardList}
-                label="Job"
+                label="Report"
                 value={invoice.job_number}
                 to={`/jobs/${invoice.job_id}`}
               />

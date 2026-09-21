@@ -48,7 +48,7 @@ STATUS_COLORS: Dict[BookingStatus, str] = {
 class Booking(Document):
     """A scheduled service visit for a customer."""
 
-    booking_number: str  # e.g. "BKG-0001"
+    booking_number: str  # e.g. "JOB-0001" - shown to users as the job number
     customer_id: PydanticObjectId
     quote_id: Optional[PydanticObjectId] = None
     job_id: Optional[PydanticObjectId] = None  # set once the visit becomes a job

@@ -137,9 +137,9 @@ export function JobReportFormPage() {
     try {
       const updated = await updateJobStatus(job.id, JOB_STATUS.IN_PROGRESS)
       setJob(updated)
-      toastSuccess('Visit started', 'Your start time has been recorded.')
+      toastSuccess('Job started', 'Your start time has been recorded.')
     } catch (err) {
-      toastError('Could not start the visit', toApiError(err).message)
+      toastError('Could not start the job', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -213,9 +213,9 @@ export function JobReportFormPage() {
       setJob(updated)
       setCompleted(true)
       setSignatures({ customer: null, technician: null })
-      toastSuccess('Visit completed', 'The inspection report is ready.')
+      toastSuccess('Job completed', 'The inspection report is ready.')
     } catch (err) {
-      toastError('Could not complete the visit', toApiError(err).message)
+      toastError('Could not complete the job', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -288,10 +288,10 @@ export function JobReportFormPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-foreground">
-                Visit completed
+                Job completed
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {job.job_number} is signed off. Report will be generated.
+                {job.booking_number ?? job.job_number} is signed off. Report will be generated.
               </p>
             </div>
 
@@ -320,7 +320,7 @@ export function JobReportFormPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 pb-16 pt-4">
       {/* Step 1 - Job summary ------------------------------------------- */}
-      <Step number={1} title="Visit summary" icon={ClipboardList} description={job.job_number}>
+      <Step number={1} title="Job summary" icon={ClipboardList} description={job.booking_number ?? job.job_number}>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <JobStatusBadge status={job.status} />
@@ -367,7 +367,7 @@ export function JobReportFormPage() {
       {/* Step 2 - Start the visit ----------------------------------------- */}
       <Step
         number={2}
-        title="Start the visit"
+        title="Start the job"
         icon={PlayCircle}
         description={
           job.actual_start
@@ -386,7 +386,7 @@ export function JobReportFormPage() {
             ) : (
               <PlayCircle className="h-5 w-5" />
             )}
-            Start visit
+            Start job
           </Button>
         ) : (
           <div className="flex items-center gap-2 rounded-md bg-primary/10 p-3 text-sm text-primary">
@@ -537,7 +537,7 @@ export function JobReportFormPage() {
             disabled={!editable || isPending}
             onChange={(checked) => updateSummary('follow_up_required', checked, { immediate: true })}
             label="Follow-up required"
-            description="Flag this visit so the office books a return visit."
+            description="Flag this job so the office books a return visit."
           />
 
           {summary.follow_up_required ? (
@@ -575,7 +575,7 @@ export function JobReportFormPage() {
       <Step
         number={6}
         title="Sign off"
-        description="Capture both signatures, then complete the visit."
+        description="Capture both signatures, then complete the job."
         muted={isPending}
       >
         <div className="space-y-6">
@@ -618,7 +618,7 @@ export function JobReportFormPage() {
                 ) : (
                   <CheckCircle2 className="h-5 w-5" />
                 )}
-                {working ? 'Completing...' : 'Complete visit'}
+                {working ? 'Completing...' : 'Complete job'}
               </Button>
               {!hasReportContent ? (
                 <p className="text-center text-xs text-muted-foreground">
@@ -637,7 +637,7 @@ export function JobReportFormPage() {
             ? 'All changes saved'
             : saveState === 'error'
               ? 'Some changes could not be saved'
-              : `${job.job_number} · ${isTechnician ? 'Technician portal' : 'Field form'}`}
+              : `${job.booking_number ?? job.job_number} · ${isTechnician ? 'Technician portal' : 'Field form'}`}
       </p>
 
       <PhotoLightbox

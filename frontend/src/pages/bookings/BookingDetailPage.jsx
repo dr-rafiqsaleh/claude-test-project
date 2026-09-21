@@ -101,12 +101,12 @@ export function BookingDetailPage() {
       const updated = await updateBookingStatus(booking.id, status, reason)
       setBooking(updated)
       toastSuccess(
-        'Visit updated',
+        'Job updated',
         `${booking.booking_number} is now ${BOOKING_STATUS_LABELS[status].toLowerCase()}.`,
       )
       return updated
     } catch (err) {
-      const apiError = toApiError(err, 'Could not update this visit')
+      const apiError = toApiError(err, 'Could not update this job')
       toastError('Update failed', apiError.message)
       setCancelError(apiError.message)
       return null
@@ -131,7 +131,7 @@ export function BookingDetailPage() {
   }
 
   if (loading) {
-    return <LoadingState message="Loading visit..." />
+    return <LoadingState message="Loading job..." />
   }
 
   if (error || !booking) {
@@ -139,15 +139,15 @@ export function BookingDetailPage() {
       <div className="space-y-4">
         <Button variant="ghost" className="-ml-2" onClick={() => navigate('/bookings')}>
           <ArrowLeft className="h-4 w-4" />
-          Back to schedule
+          Back to jobs
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <AlertCircle className="h-10 w-10 text-destructive" />
             <div>
-              <p className="font-medium text-foreground">Visit not found</p>
+              <p className="font-medium text-foreground">Job not found</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {error?.message ?? 'This visit may have been removed.'}
+                {error?.message ?? 'This job may have been removed.'}
               </p>
             </div>
             <Button variant="outline" onClick={() => void refetch()}>
@@ -178,7 +178,7 @@ export function BookingDetailPage() {
     <div className="space-y-6">
       <PageHeader
         backTo="/bookings"
-        backLabel="Back to schedule"
+        backLabel="Back to jobs"
         title={booking.booking_number}
         badge={<BookingStatusBadge status={booking.status} />}
         description={
@@ -225,7 +225,7 @@ export function BookingDetailPage() {
                 ) : (
                   <PlayCircle className="h-4 w-4" />
                 )}
-                Start visit
+                Start job
               </Button>
             ) : null}
 
@@ -269,7 +269,7 @@ export function BookingDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Schedule</CardTitle>
-              <CardDescription>When this visit is booked in.</CardDescription>
+              <CardDescription>When this job is booked in.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
               <DetailField
@@ -364,7 +364,7 @@ export function BookingDetailPage() {
               <CardTitle>Notes</CardTitle>
               <CardDescription>
                 {isTechnician
-                  ? 'Instructions for this visit.'
+                  ? 'Instructions for this job.'
                   : 'Instructions for the customer, the technician and the office.'}
               </CardDescription>
             </CardHeader>
@@ -483,7 +483,7 @@ export function BookingDetailPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel this visit</DialogTitle>
+            <DialogTitle>Cancel this job</DialogTitle>
             <DialogDescription>
               {booking.booking_number} will be marked as cancelled. Record why, so the office has a
               record of what happened.
@@ -524,7 +524,7 @@ export function BookingDetailPage() {
               onClick={() => void submitCancellation()}
             >
               {transitioning ? <Spinner size="sm" className="text-current" /> : null}
-              {transitioning ? 'Cancelling...' : 'Cancel visit'}
+              {transitioning ? 'Cancelling...' : 'Cancel job'}
             </Button>
           </DialogFooter>
         </DialogContent>

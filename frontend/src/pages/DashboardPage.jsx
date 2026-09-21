@@ -133,7 +133,7 @@ function VisitCard({ visit, onStart, starting }) {
         {isOpen(visit) && onStart ? (
           <Button className="h-12 flex-[2]" disabled={starting} onClick={() => onStart(visit)}>
             {starting ? <Spinner size="sm" className="text-current" /> : <PlayCircle className="h-4 w-4" />}
-            Start visit
+            Start job
           </Button>
         ) : null}
         {visit.status === BOOKING_STATUS.IN_PROGRESS && reportPath ? (
@@ -201,7 +201,7 @@ function TechnicianToday({ user }) {
       const updated = await updateBookingStatus(visit.id, BOOKING_STATUS.IN_PROGRESS)
       if (updated.job_id) navigate(`/jobs/${updated.job_id}/report`)
     } catch (err) {
-      toastError('Could not start the visit', toApiError(err).message)
+      toastError('Could not start the job', toApiError(err).message)
       setStartingId(null)
     }
   }
@@ -221,7 +221,7 @@ function TechnicianToday({ user }) {
             : `${dateLabel} · ${
                 remaining.length === 0
                   ? 'nothing left today'
-                  : `${remaining.length} visit${remaining.length === 1 ? '' : 's'} to go`
+                  : `${remaining.length} job${remaining.length === 1 ? '' : 's'} to go`
               }`
         }
       />
@@ -248,7 +248,7 @@ function TechnicianToday({ user }) {
               <Card>
                 <EmptyState
                   icon={CalendarCheck}
-                  title="No visits today"
+                  title="No jobs today"
                   description="Anything booked for you will appear here."
                 />
               </Card>
@@ -272,7 +272,7 @@ function TechnicianToday({ user }) {
               action={
                 <Button asChild variant="link" size="sm" className="h-auto p-0">
                   <Link to="/bookings">
-                    Full schedule
+                    All jobs
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>
@@ -456,7 +456,7 @@ function OfficeToday({ user }) {
             <Button asChild>
               <Link to="/bookings/new">
                 <CalendarPlus className="h-4 w-4" />
-                Book a visit
+                Book a job
               </Link>
             </Button>
           </>
@@ -469,7 +469,7 @@ function OfficeToday({ user }) {
             icon={ClipboardList}
             label="Reports due"
             value={show(reportsDue)}
-            hint="Visits started, report not filed"
+            hint="Jobs started, report not filed"
             to="/bookings?status=in_progress"
             loading={loading}
           />
@@ -505,7 +505,7 @@ function OfficeToday({ user }) {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
             <div>
-              <CardTitle className="text-base">Today&apos;s visits</CardTitle>
+              <CardTitle className="text-base">Today&apos;s jobs</CardTitle>
               <CardDescription>
                 {loading
                   ? 'Loading...'
@@ -516,7 +516,7 @@ function OfficeToday({ user }) {
             </div>
             <Button asChild variant="link" size="sm" className="h-auto shrink-0 p-0">
               <Link to="/bookings?view=calendar">
-                Schedule
+                Calendar
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
@@ -531,11 +531,11 @@ function OfficeToday({ user }) {
             ) : visits.length === 0 ? (
               <EmptyState
                 icon={CalendarCheck}
-                title="No visits today"
+                title="No jobs today"
                 className="py-10"
                 action={
                   <Button asChild variant="outline" size="sm">
-                    <Link to="/bookings/new">Book a visit</Link>
+                    <Link to="/bookings/new">Book a job</Link>
                   </Button>
                 }
               />

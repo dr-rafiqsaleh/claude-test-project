@@ -51,8 +51,8 @@ class CompanySettings(Document):
     default_payment_instructions: Optional[str] = None  # bank details
     invoice_prefix: str = "INV"
     quote_prefix: str = "QTE"
-    booking_prefix: str = "BKG"
-    job_prefix: str = "JOB"
+    booking_prefix: str = "JOB"  # jobs (stored as bookings)
+    job_prefix: str = "RPT"  # inspection reports
 
     # Quote defaults
     default_quote_valid_days: int = 30

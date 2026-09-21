@@ -210,7 +210,7 @@ export function CustomerDetailPage() {
               <Button asChild>
                 <Link to={`/bookings/new?customer_id=${customer.id}`}>
                   <CalendarPlus className="h-4 w-4" />
-                  Book a visit
+                  Book a job
                 </Link>
               </Button>
             </>
@@ -252,16 +252,16 @@ export function CustomerDetailPage() {
 
         <div className="space-y-6 lg:col-span-2">
           <HistoryCard
-            title="Visits"
+            title="Jobs"
             icon={CalendarDays}
             total={history.visitTotal}
             viewAllTo={`/bookings?customer_id=${customer.id}`}
             loading={history.loading}
-            empty="No visits booked yet."
+            empty="No jobs booked yet."
             action={
               canWrite ? (
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/bookings/new?customer_id=${customer.id}`}>Book a visit</Link>
+                  <Link to={`/bookings/new?customer_id=${customer.id}`}>Book a job</Link>
                 </Button>
               ) : null
             }
@@ -313,7 +313,7 @@ export function CustomerDetailPage() {
                 total={history.invoiceTotal}
                 viewAllTo={`/invoices?customer_id=${customer.id}`}
                 loading={history.loading}
-                empty="No invoices yet. They are raised automatically when a visit's report is completed."
+                empty="No invoices yet. They are raised automatically when a job's report is completed."
               >
                 {invoices.length > 0
                   ? invoices.slice(0, PREVIEW).map((invoice) => (

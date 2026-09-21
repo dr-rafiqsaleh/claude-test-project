@@ -400,7 +400,7 @@ export function InvoicesPage() {
                 <TableRow>
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead className="hidden lg:table-cell">Job #</TableHead>
+                  <TableHead className="hidden lg:table-cell">Report #</TableHead>
                   <TableHead className="hidden md:table-cell">Issued</TableHead>
                   <TableHead className="hidden md:table-cell">Due</TableHead>
                   <TableHead className="text-right">Total</TableHead>

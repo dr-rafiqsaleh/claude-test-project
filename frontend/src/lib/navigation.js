@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, Home, Receipt, Settings, UserCog, Users } from 'lucide-react'
+import { ClipboardList, FileText, Home, Receipt, Settings, UserCog, Users } from 'lucide-react'
 
 import { UserRole, WRITE_ROLES } from '@/lib/constants'
 
@@ -7,12 +7,12 @@ import { UserRole, WRITE_ROLES } from '@/lib/constants'
  * Daily work comes first, in the order the work flows; at most five items so
  * it fits a phone's bottom bar.
  *
- * `match` lists the route prefixes an item owns: a visit's report lives under
- * /jobs, but it is part of the schedule.
+ * `match` lists the route prefixes an item owns: a job's report lives under
+ * /jobs, so it belongs to Jobs too.
  */
 export const PRIMARY_NAV = [
   { label: 'Today', to: '/dashboard', icon: Home },
-  { label: 'Schedule', to: '/bookings', icon: CalendarDays, match: ['/bookings', '/jobs'] },
+  { label: 'Jobs', to: '/bookings', icon: ClipboardList, match: ['/bookings', '/jobs'] },
   { label: 'Customers', to: '/customers', icon: Users },
   { label: 'Quotes', to: '/quotes', icon: FileText, roles: WRITE_ROLES },
   { label: 'Invoices', to: '/invoices', icon: Receipt, roles: WRITE_ROLES, key: 'invoices' },

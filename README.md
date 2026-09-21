@@ -313,7 +313,8 @@ every time:
 7. **Pages** — `frontend/src/pages/<things>/`: list, detail and form screens,
    composed from `components/ui` primitives.
 8. **Routing and navigation** — add routes in `App.jsx` (wrapped in `RoleGuard`
-   where the API restricts access) and a nav item in `Sidebar.jsx`.
+   where the API restricts access) and, if it belongs in the menu, an entry in `lib/navigation.js`
+   (shared by the desktop sidebar and the phone tab bar; five items at most).
 
 Conventions worth keeping: record numbers come from the atomic `Counter`
 document (`Counter.next_number("job")`); status changes go through an explicit

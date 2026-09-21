@@ -86,7 +86,7 @@ async def main() -> None:
         await customer.insert()
 
         print("Technician runs a visit end to end from the booking")
-        visit = await make_visit(office, tech, customer, "BKG-CHK-1")
+        visit = await make_visit(office, tech, customer, "JOB-CHK-1")
 
         await expect_http_error(403, start_booking(visit, other_tech))
         ok("another technician cannot start it")
@@ -113,7 +113,7 @@ async def main() -> None:
         ok("completing the booking completes the job and raises the invoice")
 
         print("Technician runs a visit from the report side (field form)")
-        visit = await make_visit(office, tech, customer, "BKG-CHK-2")
+        visit = await make_visit(office, tech, customer, "JOB-CHK-2")
         await start_booking(visit, tech)
         job = await Job.find_one({"booking_id": visit.id})
         job.inspection_notes = "No activity found."
@@ -125,7 +125,7 @@ async def main() -> None:
         ok("completing the job completes the booking")
 
         print("Office cancels a visit in progress")
-        visit = await make_visit(office, tech, customer, "BKG-CHK-3")
+        visit = await make_visit(office, tech, customer, "JOB-CHK-3")
         await start_booking(visit, office)
         cancel = BookingStatusUpdate(status=BookingStatus.CANCELLED, reason="Customer not home")
         await update_booking_status(str(visit.id), cancel, current_user=office)
@@ -134,7 +134,7 @@ async def main() -> None:
         ok("cancelling the booking cancels its job")
 
         print("A job created ahead of the visit")
-        visit = await make_visit(office, tech, customer, "BKG-CHK-4")
+        visit = await make_visit(office, tech, customer, "JOB-CHK-4")
         job, *_ = await job_service.create_job_from_booking(visit.id, office.id)
         await update_job_status(str(job.id), JobStatusUpdate(status=JobStatus.IN_PROGRESS), current_user=tech)
         visit = await Booking.get(visit.id)

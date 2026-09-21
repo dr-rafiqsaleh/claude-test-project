@@ -345,7 +345,7 @@ async def _sweep_bookings(
         batch.add(
             recipients(booking),
             NotificationType.BOOKING_REMINDER,
-            f"Booking tomorrow: {booking.booking_number}",
+            f"Job tomorrow: {booking.booking_number}",
             f"{booking.service_type} for {customer}, {_when(booking.scheduled_start)}.",
             f"/bookings/{booking.id}",
             str(booking.id),
@@ -439,13 +439,18 @@ async def _sweep_jobs(
     ).to_list()
 
     names = await _customer_names(jobs)
+    # Title each by the job's number (JOB-...), which is what people know it by.
+    job_numbers = {
+        booking.id: booking.booking_number
+        for booking in await Booking.find({"_id": {"$in": [job.booking_id for job in jobs]}}).to_list()
+    }
 
     for job in jobs:
         customer = names.get(str(job.customer_id), "a customer")
         batch.add(
             office_ids,
             NotificationType.JOB_FOLLOW_UP,
-            f"Follow-up due: {job.job_number}",
+            f"Follow-up due: {job_numbers.get(job.booking_id, job.job_number)}",
             (
                 f"{job.service_type} for {customer} is due for a follow-up on "
                 f"{_day(job.next_service_due)}."
@@ -515,12 +520,13 @@ async def notify_job_completed(
 
         customer = await Customer.get(job.customer_id)
         customer_name = customer.full_name if customer else "a customer"
+        booking = await Booking.get(job.booking_id)
 
         batch = _Batch(await _recent_keys())
         batch.add(
             recipients,
             NotificationType.JOB_COMPLETED,
-            f"Job completed: {job.job_number}",
+            f"Job completed: {booking.booking_number if booking else job.job_number}",
             (
                 f"{job.service_type} for {customer_name} is finished. "
                 "The draft invoice is ready to review and send."
@@ -544,7 +550,7 @@ async def notify_quote_accepted(
     quote_id: "PydanticObjectId | str",
     user_ids: Optional[Sequence[PydanticObjectId]] = None,
 ) -> int:
-    """Tell the office a quote was accepted and can be turned into a booking."""
+    """Tell the office a quote was accepted and a job can be booked."""
     oid = _to_object_id(quote_id)
     if oid is None:
         return 0

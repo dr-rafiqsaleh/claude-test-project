@@ -158,7 +158,7 @@ export function JobsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Visit reports"
+        title="Job reports"
         description={user?.role === UserRole.TECHNICIAN
         ? 'Your on-site work and inspection reports.'
         : 'Track on-site work, inspection reports and sign-offs.'}
@@ -265,7 +265,7 @@ export function JobsPage() {
             title={isFiltered ? 'No reports match your filters' : 'No reports yet'}
             description={isFiltered
             ? 'Try a different search term or clear the filters.'
-            : "A visit's report opens as soon as the visit is started from its booking."}
+            : "A job's report opens as soon as the job is started."}
             action={isFiltered ? (
               <Button variant="outline" onClick={clearFilters}>
                 Clear filters

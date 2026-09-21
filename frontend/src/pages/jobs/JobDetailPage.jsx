@@ -236,9 +236,9 @@ export function JobDetailPage() {
       await saveNow({}, { throwOnError: true })
       const updated = await updateJobStatus(job.id, status)
       setJob(updated)
-      toastSuccess('Visit updated', `${job.job_number} is now ${status.replace('_', ' ')}.`)
+      toastSuccess('Job updated', `${job.job_number} is now ${status.replace('_', ' ')}.`)
     } catch (err) {
-      toastError('Could not update this visit', toApiError(err).message)
+      toastError('Could not update this job', toApiError(err).message)
     } finally {
       setTransitioning(false)
       setCancelOpen(false)
@@ -304,7 +304,7 @@ export function JobDetailPage() {
       <div className="space-y-4">
         <Button variant="ghost" className="-ml-2" onClick={() => navigate('/jobs')}>
           <ArrowLeft className="h-4 w-4" />
-          Back to schedule
+          Back to jobs
         </Button>
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
@@ -339,8 +339,8 @@ export function JobDetailPage() {
     <div className="space-y-6">
       <PageHeader
         backTo={`/bookings/${job.booking_id}`}
-        backLabel="Back to visit"
-        title={job.job_number}
+        backLabel="Back to job"
+        title={`Report ${job.job_number}`}
         badge={
           <>
             <JobStatusBadge status={job.status} />
@@ -377,7 +377,7 @@ export function JobDetailPage() {
                 ) : (
                   <PlayCircle className="h-4 w-4" />
                 )}
-                Start visit
+                Start job
               </Button>
             ) : null}
 
@@ -396,7 +396,7 @@ export function JobDetailPage() {
                 ) : (
                   <CheckCircle2 className="h-4 w-4" />
                 )}
-                Complete visit
+                Complete job
               </Button>
             ) : null}
 
@@ -441,8 +441,8 @@ export function JobDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Visit details</CardTitle>
-            <CardDescription>From the visit this report belongs to.</CardDescription>
+            <CardTitle>Job details</CardTitle>
+            <CardDescription>From the job this report belongs to.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
@@ -478,7 +478,7 @@ export function JobDetailPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Booking
+                      Job
                     </p>
                     <Link
                       to={`/bookings/${job.booking_id}`}
@@ -676,7 +676,7 @@ export function JobDetailPage() {
             disabled={!editable}
             onChange={(checked) => updateSummary('follow_up_required', checked, { immediate: true })}
             label="Follow-up required"
-            description="Flag this visit so the office books a return visit."
+            description="Flag this job so the office books a return visit."
           />
 
           {summary.follow_up_required ? (
@@ -805,14 +805,14 @@ export function JobDetailPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this visit?</AlertDialogTitle>
+            <AlertDialogTitle>Cancel this job?</AlertDialogTitle>
             <AlertDialogDescription>
               {job.job_number} will be marked as cancelled. Cancelled jobs cannot be reopened, and
               their report can no longer be edited.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={transitioning}>Keep visit</AlertDialogCancel>
+            <AlertDialogCancel disabled={transitioning}>Keep job</AlertDialogCancel>
             <AlertDialogAction
               disabled={transitioning}
               className="bg-destructive hover:bg-destructive/90"
@@ -821,7 +821,7 @@ export function JobDetailPage() {
                 void changeStatus(JOB_STATUS.CANCELLED)
               }}
             >
-              {transitioning ? 'Cancelling...' : 'Cancel visit'}
+              {transitioning ? 'Cancelling...' : 'Cancel job'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

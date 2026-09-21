@@ -511,7 +511,8 @@ async def create_invoice_from_job(
         issue_date=now,
         due_date=now + timedelta(days=term_days),
         notes=(
-            f"Raised automatically on completion of job {job.job_number} "
+            f"Raised automatically on completion of job "
+            f"{booking.booking_number if booking else job.job_number} "
             f"({job.service_type})."
         ),
         terms=terms,
@@ -1177,7 +1178,10 @@ async def generate_invoice_pdf(invoice_id: "PydanticObjectId | str") -> Tuple[by
 
     reference_block: list = [Paragraph("REFERENCES", styles["label"]), Spacer(1, 3)]
     if job is not None:
-        reference_block.append(Paragraph(f"Job: {_escape(job.job_number)}", styles["small"]))
+        # Customers know the job by its number (JOB-...), not the report's (RPT-...).
+        booking = await Booking.get(job.booking_id) if job.booking_id else None
+        job_ref = booking.booking_number if booking else job.job_number
+        reference_block.append(Paragraph(f"Job: {_escape(job_ref)}", styles["small"]))
         reference_block.append(
             Paragraph(f"Service: {_escape(job.service_type)}", styles["small"])
         )

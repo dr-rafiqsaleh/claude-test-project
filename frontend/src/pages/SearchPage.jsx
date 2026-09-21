@@ -134,7 +134,7 @@ export function SearchPage() {
         title="Search"
         description={
           <>
-            Look across customers, quotes, visits, reports{isTechnician ? '' : ' and invoices'} in one
+            Look across customers, quotes, jobs, reports{isTechnician ? '' : ' and invoices'} in one
             place.
           </>
         }
@@ -149,7 +149,7 @@ export function SearchPage() {
                 autoFocus
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search customers, visits, invoices..."
+                placeholder="Search customers, jobs, invoices..."
                 aria-label="Search QKil"
                 className="h-12 pl-12 text-base"
               />

@@ -74,8 +74,8 @@ class CompanySettingsResponse(BaseModel):
     default_payment_instructions: Optional[str] = None
     invoice_prefix: str = "INV"
     quote_prefix: str = "QTE"
-    booking_prefix: str = "BKG"
-    job_prefix: str = "JOB"
+    booking_prefix: str = "JOB"
+    job_prefix: str = "RPT"
 
     default_quote_valid_days: int = 30
     default_quote_terms: Optional[str] = None

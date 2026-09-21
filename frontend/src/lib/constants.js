@@ -373,7 +373,7 @@ export const SEARCH_TYPES = ['customers', 'quotes', 'bookings', 'jobs', 'invoice
 export const SEARCH_TYPE_LABELS = {
   customers: 'Customers',
   quotes: 'Quotes',
-  bookings: 'Visits',
+  bookings: 'Jobs',
   jobs: 'Reports',
   invoices: 'Invoices',
 }
@@ -445,7 +445,7 @@ export const NOTIFICATION_CATEGORY = {
 export const NOTIFICATION_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'unread', label: 'Unread' },
-  { key: 'bookings', label: 'Visits' },
+  { key: 'bookings', label: 'Jobs' },
   { key: 'invoices', label: 'Invoices' },
   { key: 'jobs', label: 'Reports' },
   { key: 'quotes', label: 'Quotes' },

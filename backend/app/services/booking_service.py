@@ -178,7 +178,7 @@ async def _load_relations(
 
 
 async def get_next_booking_number() -> str:
-    """Atomically increment the booking counter and format it as BKG-0001.
+    """Atomically increment the booking counter and format it as JOB-0001.
 
     The prefix comes from company settings.
     """

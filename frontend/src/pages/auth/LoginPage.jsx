@@ -27,9 +27,9 @@ const loginSchema = z.object({
 })
 
 const BRAND_POINTS = [
-  'Book visits and assign technicians in a few taps',
+  'Book jobs and assign technicians in a few taps',
   'Photo inspection reports filed on site, signed on the phone',
-  'Invoices raised the moment a visit is completed',
+  'Invoices raised the moment a job is completed',
 ]
 
 export function LoginPage() {
@@ -74,7 +74,7 @@ export function LoginPage() {
         <Logo size={40} textClassName="text-xl text-primary-foreground" />
         <div className="max-w-md space-y-6">
           <h2 className="text-3xl font-semibold leading-tight tracking-tight">
-            Every visit, from first quote to paid invoice.
+            Every job, from first quote to paid invoice.
           </h2>
           <ul className="space-y-3 text-base text-primary-foreground/85">
             {BRAND_POINTS.map((point) => (

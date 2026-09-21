@@ -143,10 +143,10 @@ export function BookingsPage() {
     setWorking(true)
     try {
       await remove(pendingDelete.id)
-      toastSuccess('Visit deleted', `${pendingDelete.booking_number} was removed.`)
+      toastSuccess('Job deleted', `${pendingDelete.booking_number} was removed.`)
       setPendingDelete(null)
     } catch (err) {
-      toastError('Could not delete visit', toApiError(err).message)
+      toastError('Could not delete job', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -157,10 +157,10 @@ export function BookingsPage() {
     setWorking(true)
     try {
       await updateStatus(pendingCancel.id, BOOKING_STATUS.CANCELLED)
-      toastSuccess('Visit cancelled', `${pendingCancel.booking_number} is now cancelled.`)
+      toastSuccess('Job cancelled', `${pendingCancel.booking_number} is now cancelled.`)
       setPendingCancel(null)
     } catch (err) {
-      toastError('Could not cancel visit', toApiError(err).message)
+      toastError('Could not cancel job', toApiError(err).message)
     } finally {
       setWorking(false)
     }
@@ -189,9 +189,9 @@ export function BookingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Schedule"
+        title="Jobs"
         description={user?.role === UserRole.TECHNICIAN
-        ? 'Your visits, as a list or on the calendar.'
+        ? 'Your jobs, as a list or on the calendar.'
         : 'Schedule technicians and keep the service calendar up to date.'}
         actions={<div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-md border border-input p-0.5">
@@ -227,7 +227,7 @@ export function BookingsPage() {
             <Button asChild>
               <Link to="/bookings/new">
                 <Plus className="h-4 w-4" />
-                Book a visit
+                Book a job
               </Link>
             </Button>
           ) : null}
@@ -250,9 +250,9 @@ export function BookingsPage() {
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search by visit number, customer or service..."
+                    placeholder="Search by job number, customer or service..."
                     className="pl-9"
-                    aria-label="Search visits"
+                    aria-label="Search jobs"
                   />
                 </div>
 
@@ -330,16 +330,16 @@ export function BookingsPage() {
 
           <Card className="overflow-hidden">
             {loading ? (
-              <LoadingState message="Loading visits..." />
+              <LoadingState message="Loading jobs..." />
             ) : error ? (
-              <ErrorState title="Could not load visits" message={error.message} onRetry={refetch} />
+              <ErrorState title="Could not load jobs" message={error.message} onRetry={refetch} />
             ) : bookings.length === 0 ? (
               <EmptyState
                 icon={CalendarClock}
-                title={isFiltered ? 'No visits match your filters' : 'No visits booked yet'}
+                title={isFiltered ? 'No jobs match your filters' : 'No jobs booked yet'}
                 description={isFiltered
                 ? 'Try a different search term or clear the filters.'
-                : 'Book your first visit to get started.'}
+                : 'Book your first job to get started.'}
                 action={isFiltered ? (
                   <Button variant="outline" onClick={clearFilters}>
                     Clear filters
@@ -348,7 +348,7 @@ export function BookingsPage() {
                   <Button asChild>
                     <Link to="/bookings/new">
                       <Plus className="h-4 w-4" />
-                      Book a visit
+                      Book a job
                     </Link>
                   </Button>
                 ) : null}
@@ -358,7 +358,7 @@ export function BookingsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Visit #</TableHead>
+                      <TableHead>Job #</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead className="hidden lg:table-cell">Technician</TableHead>
                       <TableHead className="hidden md:table-cell">Service type</TableHead>
@@ -473,15 +473,15 @@ export function BookingsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this visit?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this job?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
-                ? `${pendingDelete.booking_number} will be permanently deleted. Only scheduled or cancelled bookings can be removed, and this cannot be undone.`
+                ? `${pendingDelete.booking_number} will be permanently deleted. Only scheduled or cancelled jobs can be removed, and this cannot be undone.`
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={working}>Keep visit</AlertDialogCancel>
+            <AlertDialogCancel disabled={working}>Keep job</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
               className="bg-destructive hover:bg-destructive/90"
@@ -490,7 +490,7 @@ export function BookingsPage() {
                 void confirmDelete()
               }}
             >
-              {working ? 'Deleting...' : 'Delete visit'}
+              {working ? 'Deleting...' : 'Delete job'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -504,15 +504,15 @@ export function BookingsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this visit?</AlertDialogTitle>
+            <AlertDialogTitle>Cancel this job?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingCancel
-                ? `${pendingCancel.booking_number} will be marked as cancelled. Cancelled bookings cannot be reactivated.`
+                ? `${pendingCancel.booking_number} will be marked as cancelled. Cancelled jobs cannot be reactivated.`
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={working}>Keep visit</AlertDialogCancel>
+            <AlertDialogCancel disabled={working}>Keep job</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
               className="bg-destructive hover:bg-destructive/90"
@@ -521,7 +521,7 @@ export function BookingsPage() {
                 void confirmCancel()
               }}
             >
-              {working ? 'Cancelling...' : 'Cancel visit'}
+              {working ? 'Cancelling...' : 'Cancel job'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -677,7 +677,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
             dayMaxEventRows={4}
             eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
             slotLabelFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
-            noEventsText="No visits in this period"
+            noEventsText="No jobs in this period"
           />
         </div>
 

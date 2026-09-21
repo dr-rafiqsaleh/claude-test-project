@@ -92,7 +92,7 @@ class TreatmentApplied(BaseModel):
 class Job(Document):
     """A completed or in-flight service visit, with its pest inspection report."""
 
-    job_number: str  # e.g. "JOB-0001"
+    job_number: str  # e.g. "RPT-0001" - shown to users as the report number
     booking_id: PydanticObjectId
     customer_id: PydanticObjectId
     technician_id: Optional[PydanticObjectId] = None

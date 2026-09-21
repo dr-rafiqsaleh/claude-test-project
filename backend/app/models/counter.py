@@ -13,8 +13,8 @@ INVOICE_COUNTER = "invoice"
 #: Prefix used when formatting each counter into a record number.
 COUNTER_PREFIXES = {
     QUOTE_COUNTER: "QTE",
-    BOOKING_COUNTER: "BKG",
-    JOB_COUNTER: "JOB",
+    BOOKING_COUNTER: "JOB",  # the job itself (stored as a booking)
+    JOB_COUNTER: "RPT",  # the job's inspection report
     INVOICE_COUNTER: "INV",
 }
 
@@ -45,7 +45,7 @@ class Counter(Document):
 
     @classmethod
     async def next_number(cls, name: str, width: int = 4, prefix: str = "") -> str:
-        """Return the next record number, e.g. "BKG-0001".
+        """Return the next record number, e.g. "JOB-0001".
 
         `prefix` overrides the built-in default, so the prefixes configured in
         company settings flow through to newly created records.
