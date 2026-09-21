@@ -76,6 +76,19 @@ export function useCustomers(params) {
     [fetchCustomers],
   )
 
+  const restore = useCallback(
+    async (id) => {
+      setMutating(true)
+      try {
+        await customersApi.updateCustomer(id, { is_active: true })
+        await fetchCustomers()
+      } finally {
+        setMutating(false)
+      }
+    },
+    [fetchCustomers],
+  )
+
   return {
     customers,
     total,
@@ -88,6 +101,7 @@ export function useCustomers(params) {
     create,
     update,
     remove,
+    restore,
     mutating,
   }
 }

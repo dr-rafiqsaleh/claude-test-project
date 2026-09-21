@@ -31,6 +31,7 @@ function emptyFinding() {
 export function FindingForm({ onAdd, onCancel, large = false, className }) {
   const [draft, setDraft] = useState(emptyFinding)
   const [error, setError] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   const selectClass = cn(SELECT_CLASSES, large && 'h-12 text-base')
   const inputClass = large ? 'h-12 text-base' : undefined
@@ -39,7 +40,7 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const area = draft.area === OTHER ? draft.customArea.trim() : draft.area
     const pestType = draft.pest_type === OTHER ? draft.customPest.trim() : draft.pest_type
 
@@ -57,7 +58,8 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
     }
 
     setError(null)
-    onAdd({
+    setSaving(true)
+    const saved = await onAdd({
       area,
       pest_type: pestType,
       severity: draft.severity,
@@ -65,6 +67,13 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
       recommendation: draft.recommendation.trim(),
       photo_ids: [],
     })
+    setSaving(false)
+
+    // A failed save keeps the entry on screen so nothing has to be re-typed.
+    if (saved === false) {
+      setError('Not saved. Check your connection and tap Add finding again.')
+      return
+    }
     setDraft(emptyFinding())
   }
 
@@ -176,11 +185,12 @@ export function FindingForm({ onAdd, onCancel, large = false, className }) {
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
-          onClick={handleSubmit}
+          onClick={() => void handleSubmit()}
+          disabled={saving}
           className={large ? 'h-12 w-full text-base' : undefined}
         >
           <Plus className="h-4 w-4" />
-          Add finding
+          {saving ? 'Saving...' : 'Add finding'}
         </Button>
         {onCancel && !large ? (
           <Button type="button" variant="outline" onClick={onCancel}>

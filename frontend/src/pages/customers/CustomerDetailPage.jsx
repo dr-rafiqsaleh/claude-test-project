@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertCircle,
@@ -8,6 +9,7 @@ import {
   MapPin,
   Pencil,
   Phone,
+  RotateCcw,
   Smartphone,
   StickyNote,
   Wrench,
@@ -18,7 +20,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { LoadingState } from '@/components/ui/spinner'
+import { updateCustomer } from '@/api/customers'
+import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { useCustomer } from '@/hooks/useCustomers'
+import { toApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 
@@ -65,6 +70,20 @@ export function CustomerDetailPage() {
   const navigate = useNavigate()
   const canWrite = useAuthStore((state) => state.canWrite())
   const { customer, loading, error, refetch } = useCustomer(id)
+  const [restoring, setRestoring] = useState(false)
+
+  async function handleRestore() {
+    setRestoring(true)
+    try {
+      await updateCustomer(customer.id, { is_active: true })
+      await refetch()
+      toastSuccess('Customer restored', `${customer.first_name} ${customer.last_name} is active again.`)
+    } catch (err) {
+      toastError('Could not restore customer', toApiError(err).message)
+    } finally {
+      setRestoring(false)
+    }
+  }
 
   if (loading) {
     return <LoadingState message="Loading customer..." />
@@ -121,12 +140,20 @@ export function CustomerDetailPage() {
         </div>
 
         {canWrite ? (
-          <Button asChild>
-            <Link to={`/customers/${customer.id}/edit`}>
-              <Pencil className="h-4 w-4" />
-              Edit customer
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {!customer.is_active ? (
+              <Button variant="outline" disabled={restoring} onClick={() => void handleRestore()}>
+                <RotateCcw className="h-4 w-4" />
+                {restoring ? 'Restoring...' : 'Restore customer'}
+              </Button>
+            ) : null}
+            <Button asChild>
+              <Link to={`/customers/${customer.id}/edit`}>
+                <Pencil className="h-4 w-4" />
+                Edit customer
+              </Link>
+            </Button>
+          </div>
         ) : null}
       </div>
 

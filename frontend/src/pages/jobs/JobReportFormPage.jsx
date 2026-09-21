@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertCircle,
@@ -16,7 +16,7 @@ import {
   User as UserIcon,
 } from 'lucide-react'
 
-import { downloadJobReport, updateJob, updateJobSignature, updateJobStatus } from '@/api/jobs'
+import { downloadJobReport, updateJobSignature, updateJobStatus } from '@/api/jobs'
 import { FindingCard } from '@/components/jobs/FindingCard'
 import { FindingForm } from '@/components/jobs/FindingForm'
 import {
@@ -37,12 +37,11 @@ import { LoadingState, Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { useJob, useJobPhotos } from '@/hooks/useJobs'
+import { useReportAutosave } from '@/hooks/useReportAutosave'
 import { toApiError } from '@/lib/api'
 import { cn, formatBookingDateTime, toDateInputValue } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { JOB_STATUS, RISK_LEVELS, RISK_LEVEL_LABELS, UserRole } from '@/lib/constants'
-
-const AUTOSAVE_DELAY_MS = 1500
 
 /** A numbered, full-width step panel. */
 function Step({ number, title, description, icon: Icon, children, muted = false }) {
@@ -76,9 +75,9 @@ export function JobReportFormPage() {
   const canWrite = useAuthStore((state) => state.canWrite())
 
   const { job, loading, error, refetch, setJob } = useJob(id)
+  const { saveState, saveNow, scheduleSave } = useReportAutosave(id, setJob)
   const { photos, upload, remove: removePhoto } = useJobPhotos(id)
 
-  const [saveState, setSaveState] = useState('idle')
   const [summary, setSummary] = useState(null)
   const [showFindingForm, setShowFindingForm] = useState(false)
   const [showTreatmentForm, setShowTreatmentForm] = useState(false)
@@ -88,10 +87,6 @@ export function JobReportFormPage() {
   const [working, setWorking] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [completed, setCompleted] = useState(false)
-
-  const timerRef = useRef(null)
-  const pendingRef = useRef({})
-  const savedTimerRef = useRef(null)
 
   const isTechnician = user?.role === UserRole.TECHNICIAN
   const isAssigned = Boolean(job && job.technician_id && job.technician_id === user?.id)
@@ -119,60 +114,6 @@ export function JobReportFormPage() {
     if (job.status === JOB_STATUS.COMPLETED) setCompleted(true)
   }, [job])
 
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    },
-    [],
-  )
-
-  const flashSaved = useCallback(() => {
-    setSaveState('saved')
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    savedTimerRef.current = setTimeout(() => setSaveState('idle'), 2500)
-  }, [])
-
-  const saveNow = useCallback(
-    async (extra = {}) => {
-      if (!id) return null
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
-
-      const payload = { ...pendingRef.current, ...extra }
-      pendingRef.current = {}
-      if (Object.keys(payload).length === 0) return null
-
-      setSaveState('saving')
-      try {
-        const updated = await updateJob(id, payload)
-        setJob(updated)
-        flashSaved()
-        return updated
-      } catch (err) {
-        setSaveState('error')
-        toastError('Could not save', toApiError(err).message)
-        return null
-      }
-    },
-    [id, setJob, flashSaved],
-  )
-
-  const scheduleSave = useCallback(
-    (partial) => {
-      pendingRef.current = { ...pendingRef.current, ...partial }
-      setSaveState('saving')
-
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null
-        void saveNow()
-      }, AUTOSAVE_DELAY_MS)
-    },
-    [saveNow],
-  )
 
   function updateSummary(field, value, { immediate = false } = {}) {
     setSummary((current) => ({ ...current, [field]: value }))
@@ -204,9 +145,11 @@ export function JobReportFormPage() {
     }
   }
 
+  /** Keeps the form open, with the technician's entry, until the save succeeds. */
   async function addFinding(finding) {
-    setShowFindingForm(false)
-    await saveNow({ findings: [...(job.findings ?? []), finding] })
+    const saved = await saveNow({ findings: [...(job.findings ?? []), finding] })
+    if (saved) setShowFindingForm(false)
+    return Boolean(saved)
   }
 
   async function deleteFinding(index) {
@@ -214,8 +157,9 @@ export function JobReportFormPage() {
   }
 
   async function addTreatment(treatment) {
-    setShowTreatmentForm(false)
-    await saveNow({ treatments: [...(job.treatments ?? []), treatment] })
+    const saved = await saveNow({ treatments: [...(job.treatments ?? []), treatment] })
+    if (saved) setShowTreatmentForm(false)
+    return Boolean(saved)
   }
 
   async function deleteTreatment(index) {
@@ -257,7 +201,8 @@ export function JobReportFormPage() {
     if (!job) return
     setWorking(true)
     try {
-      await saveNow()
+      // A report that did not save must not be locked by completing the job.
+      await saveNow({}, { throwOnError: true })
 
       const signaturePayload = { customer_name_signed: signatureName.trim() || null }
       if (signatures.customer) signaturePayload.customer_signature = signatures.customer

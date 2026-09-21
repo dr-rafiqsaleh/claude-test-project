@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   Users,
@@ -92,7 +93,16 @@ export function CustomersPage() {
     return next
   }, [page, debouncedSearch, statusFilter, countyFilter])
 
-  const { customers, total, totalPages, loading, error, remove, refetch } = useCustomers(params)
+  const { customers, total, totalPages, loading, error, remove, restore, refetch } = useCustomers(params)
+
+  async function handleRestore(customer) {
+    try {
+      await restore(customer.id)
+      toastSuccess('Customer restored', `${customer.first_name} ${customer.last_name} is active again.`)
+    } catch (err) {
+      toastError('Could not restore customer', toApiError(err).message)
+    }
+  }
 
   async function confirmDelete() {
     if (!pendingDelete) return
@@ -213,7 +223,7 @@ export function CustomersPage() {
                 onClick={() => {
                   setSearch('')
                   setStatusFilter('active')
-                  setStateFilter(ANY)
+                  setCountyFilter(ANY)
                 }}
               >
                 Clear filters
@@ -282,14 +292,20 @@ export function CustomersPage() {
                                   Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  disabled={!customer.is_active}
-                                  onSelect={() => setPendingDelete(customer)}
-                                  className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Archive
-                                </DropdownMenuItem>
+                                {customer.is_active ? (
+                                  <DropdownMenuItem
+                                    onSelect={() => setPendingDelete(customer)}
+                                    className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-950"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Archive
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onSelect={() => void handleRestore(customer)}>
+                                    <RotateCcw className="h-4 w-4" />
+                                    Restore
+                                  </DropdownMenuItem>
+                                )}
                               </>
                             ) : null}
                           </DropdownMenuContent>

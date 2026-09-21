@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertCircle,
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 
 import { createInvoiceFromJob } from '@/api/invoices'
-import { downloadJobReport, updateJob, updateJobSignature, updateJobStatus } from '@/api/jobs'
+import { downloadJobReport, updateJobSignature, updateJobStatus } from '@/api/jobs'
 import { FindingCard } from '@/components/jobs/FindingCard'
 import { FindingForm } from '@/components/jobs/FindingForm'
 import { CheckboxField, FormField, SELECT_CLASSES } from '@/components/jobs/JobFormControls'
@@ -51,6 +51,7 @@ import { LoadingState, Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { useJob, useJobPhotos } from '@/hooks/useJobs'
+import { useReportAutosave } from '@/hooks/useReportAutosave'
 import { toApiError } from '@/lib/api'
 import {
   cn,
@@ -60,9 +61,6 @@ import {
 } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { JOB_STATUS, RISK_LEVELS, RISK_LEVEL_LABELS } from '@/lib/constants'
-
-/** How long to wait after the last keystroke before auto-saving. */
-const AUTOSAVE_DELAY_MS = 1500
 
 function Field({ icon: Icon, label, value }) {
   return (
@@ -122,9 +120,9 @@ export function JobDetailPage() {
   const isAdmin = useAuthStore((state) => state.isAdmin())
 
   const { job, loading, error, refetch, setJob } = useJob(id)
+  const { saveState, saveNow, scheduleSave } = useReportAutosave(id, setJob)
   const { photos, upload, remove: removePhoto } = useJobPhotos(id)
 
-  const [saveState, setSaveState] = useState('idle')
   const [transitioning, setTransitioning] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [invoicing, setInvoicing] = useState(false)
@@ -139,10 +137,6 @@ export function JobDetailPage() {
   // Locally-controlled summary fields, so typing is never interrupted by a
   // background save round-trip.
   const [summary, setSummary] = useState(null)
-
-  const timerRef = useRef(null)
-  const pendingRef = useRef({})
-  const savedTimerRef = useRef(null)
 
   const isAssigned = Boolean(job && job.technician_id && job.technician_id === user?.id)
   const editable =
@@ -169,62 +163,6 @@ export function JobDetailPage() {
     setSignatureName((current) => current || job.customer_name_signed || job.customer_name || '')
   }, [job])
 
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    },
-    [],
-  )
-
-  const flashSaved = useCallback(() => {
-    setSaveState('saved')
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    savedTimerRef.current = setTimeout(() => setSaveState('idle'), 2500)
-  }, [])
-
-  /** Save immediately, merging in anything already queued. */
-  const saveNow = useCallback(
-    async (extra = {}) => {
-      if (!id) return null
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
-
-      const payload = { ...pendingRef.current, ...extra }
-      pendingRef.current = {}
-      if (Object.keys(payload).length === 0) return null
-
-      setSaveState('saving')
-      try {
-        const updated = await updateJob(id, payload)
-        setJob(updated)
-        flashSaved()
-        return updated
-      } catch (err) {
-        setSaveState('error')
-        toastError('Could not save the report', toApiError(err).message)
-        return null
-      }
-    },
-    [id, setJob, flashSaved],
-  )
-
-  /** Queue a partial update and save it 1.5s after the last change. */
-  const scheduleSave = useCallback(
-    (partial) => {
-      pendingRef.current = { ...pendingRef.current, ...partial }
-      setSaveState('saving')
-
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null
-        void saveNow()
-      }, AUTOSAVE_DELAY_MS)
-    },
-    [saveNow],
-  )
 
   function updateSummary(field, value, { immediate = false } = {}) {
     setSummary((current) => ({ ...current, [field]: value }))
@@ -250,9 +188,9 @@ export function JobDetailPage() {
   }
 
   async function addFinding(finding) {
-    const next = [...(job.findings ?? []), finding]
-    setShowFindingForm(false)
-    await saveNow({ findings: next })
+    const saved = await saveNow({ findings: [...(job.findings ?? []), finding] })
+    if (saved) setShowFindingForm(false)
+    return Boolean(saved)
   }
 
   async function deleteFinding(index) {
@@ -261,9 +199,9 @@ export function JobDetailPage() {
   }
 
   async function addTreatment(treatment) {
-    const next = [...(job.treatments ?? []), treatment]
-    setShowTreatmentForm(false)
-    await saveNow({ treatments: next })
+    const saved = await saveNow({ treatments: [...(job.treatments ?? []), treatment] })
+    if (saved) setShowTreatmentForm(false)
+    return Boolean(saved)
   }
 
   async function deleteTreatment(index) {
@@ -309,7 +247,7 @@ export function JobDetailPage() {
     if (!job) return
     setTransitioning(true)
     try {
-      await saveNow()
+      await saveNow({}, { throwOnError: true })
       const updated = await updateJobStatus(job.id, status)
       setJob(updated)
       toastSuccess('Job updated', `${job.job_number} is now ${status.replace('_', ' ')}.`)
