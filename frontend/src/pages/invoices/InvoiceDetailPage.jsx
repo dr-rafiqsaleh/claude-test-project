@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 
 import { addPayment, downloadInvoicePdf, updateInvoiceStatus } from '@/api/invoices'
+import { EmailDialog } from '@/components/email/EmailDialog'
 import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge'
 import { PaymentDialog } from '@/components/invoices/PaymentDialog'
 import {
@@ -72,6 +73,7 @@ export function InvoiceDetailPage() {
 
   const [transitioning, setTransitioning] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -212,6 +214,22 @@ export function InvoiceDetailPage() {
                 <Banknote className="h-4 w-4" />
                 Record payment
               </Button>
+            ) : null}
+
+            {canWrite && invoice.status !== INVOICE_STATUS.CANCELLED ? (
+              <>
+                <Button onClick={() => setEmailOpen(true)}>
+                  <Mail className="h-4 w-4" />
+                  Email invoice
+                </Button>
+                <EmailDialog
+                  kind="invoice"
+                  documentId={invoice.id}
+                  open={emailOpen}
+                  onOpenChange={setEmailOpen}
+                  onSent={() => void refetch()}
+                />
+              </>
             ) : null}
 
             <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>

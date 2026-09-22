@@ -90,6 +90,14 @@ Errors keep the shape with `success: false`; validation failures also carry
   invoices become tax invoices with the VAT number. Bank details, the registered
   company name and the next invoice number are set in Settings too.
   `python scripts/check_invoicing.py` checks it on a throwaway database.
+- **Email** ✅
+  Quotes, invoices and inspection reports emailed to customers with the PDF
+  attached, from editable templates in Settings (with placeholders such as
+  `{customer_name}`). Sends through Microsoft 365 (Graph API, app registration)
+  or any SMTP server; secrets are stored encrypted. A test-send button, plain
+  error messages, a send history per document, and emailing a draft marks it
+  sent. `python scripts/check_email.py` checks both routes against a fake mail
+  server and a simulated Microsoft Graph.
 - **Phase 6 — Global search** ✅
   One endpoint across customers, quotes, bookings, jobs and invoices, fanned out
   in parallel with batched name resolution. Header quick-search with recent
@@ -101,8 +109,7 @@ Errors keep the shape with `success: false`; validation failures also carry
   a 30-day TTL index.
 - **Phase 8 — Company settings** ✅
   Singleton settings document driving company profile, logo, invoice and quote
-  defaults, SMTP configuration (stored, not yet active) and the PDF accent
-  colour.
+  defaults, email sending and templates, and the PDF accent colour.
 
 ---
 

@@ -17,6 +17,7 @@ from app.routers import (
     bookings,
     company_settings,
     customers,
+    emails,
     invoices,
     jobs,
     notifications,
@@ -77,6 +78,7 @@ app.include_router(invoices.router)
 app.include_router(search.router)
 app.include_router(notifications.router)
 app.include_router(company_settings.router)
+app.include_router(emails.router)
 
 
 @app.exception_handler(StarletteHTTPException)

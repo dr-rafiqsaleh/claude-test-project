@@ -6,7 +6,6 @@ import {
   ClipboardList,
   ExternalLink,
   ImageOff,
-  Info,
   Mail,
   Palette,
   Receipt,
@@ -23,6 +22,7 @@ import {
   uploadLogo,
 } from '@/api/settings'
 import { CheckboxField } from '@/components/jobs/JobFormControls'
+import { EmailSettings } from '@/components/settings/EmailSettings'
 import {
   ProductListEditor,
   isBlankProduct,
@@ -83,11 +83,21 @@ const EMPTY_FORM = {
   report_insecticide_guidance: '',
   report_rodenticide_guidance: '',
   report_declaration: '',
+  email_provider: 'none',
   smtp_host: '',
   smtp_port: '',
+  smtp_security: 'starttls',
   smtp_username: '',
+  smtp_password: '',
+  m365_tenant_id: '',
+  m365_client_id: '',
+  m365_client_secret: '',
+  m365_mailbox: '',
   smtp_from_email: '',
   smtp_from_name: '',
+  email_reply_to: '',
+  email_bcc: '',
+  email_templates: null,
   primary_color: DEFAULT_PRIMARY_COLOR,
 }
 
@@ -103,6 +113,16 @@ function toForm(settings) {
     ),
     default_tax_rate: Math.round((Number(settings.default_tax_rate ?? 0.2) || 0) * 10000) / 100,
     smtp_port: settings.smtp_port ?? '',
+    // Secrets are write-only: the form never holds a saved one.
+    smtp_password: '',
+    m365_client_secret: '',
+    // SMTP details saved before there was a provider choice mean SMTP.
+    email_provider:
+      settings.email_provider && settings.email_provider !== 'none'
+        ? settings.email_provider
+        : settings.smtp_host
+          ? 'smtp'
+          : 'none',
     products: (settings.products ?? []).map((product) => ({
       ...product,
       active_ingredient: product.active_ingredient ?? '',
@@ -171,11 +191,22 @@ function toPayload(form, loaded) {
     report_insecticide_guidance: String(form.report_insecticide_guidance ?? '').trim(),
     report_rodenticide_guidance: String(form.report_rodenticide_guidance ?? '').trim(),
     report_declaration: String(form.report_declaration ?? '').trim(),
+    email_provider: form.email_provider || 'none',
     smtp_host: optional(form.smtp_host),
     smtp_port: form.smtp_port === '' || form.smtp_port === null ? null : Number(form.smtp_port),
+    smtp_security: form.smtp_security || 'starttls',
     smtp_username: optional(form.smtp_username),
+    // Only sent when typed: leaving them empty keeps what is saved.
+    ...(form.smtp_password ? { smtp_password: form.smtp_password } : {}),
+    ...(form.m365_client_secret ? { m365_client_secret: form.m365_client_secret } : {}),
+    m365_tenant_id: optional(form.m365_tenant_id),
+    m365_client_id: optional(form.m365_client_id),
+    m365_mailbox: optional(form.m365_mailbox),
     smtp_from_email: optional(form.smtp_from_email),
     smtp_from_name: optional(form.smtp_from_name),
+    email_reply_to: optional(form.email_reply_to),
+    email_bcc: optional(form.email_bcc),
+    ...(form.email_templates ? { email_templates: form.email_templates } : {}),
     primary_color: String(form.primary_color ?? DEFAULT_PRIMARY_COLOR).trim() || DEFAULT_PRIMARY_COLOR,
   }
 }
@@ -310,23 +341,24 @@ export function SettingsPage() {
     if (registered && !Number(form.default_tax_rate)) set('default_tax_rate', 20)
   }
 
+  /** Save every setting. Resolves true when saved. */
   async function save() {
     if (form.vat_registered && !String(form.vat_number ?? '').trim()) {
       toastError('Add your VAT number', 'A VAT invoice has to show it.')
       setActiveTab('documents')
-      return
+      return false
     }
 
     if (!String(form.company_name ?? '').trim()) {
       toastError('Company name is required', 'It appears on every document you send.')
       setActiveTab('company')
-      return
+      return false
     }
 
     if (form.products.some((product) => !isBlankProduct(product) && !String(product.name).trim())) {
       toastError('A product needs a name', 'Name it, or remove the row, then save again.')
       setActiveTab('reports')
-      return
+      return false
     }
 
     setSaving(true)
@@ -344,8 +376,10 @@ export function SettingsPage() {
       setForm(toForm(updated))
       setDirty(false)
       toastSuccess('Settings saved', 'Your changes apply to new documents right away.')
+      return true
     } catch (err) {
       toastError('Could not save the settings', toApiError(err).message)
+      return false
     } finally {
       setSaving(false)
     }
@@ -931,87 +965,15 @@ export function SettingsPage() {
 
       {/* ---------------------------------------------------------------- */}
       {activeTab === 'email' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Email configuration</CardTitle>
-            <CardDescription>
-              Where outgoing quotes and invoices will be sent from.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-start gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300">
-              <Info className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                Email sending is configured but not active in this version. These settings will be
-                used in a future update.
-              </span>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="SMTP host" htmlFor="smtp_host">
-                <Input
-                  id="smtp_host"
-                  value={form.smtp_host}
-                  onChange={(event) => set('smtp_host', event.target.value)}
-                  placeholder="smtp.example.com"
-                />
-              </Field>
-
-              <Field label="SMTP port" htmlFor="smtp_port">
-                <Input
-                  id="smtp_port"
-                  type="number"
-                  min="1"
-                  max="65535"
-                  value={form.smtp_port}
-                  onChange={(event) => set('smtp_port', event.target.value)}
-                  placeholder="587"
-                />
-              </Field>
-
-              <Field label="SMTP username" htmlFor="smtp_username">
-                <Input
-                  id="smtp_username"
-                  value={form.smtp_username}
-                  onChange={(event) => set('smtp_username', event.target.value)}
-                  placeholder="accounts@qkil.co.uk"
-                />
-              </Field>
-
-              <Field label="From email" htmlFor="smtp_from_email">
-                <Input
-                  id="smtp_from_email"
-                  type="email"
-                  value={form.smtp_from_email}
-                  onChange={(event) => set('smtp_from_email', event.target.value)}
-                  placeholder="accounts@qkil.co.uk"
-                />
-              </Field>
-
-              <Field label="From name" htmlFor="smtp_from_name" className="sm:col-span-2">
-                <Input
-                  id="smtp_from_name"
-                  value={form.smtp_from_name}
-                  onChange={(event) => set('smtp_from_name', event.target.value)}
-                  placeholder="QKil Pest Control"
-                />
-              </Field>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
-              <Button disabled={saving} onClick={() => void save()}>
-                {saving ? (
-                  <>
-                    <Spinner size="sm" className="text-current" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save changes'
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <EmailSettings
+          form={form}
+          set={set}
+          settings={settings}
+          saving={saving}
+          dirty={dirty}
+          onSave={save}
+          SaveBar={SaveBar}
+        />
       ) : null}
 
       {/* ---------------------------------------------------------------- */}

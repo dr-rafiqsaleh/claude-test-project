@@ -8,10 +8,12 @@ from typing import Optional, Tuple
 from beanie import PydanticObjectId
 from fastapi import UploadFile
 
+from app.core.secrets import encrypt_secret
 from app.models.company_settings import (
     ALLOWED_LOGO_TYPES,
     MAX_LOGO_BYTES,
     CompanySettings,
+    EmailTemplates,
     Product,
 )
 from app.models.counter import INVOICE_COUNTER, Counter
@@ -69,11 +71,23 @@ def build_settings_payload(settings: CompanySettings) -> dict:
         "report_insecticide_guidance": settings.report_insecticide_guidance,
         "report_rodenticide_guidance": settings.report_rodenticide_guidance,
         "report_declaration": settings.report_declaration,
+        # Passwords and secrets never leave the server: only whether one is saved.
+        "email_provider": settings.email_provider,
         "smtp_host": settings.smtp_host,
         "smtp_port": settings.smtp_port,
+        "smtp_security": settings.smtp_security,
         "smtp_username": settings.smtp_username,
+        "smtp_password_set": bool(settings.smtp_password_encrypted),
+        "m365_tenant_id": settings.m365_tenant_id,
+        "m365_client_id": settings.m365_client_id,
+        "m365_client_secret_set": bool(settings.m365_client_secret_encrypted),
+        "m365_mailbox": settings.m365_mailbox,
         "smtp_from_email": settings.smtp_from_email,
         "smtp_from_name": settings.smtp_from_name,
+        "email_reply_to": settings.email_reply_to,
+        "email_bcc": settings.email_bcc,
+        "email_templates": (settings.email_templates or EmailTemplates()).model_dump(),
+        "default_email_templates": EmailTemplates().model_dump(),
         "primary_color": settings.primary_color,
         "updated_at": settings.updated_at,
         "updated_by": str(settings.updated_by) if settings.updated_by else None,
@@ -127,6 +141,19 @@ async def update_settings(
                 f"must be number {used + 1} or higher"
             )
 
+    # Secrets are write-only: blank keeps what is saved, anything else replaces it.
+    for field, stored in (
+        ("smtp_password", "smtp_password_encrypted"),
+        ("m365_client_secret", "m365_client_secret_encrypted"),
+    ):
+        value = payload.pop(field, None)
+        if value:
+            setattr(settings, stored, encrypt_secret(value))
+
+    if payload.get("email_templates") is not None:
+        settings.email_templates = EmailTemplates(**payload.pop("email_templates"))
+    payload.pop("email_templates", None)
+
     if "products" in payload:
         # The list arrives whole; new products get an id here. Reports copy a
         # product's details when it is used, so editing the list never changes
@@ -152,6 +179,8 @@ async def update_settings(
         if value is None and field in {
             "company_name",
             "vat_registered",
+            "email_provider",
+            "smtp_security",
             "address_country",
             "default_invoice_terms",
             "invoice_prefix",

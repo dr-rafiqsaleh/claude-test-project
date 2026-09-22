@@ -8,6 +8,8 @@ from io import BytesIO
 from typing import Dict, List, Optional, Set, Tuple
 
 from beanie import PydanticObjectId
+from PIL import Image as PILImage
+from PIL import ImageOps
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
@@ -831,6 +833,11 @@ RODENT_PESTS = {"rat", "rats", "mouse", "mice", "rodent", "rodents", "squirrel",
 MAX_PHOTO_WIDTH = 400
 MAX_PHOTO_HEIGHT = 300
 
+#: Longest side a photo is stored at inside the PDF, in pixels: sharp when
+#: printed at the size above, without a phone camera's full resolution
+#: making the report too big to email.
+PHOTO_MAX_PIXELS = 1400
+
 #: Width of the text column: A4 less 18mm margins, less the 6pt padding
 #: reportlab's page frame keeps on each side. Tables sized to this line up
 #: with the paragraphs around them.
@@ -1130,6 +1137,7 @@ def _decode_photo(photo: Photo) -> Optional[Image]:
         return None
 
     try:
+        raw = _shrink_photo(raw)
         reader = ImageReader(BytesIO(raw))
         width, height = reader.getSize()
     except Exception:  # noqa: BLE001 - unsupported or corrupt image payload
@@ -1141,6 +1149,18 @@ def _decode_photo(photo: Photo) -> Optional[Image]:
 
     scale = min(MAX_PHOTO_WIDTH / width, MAX_PHOTO_HEIGHT / height, 1.0)
     return Image(BytesIO(raw), width=width * scale, height=height * scale)
+
+
+def _shrink_photo(raw: bytes) -> bytes:
+    """A photo turned the way the camera held it, no bigger than it needs to be, as JPEG."""
+    with PILImage.open(BytesIO(raw)) as original:
+        picture = ImageOps.exif_transpose(original)
+        picture.thumbnail((PHOTO_MAX_PIXELS, PHOTO_MAX_PIXELS))
+        if picture.mode not in ("RGB", "L"):
+            picture = picture.convert("RGB")
+        out = BytesIO()
+        picture.save(out, "JPEG", quality=80, optimize=True)
+        return out.getvalue()
 
 
 def _signature_image(data_url: Optional[str], max_width: float = 60 * mm) -> Optional[Image]:

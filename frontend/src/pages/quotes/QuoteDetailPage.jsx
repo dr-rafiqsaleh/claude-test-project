@@ -6,6 +6,7 @@ import {
   CalendarClock,
   Check,
   Download,
+  Mail,
   MapPin,
   Pencil,
   Phone,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react'
 
 import { downloadQuotePdf, updateQuoteStatus } from '@/api/quotes'
+import { EmailDialog } from '@/components/email/EmailDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DetailField, PageHeader } from '@/components/ui/page'
@@ -56,6 +58,7 @@ export function QuoteDetailPage() {
   const settings = useCompanySettings()
 
   const [downloading, setDownloading] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
@@ -163,6 +166,22 @@ export function QuoteDetailPage() {
         }
         actions={
           <>
+            {canWrite ? (
+              <>
+                <Button onClick={() => setEmailOpen(true)}>
+                  <Mail className="h-4 w-4" />
+                  Email quote
+                </Button>
+                <EmailDialog
+                  kind="quote"
+                  documentId={quote.id}
+                  open={emailOpen}
+                  onOpenChange={setEmailOpen}
+                  onSent={() => void refetch()}
+                />
+              </>
+            ) : null}
+
             <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
               {downloading ? <Spinner size="sm" /> : <Download className="h-4 w-4" />}
               {downloading ? 'Preparing...' : 'Download PDF'}

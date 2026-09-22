@@ -39,6 +39,81 @@ class Product(BaseModel):
     safety_data_sheet_ref: Optional[str] = None
 
 
+class EmailProvider(str, Enum):
+    """How QKil sends email."""
+
+    NONE = "none"  # not set up yet
+    MICROSOFT_365 = "microsoft365"  # Microsoft Graph, signed in as an app
+    SMTP = "smtp"  # any other provider
+
+
+class SmtpSecurity(str, Enum):
+    """How the SMTP connection is encrypted."""
+
+    STARTTLS = "starttls"  # usually port 587
+    SSL = "ssl"  # usually port 465
+    NONE = "none"
+
+
+class EmailTemplate(BaseModel):
+    """The subject and message used when emailing one kind of document."""
+
+    subject: str
+    body: str
+
+
+#: Placeholders a template can use, by the kind of document it sends.
+EMAIL_PLACEHOLDERS = {
+    "common": ["customer_name", "company_name", "company_phone", "company_email", "sender_name"],
+    "quote": ["quote_number", "quote_total", "valid_until"],
+    "invoice": ["invoice_number", "invoice_total", "amount_due", "due_date", "job_number"],
+    "report": ["report_number", "job_number", "service_date", "service_type", "site_address"],
+}
+
+DEFAULT_QUOTE_EMAIL = EmailTemplate(
+    subject="Your quote {quote_number} from {company_name}",
+    body=(
+        "Dear {customer_name},\n\n"
+        "Thank you for your enquiry. Please find attached our quote {quote_number} for "
+        "{quote_total}, valid until {valid_until}.\n\n"
+        "To go ahead, just reply to this email or call us on {company_phone}.\n\n"
+        "Kind regards,\n{sender_name}\n{company_name}"
+    ),
+)
+
+DEFAULT_INVOICE_EMAIL = EmailTemplate(
+    subject="Invoice {invoice_number} from {company_name}",
+    body=(
+        "Dear {customer_name},\n\n"
+        "Please find attached invoice {invoice_number} for {amount_due}, due by {due_date}.\n\n"
+        "Our bank details are on the invoice. Please use {invoice_number} as the reference "
+        "when you pay.\n\n"
+        "Thank you for your business.\n\n"
+        "Kind regards,\n{sender_name}\n{company_name}"
+    ),
+)
+
+DEFAULT_REPORT_EMAIL = EmailTemplate(
+    subject="Your pest control report for {site_address}",
+    body=(
+        "Dear {customer_name},\n\n"
+        "Please find attached the report from our visit on {service_date} to "
+        "{site_address}.\n\n"
+        "It sets out what we found, what we did and our recommendations. If you have any "
+        "questions, just reply to this email or call us on {company_phone}.\n\n"
+        "Kind regards,\n{sender_name}\n{company_name}"
+    ),
+)
+
+
+class EmailTemplates(BaseModel):
+    """The editable emails for quotes, invoices and inspection reports."""
+
+    quote: EmailTemplate = Field(default_factory=lambda: DEFAULT_QUOTE_EMAIL.model_copy())
+    invoice: EmailTemplate = Field(default_factory=lambda: DEFAULT_INVOICE_EMAIL.model_copy())
+    report: EmailTemplate = Field(default_factory=lambda: DEFAULT_REPORT_EMAIL.model_copy())
+
+
 #: Printed on a report whenever an insecticide was used. One point per line.
 DEFAULT_INSECTICIDE_GUIDANCE = "\n".join(
     [
@@ -126,12 +201,22 @@ class CompanySettings(Document):
     report_rodenticide_guidance: str = DEFAULT_RODENTICIDE_GUIDANCE
     report_declaration: str = DEFAULT_REPORT_DECLARATION
 
-    # Email (stored now, wired up in a later phase)
+    # Email. Passwords and secrets are stored encrypted (app.core.secrets).
+    email_provider: EmailProvider = EmailProvider.NONE
     smtp_host: Optional[str] = None
     smtp_port: Optional[int] = None
+    smtp_security: SmtpSecurity = SmtpSecurity.STARTTLS
     smtp_username: Optional[str] = None
-    smtp_from_email: Optional[str] = None
+    smtp_password_encrypted: Optional[str] = None
+    m365_tenant_id: Optional[str] = None  # directory (tenant) ID, or the domain
+    m365_client_id: Optional[str] = None  # application (client) ID
+    m365_client_secret_encrypted: Optional[str] = None
+    m365_mailbox: Optional[str] = None  # the mailbox emails are sent from
+    smtp_from_email: Optional[str] = None  # the From address, for either provider
     smtp_from_name: Optional[str] = None
+    email_reply_to: Optional[str] = None
+    email_bcc: Optional[str] = None  # a copy of every email sent, e.g. for the office
+    email_templates: EmailTemplates = Field(default_factory=EmailTemplates)
 
     # Appearance
     primary_color: str = "#059669"  # emerald-600

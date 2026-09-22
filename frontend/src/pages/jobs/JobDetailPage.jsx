@@ -10,6 +10,7 @@ import {
   Download,
   FileText,
   Hash,
+  Mail,
   MapPin,
   PenLine,
   Phone,
@@ -26,6 +27,7 @@ import {
 
 import { createInvoiceFromJob } from '@/api/invoices'
 import { downloadJobReport, updateJobSignature, updateJobStatus } from '@/api/jobs'
+import { EmailDialog } from '@/components/email/EmailDialog'
 import { ActivityBadge } from '@/components/jobs/ActivityBadge'
 import { FindingCard } from '@/components/jobs/FindingCard'
 import { FindingForm } from '@/components/jobs/FindingForm'
@@ -130,6 +132,7 @@ export function JobDetailPage() {
   const [signatureName, setSignatureName] = useState('')
   const [signatures, setSignatures] = useState({ customer: null, technician: null })
   const [savingSignature, setSavingSignature] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
 
   const isAssigned = Boolean(job && job.technician_id && job.technician_id === user?.id)
   const editable =
@@ -366,6 +369,22 @@ export function JobDetailPage() {
                 )}
                 Complete job
               </Button>
+            ) : null}
+
+            {isCompleted && canWrite ? (
+              <>
+                <Button onClick={() => setEmailOpen(true)}>
+                  <Mail className="h-4 w-4" />
+                  Email report
+                </Button>
+                <EmailDialog
+                  kind="report"
+                  documentId={job.id}
+                  open={emailOpen}
+                  onOpenChange={setEmailOpen}
+                  onSent={() => void refetch()}
+                />
+              </>
             ) : null}
 
             {isCompleted ? (

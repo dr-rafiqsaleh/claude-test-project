@@ -11,6 +11,7 @@ from app.models.booking import Booking
 from app.models.company_settings import CompanySettings
 from app.models.counter import Counter
 from app.models.customer import Customer
+from app.models.email_log import EmailLog
 from app.models.invoice import Invoice
 from app.models.job import Job
 from app.models.notification import Notification
@@ -31,6 +32,7 @@ DOCUMENT_MODELS = [
     Counter,
     Notification,
     CompanySettings,
+    EmailLog,
 ]
 
 _client: Optional[AsyncIOMotorClient] = None
