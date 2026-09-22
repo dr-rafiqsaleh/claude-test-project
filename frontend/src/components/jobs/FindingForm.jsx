@@ -176,6 +176,8 @@ export function FindingForm({ onAdd, onCancel, pestsFound = [], large = false, c
         <ChoiceChips
           ariaLabel="Evidence seen"
           multiple
+          allowOther
+          otherPlaceholder="Describe the evidence"
           options={EVIDENCE_TYPES}
           value={draft.evidence}
           onChange={(value) => set('evidence', value)}

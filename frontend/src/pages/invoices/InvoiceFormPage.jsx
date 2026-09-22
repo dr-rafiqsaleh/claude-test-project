@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 
 import { listCustomers } from '@/api/customers'
-import { createInvoice, getInvoice, updateInvoice, updateInvoiceStatus } from '@/api/invoices'
+import { createInvoice, getInvoice, updateInvoice } from '@/api/invoices'
 import { listJobs } from '@/api/jobs'
 import { listQuotes } from '@/api/quotes'
 import { Button } from '@/components/ui/button'
@@ -366,27 +366,13 @@ export function InvoiceFormPage() {
           payment_instructions: payload.payment_instructions,
         })
 
-        if (shouldSend && updated.status === INVOICE_STATUS.DRAFT) {
-          await updateInvoiceStatus(id, INVOICE_STATUS.SENT)
-        }
-
-        toastSuccess(
-          shouldSend ? 'Invoice sent' : 'Invoice updated',
-          `${updated.invoice_number} was saved.`,
-        )
-        navigate(`/invoices/${id}`)
+        toastSuccess('Invoice saved', `${updated.invoice_number} was saved.`)
+        // The invoice page opens the email; sending it marks the invoice sent.
+        navigate(shouldSend ? `/invoices/${id}?email=1` : `/invoices/${id}`)
       } else {
-        const created = await createInvoice({
-          ...payload,
-          status: shouldSend ? INVOICE_STATUS.SENT : INVOICE_STATUS.DRAFT,
-        })
-        toastSuccess(
-          shouldSend ? 'Invoice sent' : 'Invoice created',
-          `${created.invoice_number} was ${
-            shouldSend ? 'created and marked as sent' : 'saved as a draft'
-          }.`,
-        )
-        navigate(`/invoices/${created.id}`)
+        const created = await createInvoice({ ...payload, status: INVOICE_STATUS.DRAFT })
+        toastSuccess('Invoice saved', `${created.invoice_number} was saved as a draft.`)
+        navigate(shouldSend ? `/invoices/${created.id}?email=1` : `/invoices/${created.id}`)
       }
     } catch (err) {
       const apiError = toApiError(err, 'Could not save this invoice')
@@ -757,12 +743,13 @@ export function InvoiceFormPage() {
                       />
                       ) : null}
 
-                      <FormItem>
-                        <FormLabel>{showVat ? 'Line total (inc. VAT)' : 'Line total'}</FormLabel>
+                      {/* Read-only, so a plain label: FormLabel only works inside a FormField. */}
+                      <div className="space-y-2">
+                        <Label>{showVat ? 'Line total (inc. VAT)' : 'Line total'}</Label>
                         <div className="flex h-10 items-center rounded-md border border-dashed border-input px-3 text-sm font-medium text-foreground">
                           {formatCurrency(lineTotal)}
                         </div>
-                      </FormItem>
+                      </div>
                     </div>
                   </div>
                 )
@@ -896,7 +883,7 @@ export function InvoiceFormPage() {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Save and send
+              Save and email
             </Button>
           </div>
         </form>

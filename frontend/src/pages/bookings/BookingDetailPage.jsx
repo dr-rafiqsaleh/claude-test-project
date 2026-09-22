@@ -25,7 +25,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { updateBookingStatus } from '@/api/bookings'
+import { stopRepeating, updateBookingStatus } from '@/api/bookings'
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge'
 import { Button } from '@/components/ui/button'
 import { DetailField, PageHeader } from '@/components/ui/page'
@@ -47,6 +47,7 @@ import { toApiError } from '@/lib/api'
 import {
   formatBookingDateTime,
   formatCurrency,
+  formatDate,
   formatDuration,
   formatTime,
 } from '@/lib/utils'
@@ -95,6 +96,23 @@ export function BookingDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelError, setCancelError] = useState(null)
+  const [stopOpen, setStopOpen] = useState(false)
+  const [stopping, setStopping] = useState(false)
+
+  async function handleStopRepeating() {
+    if (!booking) return
+    setStopping(true)
+    try {
+      const updated = await stopRepeating(booking.id)
+      setBooking(updated)
+      toastSuccess('Repeating stopped', updated.notices?.[0] ?? 'No more visits will be booked.')
+      setStopOpen(false)
+    } catch (err) {
+      toastError('Could not stop the series', toApiError(err).message)
+    } finally {
+      setStopping(false)
+    }
+  }
 
   async function changeStatus(status, reason) {
     if (!booking) return null
@@ -182,7 +200,16 @@ export function BookingDetailPage() {
         backTo="/bookings"
         backLabel="Back to jobs"
         title={booking.booking_number}
-        badge={<BookingStatusBadge status={booking.status} />}
+        badge={
+          <>
+            <BookingStatusBadge status={booking.status} />
+            {booking.is_tentative ? (
+              <span className="inline-flex items-center rounded-full border border-dashed border-indigo-400 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                Tentative
+              </span>
+            ) : null}
+          </>
+        }
         description={
           <>
             {formatBookingDateTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}
@@ -211,12 +238,13 @@ export function BookingDetailPage() {
 
             {canWrite && isScheduled ? (
               <Button
-                variant="outline"
+                variant={booking.is_tentative ? 'default' : 'outline'}
                 disabled={transitioning}
+                title="Confirmed with the customer"
                 onClick={() => void changeStatus(BOOKING_STATUS.CONFIRMED)}
               >
                 <CheckCircle2 className="h-4 w-4" />
-                Confirm
+                {booking.is_tentative ? 'Confirm visit' : 'Confirm'}
               </Button>
             ) : null}
 
@@ -265,6 +293,62 @@ export function BookingDetailPage() {
           </>
         }
       />
+
+      {booking.series_head_id ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Repeat className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="font-medium text-foreground">
+                Repeats {(RECURRENCE_TYPES[booking.series_recurrence] ?? 'regularly').toLowerCase()}
+                {booking.series_until ? `, until ${formatDate(booking.series_until)}` : ''}
+              </p>
+              <p className="text-muted-foreground">
+                {booking.series_upcoming
+                  ? `${booking.series_upcoming} more visit${booking.series_upcoming === 1 ? '' : 's'} booked`
+                  : 'No more visits booked'}
+                {booking.series_to_confirm
+                  ? `, ${booking.series_to_confirm} still to confirm with the customer`
+                  : ''}
+                . Tentative visits show dashed on the calendar.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {booking.parent_booking_id ? (
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/bookings/${booking.series_head_id}`}>First visit</Link>
+              </Button>
+            ) : null}
+            {canWrite ? (
+              <Button variant="outline" size="sm" onClick={() => setStopOpen(true)}>
+                Stop repeating
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <Dialog open={stopOpen} onOpenChange={(open) => !stopping && setStopOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Stop repeating after this visit?</DialogTitle>
+            <DialogDescription>
+              Later visits still waiting to be confirmed are removed from the calendar. Visits
+              already confirmed with the customer are kept, so you can deal with them yourself.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={stopping} onClick={() => setStopOpen(false)}>
+              Keep repeating
+            </Button>
+            <Button variant="destructive" disabled={stopping} onClick={() => void handleStopRepeating()}>
+              {stopping ? <Spinner size="sm" className="text-current" /> : null}
+              Stop repeating
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -317,8 +401,12 @@ export function BookingDetailPage() {
                 <DetailField icon={ClipboardList} label="Service type" value={booking.service_type} />
                 <DetailField
                   icon={Repeat}
-                  label="Recurrence"
-                  value={RECURRENCE_TYPES[booking.recurrence] ?? 'One-off'}
+                  label="Repeats"
+                  value={
+                    booking.series_head_id
+                      ? RECURRENCE_TYPES[booking.series_recurrence] ?? 'Repeating'
+                      : 'One-off'
+                  }
                 />
                 <DetailField
                   icon={DollarSign}

@@ -98,6 +98,7 @@ const EMPTY_FORM = {
   email_reply_to: '',
   email_bcc: '',
   email_templates: null,
+  email_technicians: true,
   primary_color: DEFAULT_PRIMARY_COLOR,
 }
 
@@ -206,6 +207,7 @@ function toPayload(form, loaded) {
     smtp_from_name: optional(form.smtp_from_name),
     email_reply_to: optional(form.email_reply_to),
     email_bcc: optional(form.email_bcc),
+    email_technicians: form.email_technicians !== false,
     ...(form.email_templates ? { email_templates: form.email_templates } : {}),
     primary_color: String(form.primary_color ?? DEFAULT_PRIMARY_COLOR).trim() || DEFAULT_PRIMARY_COLOR,
   }

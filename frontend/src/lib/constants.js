@@ -160,15 +160,17 @@ export const DELETABLE_BOOKING_STATUSES = [BOOKING_STATUS.SCHEDULED, BOOKING_STA
 
 export const SERVICE_TYPES = [
   'General Pest Control',
-  'Termite Inspection',
-  'Termite Treatment',
   'Rodent Control',
   'Cockroach Treatment',
-  'Ant Treatment',
-  'Spider Treatment',
   'Bed Bug Treatment',
-  'Wasp/Bee Removal',
-  'Pre-Purchase Inspection',
+  'Flea Treatment',
+  'Ant Treatment',
+  'Wasp Nest Removal',
+  'Moth Treatment',
+  'Bird Proofing',
+  'Squirrel Control',
+  'Proofing Works',
+  'Pest Survey',
   'Commercial Pest Control',
 ]
 
@@ -530,6 +532,7 @@ export const NOTIFICATION_TYPE = {
   QUOTE_EXPIRING: 'quote_expiring',
   QUOTE_ACCEPTED: 'quote_accepted',
   JOB_COMPLETED: 'job_completed',
+  JOB_ASSIGNED: 'job_assigned',
   SYSTEM: 'system',
 }
 
@@ -541,6 +544,7 @@ export const NOTIFICATION_CATEGORY = {
   invoice_due_soon: 'invoices',
   job_follow_up: 'jobs',
   job_completed: 'jobs',
+  job_assigned: 'bookings',
   quote_expiring: 'quotes',
   quote_accepted: 'quotes',
   system: 'system',

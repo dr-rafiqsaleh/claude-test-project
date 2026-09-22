@@ -664,6 +664,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
             events={events}
             datesSet={handleDatesSet}
             eventContent={renderEventContent}
+            eventClassNames={(arg) => (arg.event.extendedProps?.tentative ? ['qkil-tentative'] : [])}
             eventClick={(info) => {
               info.jsEvent.preventDefault()
               onSelectBooking(info.event.id)
@@ -686,6 +687,9 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
           {ALL_BOOKING_STATUSES.map((status) => (
             <BookingStatusBadge key={status} status={status} />
           ))}
+          <span className="inline-flex items-center rounded-full border border-dashed border-indigo-400 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">
+            Tentative: repeating visit to confirm
+          </span>
         </div>
       </CardContent>
     </Card>

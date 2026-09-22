@@ -396,19 +396,23 @@ function OfficeToday({ user }) {
   const [visits, setVisits] = useState([])
   const [reportsDue, setReportsDue] = useState(null)
   const [awaitingReply, setAwaitingReply] = useState(null)
+  const [toConfirm, setToConfirm] = useState(null)
   const [summary, setSummary] = useState(null)
   const [revenue, setRevenue] = useState({ state: 'loading', series: [] })
 
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const [todayRes, dueRes, quotesRes, summaryRes] = await Promise.allSettled([
+      const [todayRes, dueRes, quotesRes, summaryRes, confirmRes] = await Promise.allSettled([
         listBookings({ ...dayRange(0), page_size: 100 }),
         listBookings({ status: BOOKING_STATUS.IN_PROGRESS, page_size: 1 }),
         listQuotes({ status: 'sent', page_size: 1 }),
         getInvoiceSummary(),
+        // Booked but not yet confirmed with the customer, in the next fortnight.
+        listBookings({ status: BOOKING_STATUS.SCHEDULED, ...dayRange(0, 14), page_size: 1 }),
       ])
       if (cancelled) return
+      setToConfirm(confirmRes.status === 'fulfilled' ? confirmRes.value.total : null)
       setVisits(todayRes.status === 'fulfilled' ? [...todayRes.value.items].sort(byStart) : [])
       setReportsDue(dueRes.status === 'fulfilled' ? dueRes.value.total : null)
       setAwaitingReply(quotesRes.status === 'fulfilled' ? quotesRes.value.total : null)
@@ -464,7 +468,15 @@ function OfficeToday({ user }) {
       />
 
       <Section title="Needs attention">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <AttentionCard
+            icon={CalendarCheck}
+            label="To confirm"
+            value={show(toConfirm)}
+            hint="Jobs in the next 14 days not yet confirmed with the customer"
+            to="/bookings?status=scheduled"
+            loading={loading}
+          />
           <AttentionCard
             icon={ClipboardList}
             label="Reports due"

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, RotateCcw, Send } from 'lucide-react'
 
 import { sendTestEmail } from '@/api/emails'
-import { ChoiceChips, SELECT_CLASSES } from '@/components/jobs/JobFormControls'
+import { CheckboxField, ChoiceChips, SELECT_CLASSES } from '@/components/jobs/JobFormControls'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -25,6 +25,7 @@ const TEMPLATE_KINDS = [
   { key: 'quote', label: 'Quotes' },
   { key: 'invoice', label: 'Invoices' },
   { key: 'report', label: 'Inspection reports' },
+  { key: 'job_assigned', label: 'New job, to the technician' },
 ]
 
 function Field({ label, htmlFor, hint, className, children }) {
@@ -371,6 +372,16 @@ export function EmailSettings({ form, set, settings, saving, dirty, onSave, Save
                 </Field>
               </div>
             </div>
+          ) : null}
+
+          {provider !== 'none' ? (
+            <CheckboxField
+              id="email_technicians"
+              checked={form.email_technicians !== false}
+              onChange={(checked) => set('email_technicians', checked)}
+              label="Email technicians when they're given a job"
+              description="With the date, address, site contact and a link to the job. One email covers a whole repeating series."
+            />
           ) : null}
 
           {provider !== 'none' ? (

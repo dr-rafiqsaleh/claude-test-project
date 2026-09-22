@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowLeft,
@@ -59,6 +59,14 @@ export function QuoteDetailPage() {
 
   const [downloading, setDownloading] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // "Save and email" on the form lands here with ?email=1: open the email straight away.
+  useEffect(() => {
+    if (searchParams.get('email') !== '1' || !canWrite) return
+    setEmailOpen(true)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams, canWrite])
   const [transitioning, setTransitioning] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
@@ -166,21 +174,26 @@ export function QuoteDetailPage() {
         }
         actions={
           <>
-            {canWrite ? (
-              <>
-                <Button onClick={() => setEmailOpen(true)}>
-                  <Mail className="h-4 w-4" />
-                  Email quote
-                </Button>
-                <EmailDialog
-                  kind="quote"
-                  documentId={quote.id}
-                  open={emailOpen}
-                  onOpenChange={setEmailOpen}
-                  onSent={() => void refetch()}
-                />
-              </>
+            {/* Sending means emailing it. "Mark as sent" is only for a quote
+                that went some other way, such as by post. */}
+            {canWrite && isDraft ? (
+              <Button onClick={() => setEmailOpen(true)}>
+                <Send className="h-4 w-4" />
+                Send quote
+              </Button>
+            ) : canWrite ? (
+              <Button variant="outline" onClick={() => setEmailOpen(true)}>
+                <Mail className="h-4 w-4" />
+                Email again
+              </Button>
             ) : null}
+            <EmailDialog
+              kind="quote"
+              documentId={quote.id}
+              open={emailOpen}
+              onOpenChange={setEmailOpen}
+              onSent={() => void refetch()}
+            />
 
             <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
               {downloading ? <Spinner size="sm" /> : <Download className="h-4 w-4" />}
@@ -197,8 +210,13 @@ export function QuoteDetailPage() {
             ) : null}
 
             {canWrite && isDraft ? (
-              <Button disabled={transitioning} onClick={() => void changeStatus(QuoteStatus.SENT)}>
-                <Send className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                disabled={transitioning}
+                title="Already sent another way, such as by post"
+                onClick={() => void changeStatus(QuoteStatus.SENT)}
+              >
+                <Check className="h-4 w-4" />
                 Mark as sent
               </Button>
             ) : null}

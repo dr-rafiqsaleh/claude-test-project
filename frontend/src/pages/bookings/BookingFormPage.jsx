@@ -37,6 +37,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { useTechnicians } from '@/hooks/useBookings'
 import { toApiError } from '@/lib/api'
+import { OtherEntry } from '@/components/jobs/JobFormControls'
 import {
   addMinutesToInputValue,
   cn,
@@ -60,6 +61,9 @@ import {
 const DEFAULT_SERVICE_TYPE = 'General Pest Control'
 const NONE = ''
 
+/** The service type select's value while a custom service is being typed. */
+const OTHER_SERVICE = '__other__'
+
 const SELECT_CLASSES =
   'flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60'
 
@@ -78,6 +82,8 @@ const bookingSchema = z
       .min(5, 'At least 5 minutes')
       .max(1440, 'At most 24 hours'),
     recurrence: z.string().trim(),
+    recurrence_until: z.string().trim(),
+    apply_to_series: z.boolean(),
     quoted_amount: z.union([z.literal(''), z.coerce.number().min(0, 'Cannot be negative')]),
     customer_notes: z.string().trim().max(5000),
     technician_notes: z.string().trim().max(5000),
@@ -127,6 +133,9 @@ export function BookingFormPage() {
   const [quotesLoading, setQuotesLoading] = useState(false)
   /** Quote id the booking was originally created from (edit mode). */
   const [lockedQuoteId, setLockedQuoteId] = useState('')
+  const [serviceOther, setServiceOther] = useState(false)
+  /** When editing a visit of a repeating job: its series, from the booking. */
+  const [series, setSeries] = useState(null)
 
   const { technicians } = useTechnicians(true)
 
@@ -144,6 +153,8 @@ export function BookingFormPage() {
       scheduled_end: addMinutesToInputValue(startValue, DEFAULT_BOOKING_DURATION_MINUTES),
       estimated_duration_minutes: DEFAULT_BOOKING_DURATION_MINUTES,
       recurrence: 'none',
+      recurrence_until: '',
+      apply_to_series: false,
       quoted_amount: '',
       customer_notes: '',
       technician_notes: '',
@@ -163,6 +174,7 @@ export function BookingFormPage() {
   const watchedStart = useWatch({ control, name: 'scheduled_start' })
   const watchedEnd = useWatch({ control, name: 'scheduled_end' })
   const watchedServiceType = useWatch({ control, name: 'service_type' })
+  const watchedRecurrence = useWatch({ control, name: 'recurrence' })
 
   /** Apply a quote's details onto the form. */
   const applyQuote = useCallback(
@@ -213,6 +225,17 @@ export function BookingFormPage() {
           }
 
           setLockedQuoteId(booking.quote_id ?? '')
+          setSeries(
+            booking.series_head_id
+              ? {
+                  isLaterVisit: Boolean(booking.parent_booking_id),
+                  headId: booking.series_head_id,
+                  headNumber: booking.series_head_number,
+                  recurrence: booking.series_recurrence,
+                  toConfirm: booking.series_to_confirm,
+                }
+              : null,
+          )
           reset({
             customer_id: booking.customer_id,
             quote_id: booking.quote_id ?? NONE,
@@ -224,6 +247,10 @@ export function BookingFormPage() {
             estimated_duration_minutes:
               booking.estimated_duration_minutes || DEFAULT_BOOKING_DURATION_MINUTES,
             recurrence: booking.recurrence ?? 'none',
+            recurrence_until: booking.recurrence_until
+              ? toDateTimeInputValue(booking.recurrence_until).slice(0, 10)
+              : '',
+            apply_to_series: false,
             quoted_amount: booking.quoted_amount ?? '',
             customer_notes: booking.customer_notes ?? '',
             technician_notes: booking.technician_notes ?? '',
@@ -363,6 +390,11 @@ export function BookingFormPage() {
       service_type: values.service_type,
       pest_types: values.pest_types ?? [],
       recurrence: values.recurrence || 'none',
+      // A day, stored at midday so no time zone can move it to the day before.
+      recurrence_until:
+        values.recurrence !== 'none' && values.recurrence_until
+          ? `${values.recurrence_until}T12:00:00Z`
+          : null,
       estimated_duration_minutes: Number(values.estimated_duration_minutes),
       quoted_amount: values.quoted_amount === '' ? null : Number(values.quoted_amount),
       customer_notes: values.customer_notes === '' ? null : values.customer_notes,
@@ -379,14 +411,26 @@ export function BookingFormPage() {
     return payload
   }
 
+  /** A success toast, plus anything the save wants the office to know. */
+  function showSaved(title, message, notices = []) {
+    const problems = notices.filter((notice) => notice.includes("couldn't"))
+    const info = notices.filter((notice) => !problems.includes(notice))
+    toastSuccess(title, [message, ...info].join(' '))
+    problems.forEach((notice) => toastError('Technician not emailed', notice))
+  }
+
   async function onSubmit(values) {
     setSubmitError(null)
     const payload = toPayload(values)
 
     try {
       if (isEdit && id) {
-        const updated = await updateBooking(id, { ...payload, quote_id: values.quote_id || null })
-        toastSuccess('Job updated', `${updated.booking_number} was saved.`)
+        const updated = await updateBooking(id, {
+          ...payload,
+          quote_id: values.quote_id || null,
+          apply_to_series: Boolean(series && values.apply_to_series),
+        })
+        showSaved('Job updated', `${updated.booking_number} was saved.`, updated.notices)
         navigate(`/bookings/${id}`)
         return
       }
@@ -400,7 +444,7 @@ export function BookingFormPage() {
         created = await createBooking(payload)
       }
 
-      toastSuccess('Job booked', `${created.booking_number} has been scheduled.`)
+      showSaved('Job booked', `${created.booking_number} has been scheduled.`, created.notices)
       navigate(`/bookings/${created.id}`)
     } catch (err) {
       const apiError = toApiError(err, 'Could not save this job')
@@ -693,26 +737,91 @@ export function BookingFormPage() {
                   )}
                 />
 
+                {series?.isLaterVisit ? (
+                  <div className="space-y-1.5 text-sm">
+                    <p className="font-medium text-foreground">Repeats</p>
+                    <p className="text-muted-foreground">
+                      {RECURRENCE_TYPES[series.recurrence] ?? 'Repeating'}, part of the series that
+                      starts with {series.headNumber}. The pattern is changed on that first visit.
+                    </p>
+                  </div>
+                ) : (
+                  <FormField
+                    control={control}
+                    name="recurrence"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Repeats</FormLabel>
+                        <FormControl>
+                          <select {...field} className={SELECT_CLASSES}>
+                            {Object.entries(RECURRENCE_TYPES).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {!series?.isLaterVisit && watchedRecurrence && watchedRecurrence !== 'none' ? (
+                  <FormField
+                    control={control}
+                    name="recurrence_until"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Repeat until</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" />
+                        </FormControl>
+                        <FormDescription>Optional. Leave empty to keep repeating.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
+              </div>
+
+              {!series?.isLaterVisit && watchedRecurrence && watchedRecurrence !== 'none' ? (
+                <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  QKil books the visits for the next 12 months straight away, and keeps a year
+                  booked ahead. They start as tentative: confirm each with the customer from the
+                  job or the calendar, or move it first. The technician is emailed once for the
+                  whole series.
+                </p>
+              ) : null}
+
+              {series ? (
                 <FormField
                   control={control}
-                  name="recurrence"
+                  name="apply_to_series"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Recurrence</FormLabel>
-                      <FormControl>
-                        <select {...field} className={SELECT_CLASSES}>
-                          {Object.entries(RECURRENCE_TYPES).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </FormControl>
-                      <FormMessage />
+                      <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(field.value)}
+                          onChange={(event) => field.onChange(event.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                        />
+                        <span>
+                          <span className="block font-medium text-foreground">
+                            Also change the later visits in this series
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            Only visits still waiting to be confirmed
+                            {series.toConfirm ? ` (${series.toConfirm})` : ''}: the technician,
+                            service, notes and time of day. Confirmed visits stay as they are.
+                          </span>
+                        </span>
+                      </label>
                     </FormItem>
                   )}
                 />
-              </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -732,6 +841,12 @@ export function BookingFormPage() {
                       <FormControl>
                         <select
                           {...field}
+                          value={serviceOther ? OTHER_SERVICE : field.value}
+                          onChange={(event) => {
+                            const next = event.target.value
+                            setServiceOther(next === OTHER_SERVICE)
+                            field.onChange(next === OTHER_SERVICE ? '' : next)
+                          }}
                           className={SELECT_CLASSES}
                           aria-invalid={Boolean(fieldState.error) || undefined}
                         >
@@ -741,8 +856,19 @@ export function BookingFormPage() {
                               {service}
                             </option>
                           ))}
+                          <option value={OTHER_SERVICE}>Other: type it in</option>
                         </select>
                       </FormControl>
+                      {serviceOther ? (
+                        <Input
+                          autoFocus
+                          value={field.value}
+                          onChange={(event) => field.onChange(event.target.value)}
+                          placeholder="Describe the service"
+                          aria-label="Describe the service"
+                          maxLength={120}
+                        />
+                      ) : null}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -805,6 +931,19 @@ export function BookingFormPage() {
                           </label>
                         )
                       })}
+                    </div>
+                    <div>
+                      <OtherEntry
+                        placeholder="Name the pest"
+                        onAdd={(pest) => {
+                          const current = getValues('pest_types') ?? []
+                          const known = pestTypeOptions.find((item) => item.toLowerCase() === pest.toLowerCase())
+                          const chosen = known ?? pest
+                          if (!current.includes(chosen)) {
+                            setValue('pest_types', [...current, chosen], { shouldDirty: true })
+                          }
+                        }}
+                      />
                     </div>
                     <FormDescription>
                       {selectedPestTypes.length === 0

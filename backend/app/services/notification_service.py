@@ -284,6 +284,15 @@ async def sweep_notifications() -> int:
     """
     now = datetime.utcnow()
 
+    # Keep every repeating job booked a year ahead. Separate, so a problem
+    # here never stops the reminders.
+    try:
+        from app.services import recurrence_service  # noqa: PLC0415
+
+        await recurrence_service.extend_all_series(now)
+    except Exception:  # noqa: BLE001 - must never break a request
+        logger.exception("Could not top up repeating jobs")
+
     try:
         office_ids = await _office_user_ids()
         batch = _Batch(await _recent_keys())

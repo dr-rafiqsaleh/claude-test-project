@@ -88,6 +88,7 @@ def build_settings_payload(settings: CompanySettings) -> dict:
         "email_bcc": settings.email_bcc,
         "email_templates": (settings.email_templates or EmailTemplates()).model_dump(),
         "default_email_templates": EmailTemplates().model_dump(),
+        "email_technicians": settings.email_technicians,
         "primary_color": settings.primary_color,
         "updated_at": settings.updated_at,
         "updated_by": str(settings.updated_by) if settings.updated_by else None,
@@ -151,7 +152,11 @@ async def update_settings(
             setattr(settings, stored, encrypt_secret(value))
 
     if payload.get("email_templates") is not None:
-        settings.email_templates = EmailTemplates(**payload.pop("email_templates"))
+        templates = payload.pop("email_templates")
+        # A template left out keeps its saved (or default) wording.
+        current = (settings.email_templates or EmailTemplates()).model_dump()
+        current.update({kind: value for kind, value in templates.items() if value is not None})
+        settings.email_templates = EmailTemplates(**current)
     payload.pop("email_templates", None)
 
     if "products" in payload:
@@ -181,6 +186,7 @@ async def update_settings(
             "vat_registered",
             "email_provider",
             "smtp_security",
+            "email_technicians",
             "address_country",
             "default_invoice_terms",
             "invoice_prefix",

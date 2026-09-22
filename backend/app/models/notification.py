@@ -27,6 +27,7 @@ class NotificationType(str, Enum):
     QUOTE_EXPIRING = "quote_expiring"  # quote valid_until within 3 days
     QUOTE_ACCEPTED = "quote_accepted"  # quote moved to accepted
     JOB_COMPLETED = "job_completed"  # job completed, invoice ready
+    JOB_ASSIGNED = "job_assigned"  # a technician was given a job
     SYSTEM = "system"  # general system message
 
 
@@ -38,6 +39,7 @@ NOTIFICATION_CATEGORY = {
     NotificationType.INVOICE_DUE_SOON: "invoices",
     NotificationType.JOB_FOLLOW_UP: "jobs",
     NotificationType.JOB_COMPLETED: "jobs",
+    NotificationType.JOB_ASSIGNED: "bookings",
     NotificationType.QUOTE_EXPIRING: "quotes",
     NotificationType.QUOTE_ACCEPTED: "quotes",
     NotificationType.SYSTEM: "system",

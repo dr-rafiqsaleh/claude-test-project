@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
   Banknote,
   Building2,
   CalendarDays,
+  Check,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -74,6 +75,14 @@ export function InvoiceDetailPage() {
   const [transitioning, setTransitioning] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // "Save and email" on the form lands here with ?email=1: open the email straight away.
+  useEffect(() => {
+    if (searchParams.get('email') !== '1' || !canWrite) return
+    setEmailOpen(true)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams, canWrite])
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -190,23 +199,29 @@ export function InvoiceDetailPage() {
         }
         actions={
           <>
+            {/* Sending means emailing it. "Mark as sent" is only for an invoice
+                that went some other way, such as by post. */}
             {canWrite && isDraft ? (
-              <Button
-                disabled={transitioning}
-                onClick={() =>
-                  void changeStatus(
-                    INVOICE_STATUS.SENT,
-                    `${invoice.invoice_number} is now marked as sent.`,
-                  )
-                }
-              >
-                {transitioning ? (
-                  <Spinner size="sm" className="text-current" />
-                ) : (
+              <>
+                <Button onClick={() => setEmailOpen(true)}>
                   <Send className="h-4 w-4" />
-                )}
-                Send invoice
-              </Button>
+                  Send invoice
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={transitioning}
+                  title="Already sent another way, such as by post"
+                  onClick={() =>
+                    void changeStatus(
+                      INVOICE_STATUS.SENT,
+                      `${invoice.invoice_number} is now marked as sent.`,
+                    )
+                  }
+                >
+                  {transitioning ? <Spinner size="sm" /> : <Check className="h-4 w-4" />}
+                  Mark as sent
+                </Button>
+              </>
             ) : null}
 
             {canWrite && payable ? (
@@ -216,21 +231,19 @@ export function InvoiceDetailPage() {
               </Button>
             ) : null}
 
-            {canWrite && invoice.status !== INVOICE_STATUS.CANCELLED ? (
-              <>
-                <Button onClick={() => setEmailOpen(true)}>
-                  <Mail className="h-4 w-4" />
-                  Email invoice
-                </Button>
-                <EmailDialog
-                  kind="invoice"
-                  documentId={invoice.id}
-                  open={emailOpen}
-                  onOpenChange={setEmailOpen}
-                  onSent={() => void refetch()}
-                />
-              </>
+            {canWrite && !isDraft && invoice.status !== INVOICE_STATUS.CANCELLED ? (
+              <Button variant="outline" onClick={() => setEmailOpen(true)}>
+                <Mail className="h-4 w-4" />
+                Email again
+              </Button>
             ) : null}
+            <EmailDialog
+              kind="invoice"
+              documentId={invoice.id}
+              open={emailOpen}
+              onOpenChange={setEmailOpen}
+              onSent={() => void refetch()}
+            />
 
             <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
               {downloading ? <Spinner size="sm" /> : <Download className="h-4 w-4" />}

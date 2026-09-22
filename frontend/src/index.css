@@ -167,6 +167,18 @@
   @apply whitespace-nowrap;
 }
 
+/* A visit of a repeating job not yet confirmed with the customer. */
+.qkil-calendar .fc .fc-event.qkil-tentative {
+  @apply opacity-80;
+  outline: 1.5px dashed hsl(var(--foreground) / 0.55);
+  outline-offset: -2px;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    hsl(0 0% 100% / 0.22) 6px 12px
+  );
+}
+
 .qkil-calendar .fc .fc-scrollgrid {
   @apply rounded-lg;
 }

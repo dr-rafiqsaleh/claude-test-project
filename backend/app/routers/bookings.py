@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.config import settings
 from app.core.dependencies import get_current_user, require_admin, require_staff
-from app.models.booking import BookingStatus
+from app.models.booking import Booking, BookingStatus
 from app.models.user import User, UserRole
 from app.schemas.booking import (
     BookingCreate,
@@ -33,7 +33,7 @@ from app.schemas.booking import (
     TechnicianAvailabilityResponse,
 )
 from app.schemas.user import UserListData, UserListResponse, UserResponse
-from app.services import booking_service
+from app.services import assignment_service, booking_service, recurrence_service
 from app.services.booking_service import (
     BookingNotFoundError,
     BookingStateError,
@@ -57,6 +57,14 @@ def _redact_for(user: User, payload: dict) -> dict:
     if _is_technician(user):
         payload = dict(payload)
         payload["internal_notes"] = None
+    return payload
+
+
+async def _full_payload(booking, customer, technician, quote, notices=None) -> dict:
+    """A booking with its series details and any notices from the save."""
+    payload = build_booking_payload(booking, customer, technician, quote)
+    payload.update(await recurrence_service.series_info(booking))
+    payload["notices"] = [notice for notice in (notices or []) if notice]
     return payload
 
 
@@ -133,18 +141,25 @@ async def create_booking(
     payload: BookingCreate,
     current_user: User = Depends(require_staff),
 ) -> BookingResponseEnvelope:
-    """Create a booking with an auto-generated booking number."""
+    """Create a booking with an auto-generated booking number.
+
+    A repeating job books its later visits too, and a technician given the
+    job is told about it.
+    """
+    notices: list = []
     try:
         booking, customer, technician, quote = await booking_service.create_booking(
             payload,
             created_by=current_user.id,
+            notices=notices,
         )
     except (CustomerNotFoundError, TechnicianNotFoundError, QuoteNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
+    notices.append(await assignment_service.notify_if_assigned(booking, technician, customer, None))
     return BookingResponseEnvelope(
         data=BookingResponse.model_validate(
-            build_booking_payload(booking, customer, technician, quote)
+            await _full_payload(booking, customer, technician, quote, notices)
         ),
         message=f"Booking {booking.booking_number} created successfully",
         success=True,
@@ -163,20 +178,23 @@ async def create_booking_from_quote(
     current_user: User = Depends(require_staff),
 ) -> BookingResponseEnvelope:
     """Create a booking from an accepted quote and mark the quote as converted."""
+    notices: list = []
     try:
         booking, customer, technician, quote = await booking_service.create_booking_from_quote(
             quote_id,
             payload,
             created_by=current_user.id,
+            notices=notices,
         )
     except (QuoteNotFoundError, CustomerNotFoundError, TechnicianNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except QuoteNotConvertibleError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+    notices.append(await assignment_service.notify_if_assigned(booking, technician, customer, None))
     return BookingResponseEnvelope(
         data=BookingResponse.model_validate(
-            build_booking_payload(booking, customer, technician, quote)
+            await _full_payload(booking, customer, technician, quote, notices)
         ),
         message=(
             f"Quote {quote.quote_number} converted to booking {booking.booking_number}"
@@ -278,7 +296,7 @@ async def get_booking(
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    payload = build_booking_payload(booking, customer, technician, quote)
+    payload = await _full_payload(booking, customer, technician, quote)
     _assert_can_view(current_user, payload)
 
     return BookingResponseEnvelope(
@@ -296,9 +314,16 @@ async def update_booking(
 ) -> BookingResponseEnvelope:
     """Update a booking. Only scheduled or confirmed bookings can be edited."""
     try:
+        before = await Booking.get(booking_id)
+    except Exception:  # noqa: BLE001 - not an id; the update below reports it
+        before = None
+    previous_technician = before.technician_id if before else None
+    notices: list = []
+    try:
         booking, customer, technician, quote = await booking_service.update_booking(
             booking_id,
             payload,
+            notices=notices,
         )
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -307,9 +332,12 @@ async def update_booking(
     except BookingStateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+    notices.append(
+        await assignment_service.notify_if_assigned(booking, technician, customer, previous_technician)
+    )
     return BookingResponseEnvelope(
         data=BookingResponse.model_validate(
-            build_booking_payload(booking, customer, technician, quote)
+            await _full_payload(booking, customer, technician, quote, notices)
         ),
         message="Booking updated successfully",
         success=True,
@@ -372,6 +400,34 @@ async def update_booking_status(
     return BookingResponseEnvelope(
         data=BookingResponse.model_validate(_redact_for(current_user, payload_out)),
         message=f"Booking marked as {booking.status.value.replace('_', ' ')}",
+        success=True,
+    )
+
+
+@router.post(
+    "/{booking_id}/stop-repeating",
+    response_model=BookingResponseEnvelope,
+    summary="Stop a repeating job after this visit",
+)
+async def stop_repeating(
+    booking_id: str,
+    _current_user: User = Depends(require_staff),
+) -> BookingResponseEnvelope:
+    """Remove the later visits still waiting to be confirmed; keep confirmed ones."""
+    try:
+        booking, removed, kept = await booking_service.stop_repeating(booking_id)
+        booking, customer, technician, quote = await booking_service.get_booking(booking.id)
+    except BookingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    notice = f"No more visits after this one. {removed} unconfirmed visit(s) removed."
+    if kept:
+        notice += f" {kept} later visit(s) already confirmed with the customer were kept: cancel them if needed."
+    return BookingResponseEnvelope(
+        data=BookingResponse.model_validate(
+            await _full_payload(booking, customer, technician, quote, [notice])
+        ),
+        message=notice,
         success=True,
     )
 

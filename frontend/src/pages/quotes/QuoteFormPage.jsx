@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 
 import { listCustomers } from '@/api/customers'
-import { createQuote, getQuote, updateQuote, updateQuoteStatus } from '@/api/quotes'
+import { createQuote, getQuote, updateQuote } from '@/api/quotes'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -236,24 +236,13 @@ export function QuoteFormPage() {
     try {
       if (isEdit && id) {
         const updated = await updateQuote(id, payload)
-        if (shouldSend) {
-          await updateQuoteStatus(id, QuoteStatus.SENT)
-        }
-        toastSuccess(
-          shouldSend ? 'Quote sent' : 'Quote updated',
-          `${updated.quote_number} was saved.`,
-        )
-        navigate(`/quotes/${id}`)
+        toastSuccess('Quote saved', `${updated.quote_number} was saved.`)
+        // The quote page opens the email; sending it marks the quote sent.
+        navigate(shouldSend ? `/quotes/${id}?email=1` : `/quotes/${id}`)
       } else {
-        const created = await createQuote({
-          ...payload,
-          status: shouldSend ? QuoteStatus.SENT : QuoteStatus.DRAFT,
-        })
-        toastSuccess(
-          shouldSend ? 'Quote sent' : 'Quote created',
-          `${created.quote_number} was ${shouldSend ? 'created and marked as sent' : 'saved as a draft'}.`,
-        )
-        navigate(`/quotes/${created.id}`)
+        const created = await createQuote({ ...payload, status: QuoteStatus.DRAFT })
+        toastSuccess('Quote saved', `${created.quote_number} was saved as a draft.`)
+        navigate(shouldSend ? `/quotes/${created.id}?email=1` : `/quotes/${created.id}`)
       }
     } catch (err) {
       const apiError = toApiError(err, 'Could not save this quote')
@@ -716,7 +705,7 @@ export function QuoteFormPage() {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Save and send
+              Save and email
             </Button>
           </div>
         </form>

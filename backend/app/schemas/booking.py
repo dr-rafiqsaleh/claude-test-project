@@ -64,6 +64,7 @@ class BookingCreate(BaseModel):
     site_contact_phone: Optional[str] = Field(default=None, max_length=40)
     order_number: Optional[str] = Field(default=None, max_length=60)
     recurrence: RecurrenceType = RecurrenceType.NONE
+    recurrence_until: Optional[datetime] = None
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     internal_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     customer_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
@@ -122,6 +123,9 @@ class BookingUpdate(BaseModel):
     site_contact_phone: Optional[str] = Field(default=None, max_length=40)
     order_number: Optional[str] = Field(default=None, max_length=60)
     recurrence: Optional[RecurrenceType] = None
+    recurrence_until: Optional[datetime] = None
+    #: Also apply these changes to the later, not yet confirmed visits in its series.
+    apply_to_series: bool = False
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     internal_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     customer_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
@@ -198,6 +202,7 @@ class QuoteToBookingRequest(BaseModel):
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     internal_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     recurrence: RecurrenceType = RecurrenceType.NONE
+    recurrence_until: Optional[datetime] = None
 
     @field_validator("technician_id")
     @classmethod
@@ -249,7 +254,21 @@ class BookingResponse(BaseModel):
     order_number: Optional[str] = None
 
     recurrence: RecurrenceType = RecurrenceType.NONE
+    recurrence_until: Optional[datetime] = None
     parent_booking_id: Optional[str] = None
+    series_index: int = 0
+    #: A visit generated for a repeating job, not yet confirmed with the customer.
+    is_tentative: bool = False
+    #: The series it belongs to, on a single booking's page.
+    series_head_id: Optional[str] = None
+    series_head_number: Optional[str] = None
+    series_recurrence: Optional[RecurrenceType] = None
+    series_until: Optional[datetime] = None
+    series_upcoming: int = 0
+    series_to_confirm: int = 0
+    #: After a save, in words: what happened to the series, and whether the
+    #: technician was told.
+    notices: List[str] = Field(default_factory=list)
 
     technician_notes: Optional[str] = None
     internal_notes: Optional[str] = None
@@ -294,6 +313,7 @@ class CalendarEventProps(BaseModel):
     """Extra data FullCalendar carries on each event."""
 
     status: BookingStatus
+    tentative: bool = False
     booking_number: str
     customer_name: Optional[str] = None
     technician_name: Optional[str] = None

@@ -77,6 +77,7 @@ class EmailTemplatesSchema(BaseModel):
     quote: EmailTemplateSchema
     invoice: EmailTemplateSchema
     report: EmailTemplateSchema
+    job_assigned: Optional[EmailTemplateSchema] = None
 
 
 def _digits(value: str) -> str:
@@ -143,6 +144,7 @@ class CompanySettingsUpdate(BaseModel):
     email_reply_to: Optional[str] = Field(None, max_length=200)
     email_bcc: Optional[str] = Field(None, max_length=200)
     email_templates: Optional[EmailTemplatesSchema] = None
+    email_technicians: Optional[bool] = None
 
     primary_color: Optional[str] = Field(None, max_length=9)
 
@@ -246,6 +248,7 @@ class CompanySettingsResponse(BaseModel):
     email_bcc: Optional[str] = None
     email_templates: EmailTemplatesSchema
     default_email_templates: EmailTemplatesSchema
+    email_technicians: bool = True
     email_placeholders: dict = Field(default_factory=lambda: EMAIL_PLACEHOLDERS)
 
     primary_color: str = "#059669"

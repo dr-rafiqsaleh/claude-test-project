@@ -68,6 +68,20 @@ EMAIL_PLACEHOLDERS = {
     "quote": ["quote_number", "quote_total", "valid_until"],
     "invoice": ["invoice_number", "invoice_total", "amount_due", "due_date", "job_number"],
     "report": ["report_number", "job_number", "service_date", "service_type", "site_address"],
+    "job_assigned": [
+        "technician_name",
+        "job_number",
+        "job_date",
+        "job_time",
+        "service_type",
+        "pest_types",
+        "site_address",
+        "site_contact",
+        "customer_phone",
+        "technician_notes",
+        "repeats",
+        "job_link",
+    ],
 }
 
 DEFAULT_QUOTE_EMAIL = EmailTemplate(
@@ -106,12 +120,33 @@ DEFAULT_REPORT_EMAIL = EmailTemplate(
 )
 
 
+DEFAULT_JOB_ASSIGNED_EMAIL = EmailTemplate(
+    subject="New job {job_number}: {service_type} on {job_date}",
+    body=(
+        "Hi {technician_name},\n\n"
+        "You've been given a job.\n\n"
+        "When: {job_date}, {job_time}\n"
+        "Where: {site_address}\n"
+        "Customer: {customer_name}, {customer_phone}\n"
+        "On site: {site_contact}\n"
+        "Service: {service_type} ({pest_types})\n"
+        "Notes: {technician_notes}\n"
+        "{repeats}\n\n"
+        "Open the job: {job_link}\n\n"
+        "{company_name}"
+    ),
+)
+
+
 class EmailTemplates(BaseModel):
-    """The editable emails for quotes, invoices and inspection reports."""
+    """The editable emails for quotes, invoices, reports and new jobs."""
 
     quote: EmailTemplate = Field(default_factory=lambda: DEFAULT_QUOTE_EMAIL.model_copy())
     invoice: EmailTemplate = Field(default_factory=lambda: DEFAULT_INVOICE_EMAIL.model_copy())
     report: EmailTemplate = Field(default_factory=lambda: DEFAULT_REPORT_EMAIL.model_copy())
+    job_assigned: EmailTemplate = Field(
+        default_factory=lambda: DEFAULT_JOB_ASSIGNED_EMAIL.model_copy()
+    )
 
 
 #: Printed on a report whenever an insecticide was used. One point per line.
@@ -217,6 +252,7 @@ class CompanySettings(Document):
     email_reply_to: Optional[str] = None
     email_bcc: Optional[str] = None  # a copy of every email sent, e.g. for the office
     email_templates: EmailTemplates = Field(default_factory=EmailTemplates)
+    email_technicians: bool = True  # email a technician when they are given a job
 
     # Appearance
     primary_color: str = "#059669"  # emerald-600

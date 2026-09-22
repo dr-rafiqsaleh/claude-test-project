@@ -69,9 +69,16 @@ class Booking(Document):
     site_contact_phone: Optional[str] = None
     order_number: Optional[str] = None  # the customer's purchase order, if they use one
 
-    # Recurrence
+    # Recurrence. The first visit of a repeating job heads its series; the
+    # later visits are generated from it, a year ahead, and point back to it.
     recurrence: RecurrenceType = RecurrenceType.NONE
+    recurrence_until: Optional[datetime] = None  # no visits after this date
     parent_booking_id: Optional[PydanticObjectId] = None  # head of a recurring series
+    series_index: int = 0  # 0 for the head, then 1, 2, 3... for later visits
+    series_last_index: int = 0  # on the head: the last visit generated so far
+    # On the head: when the pattern is counted from. Moving just the first
+    # visit (the customer is busy that day) leaves the rest of the series put.
+    series_anchor: Optional[datetime] = None
 
     # Notes
     technician_notes: Optional[str] = None  # visible to the assigned technician
@@ -96,6 +103,7 @@ class Booking(Document):
             IndexModel([("technician_id", 1)], name="idx_technician_id"),
             IndexModel([("scheduled_start", 1)], name="idx_scheduled_start"),
             IndexModel([("status", 1)], name="idx_status"),
+            IndexModel([("parent_booking_id", 1)], name="idx_parent_booking_id"),
         ]
 
     @property

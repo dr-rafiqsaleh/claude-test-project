@@ -1,4 +1,81 @@
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+
+/** The catch-all option some lists include; `allowOther` replaces it with free text. */
+const OTHER = 'Other'
+
+/**
+ * "+ Other": a small inline box for typing a value that is not in the list.
+ * Enter or Add calls `onAdd(text)`; Escape cancels.
+ */
+export function OtherEntry({ onAdd, label = 'Other', placeholder = 'Type it in', large = false, disabled = false }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+
+  function add() {
+    const value = text.trim()
+    if (!value) return
+    onAdd(value)
+    setText('')
+    setOpen(false)
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full border border-dashed border-input px-3 font-medium text-muted-foreground transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+          'enabled:hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60',
+          large ? 'min-h-11 py-2 text-sm' : 'py-1 text-xs',
+        )}
+      >
+        <Plus className="h-3.5 w-3.5" />
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <span className="inline-flex w-full items-center gap-2 sm:w-auto">
+      <Input
+        autoFocus
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            add()
+          }
+          if (event.key === 'Escape') setOpen(false)
+        }}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className={cn('min-w-0 flex-1 sm:w-56', large ? 'h-11 text-base' : 'h-8 text-sm')}
+        maxLength={120}
+      />
+      <Button type="button" size="sm" className={large ? 'h-11' : 'h-8'} onClick={add}>
+        Add
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className={large ? 'h-11' : 'h-8'}
+        onClick={() => setOpen(false)}
+      >
+        Cancel
+      </Button>
+    </span>
+  )
+}
 
 /** Matches the look of the shared `Input`, applied to a native `<select>`. */
 export const SELECT_CLASSES =
@@ -43,6 +120,9 @@ export function ReadOnlyField({ label, value, className }) {
  * Single choice by default: `value` is a string, and tapping the chosen
  * option again clears it. With `multiple`, `value` is an array and each
  * option toggles.
+ *
+ * `allowOther` adds "+ Other", for typing something the list does not have.
+ * What is typed shows as a chosen chip like any other.
  */
 export function ChoiceChips({
   options,
@@ -52,10 +132,26 @@ export function ChoiceChips({
   multiple = false,
   large = false,
   disabled = false,
+  allowOther = false,
+  otherPlaceholder,
   ariaLabel,
   className,
 }) {
   const selected = multiple ? (value ?? []) : [value]
+  const listed = allowOther ? options.filter((option) => option !== OTHER) : options
+  // Typed-in values already chosen, so they stay visible and can be untoggled.
+  const typed = allowOther ? selected.filter((item) => item && !listed.includes(item)) : []
+  const shown = [...listed, ...typed]
+
+  function addOther(text) {
+    const existing = shown.find((option) => option.toLowerCase() === text.toLowerCase())
+    const chosen = existing ?? text
+    if (multiple) {
+      if (!selected.includes(chosen)) onChange([...selected, chosen])
+    } else {
+      onChange(chosen)
+    }
+  }
 
   function toggle(option) {
     if (multiple) {
@@ -71,7 +167,7 @@ export function ChoiceChips({
 
   return (
     <div role="group" aria-label={ariaLabel} className={cn('flex flex-wrap gap-2', className)}>
-      {options.map((option) => {
+      {shown.map((option) => {
         const isSelected = selected.includes(option)
         return (
           <button
@@ -94,6 +190,14 @@ export function ChoiceChips({
           </button>
         )
       })}
+      {allowOther ? (
+        <OtherEntry
+          onAdd={addOther}
+          placeholder={otherPlaceholder}
+          large={large}
+          disabled={disabled}
+        />
+      ) : null}
     </div>
   )
 }

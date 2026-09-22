@@ -173,6 +173,8 @@ export function ActivityFields({ fields, setField, disabled, large = false }) {
           <ChoiceChips
             ariaLabel="Pests found"
             multiple
+            allowOther
+            otherPlaceholder="Name the pest"
             options={pestOptions(fields.pests_found)}
             value={fields.pests_found}
             onChange={(value) => setField('pests_found', value, { immediate: true })}

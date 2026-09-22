@@ -28,6 +28,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from app.core.uk_time import to_uk
 from app.models.booking import TERMINAL_STATUSES as BOOKING_TERMINAL_STATUSES
 from app.models.booking import Booking, BookingStatus, RecurrenceType
 from app.models.company_settings import ProductCategory
@@ -844,24 +845,9 @@ PHOTO_MAX_PIXELS = 1400
 CONTENT_WIDTH = A4[0] - 36 * mm - 12
 
 
-def _last_sunday(year: int, month: int) -> datetime:
-    """Midnight on the last Sunday of a month."""
-    day = datetime(year, month + 1, 1) - timedelta(days=1) if month < 12 else datetime(year, 12, 31)
-    return day - timedelta(days=(day.weekday() + 1) % 7)
-
-
 def _uk_time(value: datetime) -> datetime:
-    """A stored UTC time as the clock read in the UK.
-
-    British Summer Time runs from 01:00 UTC on the last Sunday in March to
-    01:00 UTC on the last Sunday in October. Worked out here rather than with
-    zoneinfo, which has no time zone data on Windows without an extra package.
-    """
-    if value.tzinfo is not None:
-        value = value.astimezone(timezone.utc).replace(tzinfo=None)
-    bst_start = _last_sunday(value.year, 3) + timedelta(hours=1)
-    bst_end = _last_sunday(value.year, 10) + timedelta(hours=1)
-    return value + timedelta(hours=1) if bst_start <= value < bst_end else value
+    """A stored UTC time as the clock read in the UK."""
+    return to_uk(value)
 
 
 def _pdf_date(value: Optional[datetime]) -> str:

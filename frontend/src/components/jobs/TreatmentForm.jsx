@@ -315,6 +315,8 @@ export function TreatmentForm({ onAdd, onCancel, pestsFound = [], large = false,
         <ChoiceChips
           ariaLabel="Location"
           multiple
+          allowOther
+          otherPlaceholder="Name the location"
           options={INSPECTION_AREAS}
           value={draft.areas_treated}
           onChange={(value) => set('areas_treated', value)}

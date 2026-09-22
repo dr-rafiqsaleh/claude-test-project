@@ -47,6 +47,12 @@ export async function updateBookingStatus(id, status, reason) {
   return unwrap(response)
 }
 
+/** POST /bookings/{id}/stop-repeating - no more visits after this one. */
+export async function stopRepeating(id) {
+  const response = await api.post(`/bookings/${id}/stop-repeating`)
+  return unwrap(response)
+}
+
 /** DELETE /bookings/{id} - scheduled or cancelled bookings only. */
 export async function deleteBooking(id) {
   const response = await api.delete(`/bookings/${id}`)

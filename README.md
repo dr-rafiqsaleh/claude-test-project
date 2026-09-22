@@ -74,6 +74,14 @@ Errors keep the shape with `success: false`; validation failures also carry
 - **Phase 3 — Bookings** ✅
   Calendar scheduling, technician assignment, recurrence, conflict-aware status
   transitions, conversion from an accepted quote.
+- **Repeating jobs** ✅
+  A weekly, fortnightly, monthly or quarterly job books its visits a year
+  ahead as tentative visits, kept topped up by the reminder sweep, with an
+  optional end date. Times hold in UK clock time across the clock changes.
+  The office confirms or moves each visit; changes can be applied to the
+  later unconfirmed visits; "Stop repeating" ends a series. Technicians are
+  told about new jobs in the app and by email (one email per series).
+  `python scripts/check_recurring.py` checks it on a throwaway database.
 - **Phase 4 — Jobs & inspection reports** ✅
   Mobile-first technician portal and one combined Pest Control Inspection &
   Treatment Report: visit type, pest activity level, findings with evidence,

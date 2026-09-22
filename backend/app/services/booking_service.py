@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from beanie import PydanticObjectId
 
+from app.core.uk_time import to_uk
 from app.models.booking import (
     EDITABLE_STATUSES,
     STATUS_COLORS,
@@ -17,6 +18,7 @@ from app.models.customer import Customer
 from app.models.quote import Quote, QuoteStatus
 from app.models.user import User, UserRole
 from app.schemas.booking import BookingCreate, BookingUpdate, QuoteToBookingRequest
+from app.services import recurrence_service
 
 #: Allowed status transitions for the booking lifecycle.
 ALLOWED_TRANSITIONS: Dict[BookingStatus, Set[BookingStatus]] = {
@@ -134,7 +136,11 @@ def build_booking_payload(
         "site_contact_phone": booking.site_contact_phone,
         "order_number": booking.order_number,
         "recurrence": booking.recurrence,
+        "recurrence_until": booking.recurrence_until,
         "parent_booking_id": str(booking.parent_booking_id) if booking.parent_booking_id else None,
+        "series_index": booking.series_index,
+        "is_tentative": booking.parent_booking_id is not None
+        and booking.status == BookingStatus.SCHEDULED,
         "technician_notes": booking.technician_notes,
         "internal_notes": booking.internal_notes,
         "customer_notes": booking.customer_notes,
@@ -195,11 +201,25 @@ async def get_next_booking_number() -> str:
 # ---------------------------------------------------------------------------
 
 
+def _booked_ahead(created: List[Booking]) -> str:
+    visits = "visit" if len(created) == 1 else "visits"
+    return (
+        f"{len(created)} more {visits} booked ahead, up to "
+        f"{to_uk(created[-1].scheduled_start).strftime('%d %B %Y').lstrip('0')}. They're "
+        "tentative: confirm each with the customer, or move it, before the day."
+    )
+
+
 async def create_booking(
     payload: BookingCreate,
     created_by: PydanticObjectId,
+    notices: Optional[List[str]] = None,
 ) -> Tuple[Booking, Optional[Customer], Optional[User], Optional[Quote]]:
-    """Create a booking with an auto-generated booking number."""
+    """Create a booking with an auto-generated booking number.
+
+    A repeating job books its later visits straight away (see
+    recurrence_service). `notices` collects what happened, for the office.
+    """
     customer = await _resolve_customer(payload.customer_id)
 
     technician: Optional[User] = None
@@ -231,6 +251,7 @@ async def create_booking(
         site_contact_phone=payload.site_contact_phone,
         order_number=payload.order_number,
         recurrence=payload.recurrence,
+        recurrence_until=payload.recurrence_until,
         technician_notes=payload.technician_notes,
         internal_notes=payload.internal_notes,
         customer_notes=payload.customer_notes,
@@ -241,6 +262,10 @@ async def create_booking(
         updated_at=now,
     )
     await booking.insert()
+
+    created = await recurrence_service.extend_series(booking)
+    if created and notices is not None:
+        notices.append(_booked_ahead(created))
 
     # Keep the quote in sync when a booking is created straight against it.
     if quote is not None and not quote.converted_to_booking:
@@ -277,6 +302,7 @@ async def create_booking_from_quote(
     quote_id: "PydanticObjectId | str",
     payload: QuoteToBookingRequest,
     created_by: PydanticObjectId,
+    notices: Optional[List[str]] = None,
 ) -> Tuple[Booking, Optional[Customer], Optional[User], Optional[Quote]]:
     """Convert an accepted quote into a booking and flag the quote as converted."""
     quote_oid = _to_object_id(quote_id)
@@ -321,6 +347,7 @@ async def create_booking_from_quote(
         site_contact_phone=payload.site_contact_phone,
         order_number=payload.order_number,
         recurrence=payload.recurrence,
+        recurrence_until=payload.recurrence_until,
         technician_notes=payload.technician_notes,
         internal_notes=payload.internal_notes,
         customer_notes=payload.customer_notes or quote.notes,
@@ -331,6 +358,10 @@ async def create_booking_from_quote(
         updated_at=now,
     )
     await booking.insert()
+
+    created = await recurrence_service.extend_series(booking)
+    if created and notices is not None:
+        notices.append(_booked_ahead(created))
 
     quote.converted_to_booking = True
     quote.booking_id = booking.id
@@ -460,14 +491,26 @@ async def get_booking(
 async def update_booking(
     booking_id: "PydanticObjectId | str",
     payload: BookingUpdate,
+    notices: Optional[List[str]] = None,
 ) -> Tuple[Booking, Optional[Customer], Optional[User], Optional[Quote]]:
-    """Apply a partial update. Only scheduled or confirmed bookings can be edited."""
+    """Apply a partial update. Only scheduled or confirmed bookings can be edited.
+
+    On the first visit of a repeating job, a new repeat pattern or end date
+    rebooks the series. With `apply_to_series`, the changes also go to the
+    later visits still waiting to be confirmed.
+    """
     booking, customer, technician, quote = await get_booking(booking_id)
 
     if booking.status not in EDITABLE_STATUSES:
         raise BookingStateError(f"A {booking.status.value} booking can no longer be edited")
 
     data = payload.model_dump(exclude_unset=True)
+    apply_to_series = bool(data.pop("apply_to_series", False))
+    before = (booking.recurrence, booking.recurrence_until, booking.scheduled_start)
+    if booking.parent_booking_id is not None:
+        # A later visit follows its series; the pattern is set on the first visit.
+        data.pop("recurrence", None)
+        data.pop("recurrence_until", None)
 
     if "customer_id" in data and data["customer_id"]:
         customer = await _resolve_customer(str(data["customer_id"]))
@@ -514,6 +557,9 @@ async def update_booking(
     if "recurrence" in data and data["recurrence"] is not None:
         booking.recurrence = RecurrenceType(data["recurrence"])
 
+    if "recurrence_until" in data:
+        booking.recurrence_until = data["recurrence_until"]
+
     for field in (
         "technician_notes",
         "internal_notes",
@@ -533,7 +579,38 @@ async def update_booking(
 
     booking.touch()
     await booking.save()
+
+    moved_head = booking.parent_booking_id is None and booking.scheduled_start != before[2]
+    pattern_changed = booking.parent_booking_id is None and (
+        (booking.recurrence, booking.recurrence_until) != before[:2]
+        or (apply_to_series and moved_head and booking.recurrence != RecurrenceType.NONE)
+    )
+    if pattern_changed:
+        removed, created = await recurrence_service.restart_series(booking)
+        if notices is not None and (removed or created):
+            if booking.recurrence == RecurrenceType.NONE:
+                notices.append(f"No longer repeating: {removed} unconfirmed visit(s) removed.")
+            else:
+                notices.append(
+                    f"Series rebooked: {removed} unconfirmed visit(s) replaced, "
+                    f"{len(created)} booked in the new pattern."
+                )
+    elif apply_to_series:
+        updated = await recurrence_service.apply_to_later_visits(booking, data)
+        if notices is not None:
+            notices.append(
+                f"Also applied to {updated} later unconfirmed visit(s) in this series."
+                if updated
+                else "There are no later unconfirmed visits in this series to update."
+            )
     return booking, customer, technician, quote
+
+
+async def stop_repeating(booking_id: "PydanticObjectId | str") -> Tuple[Booking, int, int]:
+    """Stop a repeating job after this visit. Returns (booking, removed, kept confirmed)."""
+    booking, _customer, _technician, _quote = await get_booking(booking_id)
+    removed, kept = await recurrence_service.stop_series(booking)
+    return booking, removed, kept
 
 
 async def update_status(
@@ -633,6 +710,8 @@ async def get_calendar_events(
                 "color": STATUS_COLORS.get(booking.status, "#6366f1"),
                 "extendedProps": {
                     "status": booking.status,
+                    "tentative": booking.parent_booking_id is not None
+                    and booking.status == BookingStatus.SCHEDULED,
                     "booking_number": booking.booking_number,
                     "customer_name": customer_name,
                     "technician_name": technician.full_name if technician else None,
