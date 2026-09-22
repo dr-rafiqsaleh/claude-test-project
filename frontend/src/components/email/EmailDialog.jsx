@@ -45,6 +45,7 @@ export function EmailDialog({ kind, documentId, open, onOpenChange, onSent }) {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
+  const [saveToCustomer, setSaveToCustomer] = useState(true)
 
   useEffect(() => {
     if (!open) return undefined
@@ -93,13 +94,16 @@ export function EmailDialog({ kind, documentId, open, onOpenChange, onSent }) {
         cc: splitAddresses(form.cc),
         subject: form.subject,
         body: form.body,
+        save_to_customer: Boolean(draft && !draft.customer_has_email && saveToCustomer),
       })
       toastSuccess('Email sent', `Sent to ${to.join(', ')}.`)
       onOpenChange(false)
       onSent?.()
     } catch (err) {
       // Kept in the dialog, where the details can be fixed and sent again.
+      // The failed attempt is on the record too.
       setError(toApiError(err, 'Could not send the email').message)
+      onSent?.()
     } finally {
       setSending(false)
     }
@@ -140,6 +144,28 @@ export function EmailDialog({ kind, documentId, open, onOpenChange, onSent }) {
           </div>
         ) : draft ? (
           <div className="space-y-4">
+            {!draft.customer_has_email ? (
+              <div className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-medium">{draft.customer_name ?? 'This customer'} has no email
+                    address saved.</span>{' '}
+                    Type the address below before sending.
+                  </p>
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={saveToCustomer}
+                      onChange={(event) => setSaveToCustomer(event.target.checked)}
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                    />
+                    Save it to their record for next time
+                  </label>
+                </div>
+              </div>
+            ) : null}
+
             <div className="space-y-1.5">
               <Label htmlFor="email-to">To</Label>
               <Input
@@ -150,14 +176,7 @@ export function EmailDialog({ kind, documentId, open, onOpenChange, onSent }) {
                 onChange={(event) => set('to', event.target.value)}
                 placeholder="customer@example.com"
               />
-              {draft.to.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  This customer has no email address saved. Type one in, and add it to their record
-                  for next time.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Separate several addresses with commas.</p>
-              )}
+              <p className="text-xs text-muted-foreground">Separate several addresses with commas.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -196,16 +215,19 @@ export function EmailDialog({ kind, documentId, open, onOpenChange, onSent }) {
               {draft.attachment_name}
             </p>
 
-            {draft.history.length > 0 ? (
+            {draft.history.some((log) => log.status === 'sent') ? (
               <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">Already sent</p>
                 <ul className="mt-1 space-y-0.5">
-                  {draft.history.slice(0, 3).map((log) => (
-                    <li key={log.sent_at}>
-                      {formatDateTime(log.sent_at)} to {log.to.join(', ')}
-                      {log.sent_by_name ? ` by ${log.sent_by_name}` : ''}
-                    </li>
-                  ))}
+                  {draft.history
+                    .filter((log) => log.status === 'sent')
+                    .slice(0, 3)
+                    .map((log) => (
+                      <li key={log.id}>
+                        {formatDateTime(log.sent_at)} to {log.to.join(', ')}
+                        {log.sent_by_name ? ` by ${log.sent_by_name}` : ''}
+                      </li>
+                    ))}
                 </ul>
               </div>
             ) : null}

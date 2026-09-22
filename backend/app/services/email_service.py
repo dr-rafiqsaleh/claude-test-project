@@ -13,6 +13,7 @@ seeing it is running a pest control business, not a mail server.
 
 import asyncio
 import base64
+import hashlib
 import html
 import logging
 import re
@@ -21,16 +22,19 @@ import socket
 import ssl
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
+from email import policy
 from email.message import EmailMessage
-from email.utils import formataddr, formatdate, make_msgid
+from email.utils import format_datetime, formataddr, formatdate, make_msgid
 from typing import Dict, List, Optional, Tuple
 
 import httpx
+from beanie import PydanticObjectId
+from pydantic import BaseModel, Field
 
 from app.core.secrets import decrypt_secret
 from app.models.company_settings import CompanySettings, EmailProvider, EmailTemplates, SmtpSecurity
-from app.models.email_log import EmailLog
+from app.models.email_log import MAX_KEPT_ATTACHMENT, EmailLog
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -55,6 +59,27 @@ _PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
 _token_cache: Dict[Tuple[str, str], Tuple[str, float]] = {}
 
 
+class EmailLogSummary(BaseModel):
+    """An email record without its attachment, for listing."""
+
+    id: PydanticObjectId = Field(alias="_id")
+    document_type: str
+    document_id: PydanticObjectId
+    document_number: str
+    status: str = "sent"
+    error: Optional[str] = None
+    from_address: Optional[str] = None
+    to: List[str] = []
+    cc: List[str] = []
+    bcc: List[str] = []
+    subject: str
+    attachment_name: Optional[str] = None
+    attachment_size: int = 0
+    provider: Optional[str] = None
+    sent_by_name: Optional[str] = None
+    sent_at: datetime
+
+
 class EmailError(Exception):
     """An email could not be sent. The message says why, and what to do."""
 
@@ -73,6 +98,15 @@ class OutgoingEmail:
     body: str  # plain text; an HTML version is made from it
     cc: List[str] = field(default_factory=list)
     attachments: List[Attachment] = field(default_factory=list)
+
+
+@dataclass
+class SendReceipt:
+    """What the provider said when it accepted an email, kept as evidence."""
+
+    provider: str
+    message_id: Optional[str] = None
+    reference: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -127,17 +161,16 @@ async def send(
     email: OutgoingEmail,
     *,
     http_transport: Optional[httpx.AsyncBaseTransport] = None,
-) -> None:
-    """Send one email with the provider chosen in Settings."""
+) -> SendReceipt:
+    """Send one email with the provider chosen in Settings, returning its receipt."""
     if not email.to:
         raise EmailError("Add at least one address to send to.")
 
     if settings.email_provider == EmailProvider.MICROSOFT_365:
-        await _send_microsoft_365(settings, email, http_transport)
-    elif settings.email_provider == EmailProvider.SMTP:
-        await asyncio.to_thread(_send_smtp, settings, email)
-    else:
-        raise EmailError("Email isn't set up yet. An admin can set it up in Settings > Email.")
+        return await _send_microsoft_365(settings, email, http_transport)
+    if settings.email_provider == EmailProvider.SMTP:
+        return await asyncio.to_thread(_send_smtp, settings, email)
+    raise EmailError("Email isn't set up yet. An admin can set it up in Settings > Email.")
 
 
 # --- SMTP -----------------------------------------------------------------
@@ -189,7 +222,31 @@ def _explain_smtp(exc: Exception, settings: CompanySettings) -> str:
     return f"The mail server couldn't send the email: {detail or exc}"
 
 
-def _send_smtp(settings: CompanySettings, email: OutgoingEmail) -> None:
+def _deliver(server: smtplib.SMTP, sender: str, recipients: List[str], message: EmailMessage) -> str:
+    """Hand the message to the server step by step, keeping its final reply.
+
+    That reply (such as "250 2.0.0 OK queued as 4Xy9") is the server's own
+    record of accepting the email, so it is kept as evidence.
+    """
+    code, response = server.mail(sender)
+    if code != 250:
+        raise smtplib.SMTPSenderRefused(code, response, sender)
+    refused = {}
+    for recipient in recipients:
+        code, response = server.rcpt(recipient)
+        if code not in (250, 251):
+            refused[recipient] = (code, response)
+    if refused:
+        server.rset()
+        raise smtplib.SMTPRecipientsRefused(refused)
+    code, response = server.data(message.as_bytes(policy=policy.SMTP))
+    if code != 250:
+        server.rset()
+        raise smtplib.SMTPDataError(code, response)
+    return f"{code} {response.decode(errors='replace')}"
+
+
+def _send_smtp(settings: CompanySettings, email: OutgoingEmail) -> SendReceipt:
     if not settings.smtp_host:
         raise EmailError("Add the SMTP server name in Settings > Email.")
 
@@ -203,7 +260,8 @@ def _send_smtp(settings: CompanySettings, email: OutgoingEmail) -> None:
     if settings.email_reply_to:
         message["Reply-To"] = settings.email_reply_to
     message["Date"] = formatdate(localtime=True)
-    message["Message-ID"] = make_msgid(domain=from_address.split("@")[-1])
+    message_id = make_msgid(domain=from_address.split("@")[-1])
+    message["Message-ID"] = message_id
     message.set_content(email.body)
     message.add_alternative(_html_body(email.body, settings), subtype="html")
     for attachment in email.attachments:
@@ -232,7 +290,8 @@ def _send_smtp(settings: CompanySettings, email: OutgoingEmail) -> None:
                 if password is None:
                     raise EmailError("Enter the email password in Settings > Email.")
                 server.login(settings.smtp_username, password)
-            server.send_message(message, from_addr=from_address, to_addrs=recipients)
+            reply = _deliver(server, from_address, recipients, message)
+        return SendReceipt(provider="smtp", message_id=message_id, reference=reply)
     except EmailError:
         raise
     except (smtplib.SMTPException, OSError) as exc:
@@ -334,11 +393,18 @@ def _graph_message(settings: CompanySettings, email: OutgoingEmail) -> dict:
     return message
 
 
+def _graph_reference(response: httpx.Response) -> str:
+    """Microsoft's own id for a request, which its support can trace."""
+    request_id = response.headers.get("request-id") or response.headers.get("client-request-id")
+    reference = f"Accepted by Microsoft 365 (HTTP {response.status_code})"
+    return f"{reference}, request id {request_id}" if request_id else reference
+
+
 async def _send_microsoft_365(
     settings: CompanySettings,
     email: OutgoingEmail,
     transport: Optional[httpx.AsyncBaseTransport],
-) -> None:
+) -> SendReceipt:
     mailbox = settings.m365_mailbox
     if not mailbox:
         raise EmailError("Add the mailbox to send from, in Settings > Email.")
@@ -368,13 +434,14 @@ async def _send_microsoft_365(
                 )
                 if response.status_code != 202:
                     raise EmailError(_explain_graph(response, settings))
-                return
+                return SendReceipt(provider="microsoft365", reference=_graph_reference(response))
 
             # Large attachments: save a draft, upload each file in pieces, then send it.
             response = await client.post(f"{user_url}/messages", headers=headers, json=message)
             if response.status_code != 201:
                 raise EmailError(_explain_graph(response, settings))
-            message_url = f"{user_url}/messages/{response.json()['id']}"
+            draft = response.json()
+            message_url = f"{user_url}/messages/{draft['id']}"
 
             for attachment in email.attachments:
                 size = len(attachment.content)
@@ -411,6 +478,11 @@ async def _send_microsoft_365(
             response = await client.post(f"{message_url}/send", headers=headers)
             if response.status_code != 202:
                 raise EmailError(_explain_graph(response, settings))
+            return SendReceipt(
+                provider="microsoft365",
+                message_id=draft.get("internetMessageId"),
+                reference=_graph_reference(response),
+            )
     except EmailError:
         raise
     except httpx.HTTPError as exc:
@@ -518,15 +590,76 @@ def _context(settings: CompanySettings, document: dict, user: User) -> Dict[str,
     }
 
 
-async def history(kind: str, document_id: str) -> List[EmailLog]:
-    """Emails already sent for a document, newest first."""
+def _oid(value: str):
     from beanie import PydanticObjectId  # noqa: PLC0415
 
     try:
-        oid = PydanticObjectId(document_id)
+        return PydanticObjectId(value)
     except Exception:  # noqa: BLE001 - not an object id
+        return None
+
+
+#: The attachment itself is only loaded when asked for.
+_WITHOUT_CONTENT = {"attachment_content": 0}
+
+
+async def history(kind: str, document_id: str) -> List[EmailLog]:
+    """Emails sent (or attempted) for a document, newest first."""
+    oid = _oid(document_id)
+    if oid is None:
         return []
-    return await EmailLog.find({"document_type": kind, "document_id": oid}).sort("-sent_at").to_list()
+    return await (
+        EmailLog.find({"document_type": kind, "document_id": oid})
+        .sort("-sent_at")
+        .project(EmailLogSummary)
+        .to_list()
+    )
+
+
+async def customer_history(customer_id: str) -> List[EmailLog]:
+    """Every email sent (or attempted) to a customer, newest first."""
+    oid = _oid(customer_id)
+    if oid is None:
+        return []
+    return await EmailLog.find({"customer_id": oid}).sort("-sent_at").project(EmailLogSummary).to_list()
+
+
+async def get_log(log_id: str) -> Optional[EmailLog]:
+    """One email record in full, including the attachment as sent."""
+    oid = _oid(log_id)
+    return await EmailLog.get(oid) if oid else None
+
+
+def as_eml(log: EmailLog) -> bytes:
+    """The recorded email rebuilt as a .eml file, which opens in Outlook or any mail app.
+
+    Rebuilt from the record: the addresses, subject, message and attachment
+    are exactly those sent; mail-server headers added in transit are not.
+    """
+    message = EmailMessage()
+    message["Subject"] = log.subject
+    message["From"] = formataddr((log.from_name or "", log.from_address or ""))
+    message["To"] = ", ".join(log.to)
+    if log.cc:
+        message["Cc"] = ", ".join(log.cc)
+    if log.reply_to:
+        message["Reply-To"] = log.reply_to
+    message["Date"] = format_datetime(log.sent_at.replace(tzinfo=timezone.utc))
+    if log.message_id:
+        message["Message-ID"] = log.message_id
+    message["X-QKil-Record"] = (
+        f"{log.status}; {log.provider or 'unknown provider'}; {log.provider_reference or 'no reference'}"
+    )
+    message.set_content(log.body)
+    if log.attachment_content:
+        maintype, subtype = (log.attachment_type or "application/pdf").split("/", 1)
+        message.add_attachment(
+            log.attachment_content,
+            maintype=maintype,
+            subtype=subtype,
+            filename=log.attachment_name or "attachment.pdf",
+        )
+    return message.as_bytes(policy=policy.SMTP)
 
 
 async def compose(kind: str, document_id: str, user: User) -> dict:
@@ -539,6 +672,9 @@ async def compose(kind: str, document_id: str, user: User) -> dict:
     context = _context(settings, document, user)
     customer = document["customer"]
     return {
+        "customer_id": str(customer.id) if customer else None,
+        "customer_name": customer.full_name if customer else None,
+        "customer_has_email": bool(customer and customer.email),
         "to": [customer.email] if customer and customer.email else [],
         "cc": [],
         "subject": render(template.subject, context),
@@ -558,9 +694,15 @@ async def send_document(
     subject: str,
     body: str,
     *,
+    save_to_customer: bool = False,
     http_transport: Optional[httpx.AsyncBaseTransport] = None,
 ) -> EmailLog:
-    """Email a document as a PDF, mark it sent, and log it."""
+    """Email a document as a PDF, mark it sent, and keep a full record of it.
+
+    The record is written whether the provider accepts the email or not, so
+    a failed attempt is on file too. `save_to_customer` stores the first
+    address on a customer who had none.
+    """
     from app.models.invoice import InvoiceStatus  # noqa: PLC0415
     from app.models.job import JobStatus  # noqa: PLC0415
     from app.models.quote import QuoteStatus  # noqa: PLC0415
@@ -577,17 +719,57 @@ async def send_document(
         raise EmailError("A cancelled invoice can't be emailed.")
 
     pdf, _number = await document["pdf"]()
-    await send(
-        settings,
-        OutgoingEmail(
-            to=to,
-            cc=cc,
-            subject=subject,
-            body=body,
-            attachments=[Attachment(document["filename"], pdf)],
-        ),
-        http_transport=http_transport,
+    customer = document["customer"]
+    from_name, from_address = _sender(settings)
+    log = EmailLog(
+        document_type=kind,
+        document_id=record.id,
+        document_number=document["number"],
+        customer_id=customer.id if customer else None,
+        from_address=from_address,
+        from_name=from_name,
+        reply_to=settings.email_reply_to,
+        to=to,
+        cc=cc,
+        bcc=[settings.email_bcc] if settings.email_bcc else [],
+        subject=subject,
+        body=body,
+        attachment_name=document["filename"],
+        attachment_type="application/pdf",
+        attachment_size=len(pdf),
+        attachment_sha256=hashlib.sha256(pdf).hexdigest(),
+        attachment_content=pdf if len(pdf) <= MAX_KEPT_ATTACHMENT else None,
+        provider=settings.email_provider.value,
+        sent_by=user.id,
+        sent_by_name=user.full_name,
     )
+
+    try:
+        receipt = await send(
+            settings,
+            OutgoingEmail(
+                to=to,
+                cc=cc,
+                subject=subject,
+                body=body,
+                attachments=[Attachment(document["filename"], pdf)],
+            ),
+            http_transport=http_transport,
+        )
+    except EmailError as exc:
+        log.status = "failed"
+        log.error = str(exc)
+        await log.insert()
+        raise
+
+    log.message_id = receipt.message_id
+    log.provider_reference = receipt.reference
+    await log.insert()
+
+    if save_to_customer and customer is not None and not customer.email and to:
+        customer.email = to[0]
+        customer.touch()
+        await customer.save()
 
     # A draft that has gone to the customer is now sent.
     if kind == "quote" and record.status == QuoteStatus.DRAFT:
@@ -595,17 +777,6 @@ async def send_document(
     if kind == "invoice" and record.status == InvoiceStatus.DRAFT:
         await invoice_service.update_status(record.id, InvoiceStatus.SENT)
 
-    log = EmailLog(
-        document_type=kind,
-        document_id=record.id,
-        document_number=document["number"],
-        to=to,
-        cc=cc,
-        subject=subject,
-        sent_by=user.id,
-        sent_by_name=user.full_name,
-    )
-    await log.insert()
     logger.info("Emailed %s %s to %s", kind, document["number"], ", ".join(to))
     return log
 

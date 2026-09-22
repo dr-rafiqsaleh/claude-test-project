@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import List, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.common import ApiResponse
 
@@ -29,13 +29,31 @@ def _addresses(values: List[str]) -> List[str]:
 
 
 class EmailLogResponse(BaseModel):
-    """One email already sent for a document."""
+    """One email sent (or attempted) for a document, as listed."""
 
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    document_type: str
+    document_id: str
+    document_number: str
+    status: str = "sent"
+    error: str | None = None
+    from_address: str | None = None
     to: List[str]
     cc: List[str] = Field(default_factory=list)
+    bcc: List[str] = Field(default_factory=list)
     subject: str
+    attachment_name: str | None = None
+    attachment_size: int = 0
+    provider: str | None = None
     sent_by_name: str | None = None
     sent_at: datetime
+
+    @field_validator("id", "document_id", mode="before")
+    @classmethod
+    def _to_str(cls, value: object) -> str:
+        return str(value)
 
     @field_validator("sent_at")
     @classmethod
@@ -43,9 +61,25 @@ class EmailLogResponse(BaseModel):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
+class EmailLogDetail(EmailLogResponse):
+    """The full record of one email: everything needed to show what was sent."""
+
+    from_name: str | None = None
+    reply_to: str | None = None
+    body: str = ""
+    attachment_type: str | None = None
+    attachment_sha256: str | None = None
+    attachment_kept: bool = False
+    message_id: str | None = None
+    provider_reference: str | None = None
+
+
 class EmailDraft(BaseModel):
     """A ready-to-send email for a document, filled in from its template."""
 
+    customer_id: str | None = None
+    customer_name: str | None = None
+    customer_has_email: bool = False
     to: List[str]
     cc: List[str] = Field(default_factory=list)
     subject: str
@@ -64,6 +98,8 @@ class SendDocumentEmail(BaseModel):
     cc: List[str] = Field(default_factory=list, max_length=10)
     subject: str = Field(min_length=1, max_length=300)
     body: str = Field(min_length=1, max_length=20000)
+    #: For a customer with no email address saved: keep the first "to" address.
+    save_to_customer: bool = False
 
     @field_validator("to", "cc")
     @classmethod
@@ -102,3 +138,7 @@ class EmailLogEnvelope(ApiResponse[EmailLogResponse]):
 
 class EmailHistoryEnvelope(ApiResponse[List[EmailLogResponse]]):
     """Envelope for a document's sent emails."""
+
+
+class EmailLogDetailEnvelope(ApiResponse[EmailLogDetail]):
+    """Envelope for one email's full record."""

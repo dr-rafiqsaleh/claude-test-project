@@ -21,6 +21,7 @@ import { updateCustomer } from '@/api/customers'
 import { listInvoices } from '@/api/invoices'
 import { listQuotes } from '@/api/quotes'
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge'
+import { EmailHistory } from '@/components/email/EmailHistory'
 import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -331,6 +332,8 @@ export function CustomerDetailPage() {
                     ))
                   : null}
               </HistoryCard>
+
+              <EmailHistory customerId={customer.id} />
             </>
           ) : null}
         </div>

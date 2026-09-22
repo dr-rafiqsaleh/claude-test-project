@@ -28,6 +28,7 @@ import {
 import { createInvoiceFromJob } from '@/api/invoices'
 import { downloadJobReport, updateJobSignature, updateJobStatus } from '@/api/jobs'
 import { EmailDialog } from '@/components/email/EmailDialog'
+import { EmailHistory } from '@/components/email/EmailHistory'
 import { ActivityBadge } from '@/components/jobs/ActivityBadge'
 import { FindingCard } from '@/components/jobs/FindingCard'
 import { FindingForm } from '@/components/jobs/FindingForm'
@@ -133,6 +134,7 @@ export function JobDetailPage() {
   const [signatures, setSignatures] = useState({ customer: null, technician: null })
   const [savingSignature, setSavingSignature] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [emailsVersion, setEmailsVersion] = useState(0)
 
   const isAssigned = Boolean(job && job.technician_id && job.technician_id === user?.id)
   const editable =
@@ -382,7 +384,10 @@ export function JobDetailPage() {
                   documentId={job.id}
                   open={emailOpen}
                   onOpenChange={setEmailOpen}
-                  onSent={() => void refetch()}
+                  onSent={() => {
+                    setEmailsVersion((version) => version + 1)
+                    void refetch()
+                  }}
                 />
               </>
             ) : null}
@@ -769,6 +774,10 @@ export function JobDetailPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : null}
+
+      {isCompleted && canWrite ? (
+        <EmailHistory kind="report" documentId={job.id} refreshKey={emailsVersion} />
       ) : null}
 
       <PhotoLightbox

@@ -676,8 +676,8 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
             allDaySlot={false}
             expandRows
             dayMaxEventRows={4}
-            eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
-            slotLabelFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
+            eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+            slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
             noEventsText="No jobs in this period"
           />
         </div>

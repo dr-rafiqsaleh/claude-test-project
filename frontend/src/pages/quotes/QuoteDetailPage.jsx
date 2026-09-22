@@ -18,6 +18,7 @@ import {
 
 import { downloadQuotePdf, updateQuoteStatus } from '@/api/quotes'
 import { EmailDialog } from '@/components/email/EmailDialog'
+import { EmailHistory } from '@/components/email/EmailHistory'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DetailField, PageHeader } from '@/components/ui/page'
@@ -59,6 +60,7 @@ export function QuoteDetailPage() {
 
   const [downloading, setDownloading] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [emailsVersion, setEmailsVersion] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // "Save and email" on the form lands here with ?email=1: open the email straight away.
@@ -192,7 +194,10 @@ export function QuoteDetailPage() {
               documentId={quote.id}
               open={emailOpen}
               onOpenChange={setEmailOpen}
-              onSent={() => void refetch()}
+              onSent={() => {
+                setEmailsVersion((version) => version + 1)
+                void refetch()
+              }}
             />
 
             <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
@@ -390,6 +395,10 @@ export function QuoteDetailPage() {
           </Card>
         </div>
       </div>
+
+      {canWrite ? (
+        <EmailHistory kind="quote" documentId={quote.id} refreshKey={emailsVersion} />
+      ) : null}
 
       <Dialog
         open={rejectOpen}

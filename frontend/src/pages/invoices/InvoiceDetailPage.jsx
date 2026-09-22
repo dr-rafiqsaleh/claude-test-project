@@ -22,6 +22,7 @@ import {
 
 import { addPayment, downloadInvoicePdf, updateInvoiceStatus } from '@/api/invoices'
 import { EmailDialog } from '@/components/email/EmailDialog'
+import { EmailHistory } from '@/components/email/EmailHistory'
 import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge'
 import { PaymentDialog } from '@/components/invoices/PaymentDialog'
 import {
@@ -75,6 +76,7 @@ export function InvoiceDetailPage() {
   const [transitioning, setTransitioning] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [emailsVersion, setEmailsVersion] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // "Save and email" on the form lands here with ?email=1: open the email straight away.
@@ -242,7 +244,10 @@ export function InvoiceDetailPage() {
               documentId={invoice.id}
               open={emailOpen}
               onOpenChange={setEmailOpen}
-              onSent={() => void refetch()}
+              onSent={() => {
+                setEmailsVersion((version) => version + 1)
+                void refetch()
+              }}
             />
 
             <Button variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
@@ -610,6 +615,10 @@ export function InvoiceDetailPage() {
           </CardContent>
         ) : null}
       </Card>
+
+      {canWrite ? (
+        <EmailHistory kind="invoice" documentId={invoice.id} refreshKey={emailsVersion} />
+      ) : null}
 
       <PaymentDialog
         open={paymentOpen}

@@ -13,6 +13,7 @@ Prints each step and exits non-zero on the first failure.
 
 import asyncio
 import base64
+import hashlib
 import json
 import socket
 import sys
@@ -39,6 +40,7 @@ from app.schemas.invoice import InvoiceCreate, InvoiceItemSchema
 from app.schemas.job import JobUpdate
 from app.schemas.quote import QuoteCreate, QuoteItemSchema
 from app.services import company_settings_service, email_service, invoice_service, job_service, quote_service
+from app.routers.emails import email_attachment, email_eml, email_record
 from app.services.email_service import Attachment, EmailError, OutgoingEmail
 
 CHECK_DB = "qkil_email_check"
@@ -253,6 +255,34 @@ async def main() -> None:
         assert len(logs) == 1 and logs[0].to == ["lena@example.com"]
         ok("the draft quote is now sent, and the email is logged")
 
+        print("The record kept of it")
+        log = logs[0]
+        sent_pdf = attachments[0].get_content()
+        assert log.status == "sent" and log.body == draft["body"] and log.subject == draft["subject"]
+        assert log.from_address == "accounts@example.com" and log.bcc == ["office@example.com"]
+        assert log.attachment_sha256 == hashlib.sha256(sent_pdf).hexdigest()
+        assert log.attachment_content == sent_pdf and log.attachment_size == len(sent_pdf)
+        ok("it keeps every address, the exact message, and the PDF byte for byte with its fingerprint")
+
+        assert log.message_id == message["Message-ID"], (log.message_id, message["Message-ID"])
+        assert log.provider_reference.startswith("250"), log.provider_reference
+        ok(f"and the server's receipt: '{log.provider_reference}', Message-ID {log.message_id}")
+
+        listed = await email_service.history("quote", str(quote.id))
+        assert len(listed) == 1 and not hasattr(listed[0], "attachment_content")
+        assert [entry.id for entry in await email_service.customer_history(str(customer.id))] == [log.id]
+        ok("it lists on the quote and on the customer, without loading the PDF")
+
+        detail = (await email_record(str(log.id), _current_user=office)).data
+        assert detail.attachment_kept and detail.body == log.body
+        pdf_copy = await email_attachment(str(log.id), _current_user=office)
+        assert pdf_copy.body == sent_pdf
+        eml = message_from_bytes((await email_eml(str(log.id), _current_user=office)).body, policy=policy.default)
+        eml_pdf = next(eml.iter_attachments()).get_content()
+        assert eml["Subject"] == draft["subject"] and eml_pdf == sent_pdf
+        assert eml["Message-ID"] == log.message_id
+        ok("it can be viewed, and downloaded as the PDF sent or as a .eml that opens in Outlook")
+
         report_draft = await email_service.compose("report", job_id, office)
         assert "9 Rental Row" in report_draft["subject"], report_draft["subject"]
         await email_service.send_document(
@@ -271,6 +301,15 @@ async def main() -> None:
         except EmailError as exc:
             assert "refused the username or password" in str(exc), exc
             ok("a refused login explains itself")
+        try:
+            await email_service.send_document(
+                "invoice", str(invoice.id), office, to=["lena@example.com"], cc=[], subject="Invoice", body="Attached."
+            )
+            raise AssertionError("a refused login should fail")
+        except EmailError:
+            failed = await EmailLog.find_one({"document_id": invoice.id, "status": "failed"})
+            assert failed is not None and "refused the username or password" in failed.error
+            ok("a failed attempt is on the record too, with the reason")
         failing.stop()
 
         refusing = FakeMailServer(refuse_sender=True)
@@ -306,10 +345,18 @@ async def main() -> None:
         )
         graph = FakeGraph()
         email_service._token_cache.clear()
+        # A customer with no email saved: the office types one in and keeps it.
+        customer.email = None
+        await customer.save()
         await email_service.send_document(
             "invoice", str(invoice.id), office, to=["lena@example.com"], cc=[],
-            subject="Invoice", body="Please find attached.", http_transport=httpx.MockTransport(graph),
+            subject="Invoice", body="Please find attached.", save_to_customer=True,
+            http_transport=httpx.MockTransport(graph),
         )
+        assert (await Customer.get(customer.id)).email == "lena@example.com"
+        ok("an address typed for a customer who had none is saved to their record")
+        graph_log = await EmailLog.find_one({"document_id": invoice.id, "status": "sent"})
+        assert "Accepted by Microsoft 365 (HTTP 202)" in graph_log.provider_reference
         token_request, send_request = graph.requests
         assert b"client_credentials" in token_request.content and b"app-secret" in token_request.content
         assert str(send_request.url).endswith("/users/info@example.com/sendMail")

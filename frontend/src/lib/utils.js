@@ -88,18 +88,18 @@ export function toDate(value) {
   return isValid(date) ? date : null
 }
 
-/** Booking-style timestamp, e.g. "Mon 28 Jul 2025, 9:00 AM". */
+/** Booking-style timestamp, in 24-hour UK time, e.g. "Mon 28 Jul 2025, 09:00". */
 export function formatBookingDateTime(value) {
   const date = toDate(value)
   if (!date) return '--'
-  return format(date, 'EEE d MMM yyyy, h:mm a')
+  return format(date, 'EEE d MMM yyyy, HH:mm')
 }
 
-/** Just the time portion, e.g. "9:00 AM". */
+/** Just the time portion, e.g. "09:00". */
 export function formatTime(value) {
   const date = toDate(value)
   if (!date) return '--'
-  return format(date, 'h:mm a')
+  return format(date, 'HH:mm')
 }
 
 /** Human duration from a minute count, e.g. 90 -> "1h 30m". */
