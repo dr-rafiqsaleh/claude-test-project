@@ -50,6 +50,14 @@ const TABS = [
   { key: 'appearance', label: 'Appearance', icon: Palette },
 ]
 
+/** Each numbered document: its prefix setting, next-number setting and default prefix. */
+const NUMBERING = [
+  { label: 'Invoices', prefixKey: 'invoice_prefix', nextKey: 'next_invoice_number', fallback: 'INV' },
+  { label: 'Quotes', prefixKey: 'quote_prefix', nextKey: 'next_quote_number', fallback: 'QTE' },
+  { label: 'Jobs', prefixKey: 'booking_prefix', nextKey: 'next_job_number', fallback: 'JOB' },
+  { label: 'Reports', prefixKey: 'job_prefix', nextKey: 'next_report_number', fallback: 'RPT' },
+]
+
 /** Every field the form owns, so a partial API response cannot leave holes. */
 const EMPTY_FORM = {
   company_name: '',
@@ -61,6 +69,9 @@ const EMPTY_FORM = {
   bank_sort_code: '',
   bank_account_number: '',
   next_invoice_number: '',
+  next_quote_number: '',
+  next_job_number: '',
+  next_report_number: '',
   phone: '',
   email: '',
   website: '',
@@ -155,10 +166,13 @@ function toPayload(form, loaded) {
     bank_account_name: optional(form.bank_account_name),
     bank_sort_code: optional(form.bank_sort_code),
     bank_account_number: optional(form.bank_account_number),
-    ...(Number(form.next_invoice_number) &&
-    Number(form.next_invoice_number) !== loaded?.next_invoice_number
-      ? { next_invoice_number: Number(form.next_invoice_number) }
-      : {}),
+    // Next numbers are only sent when changed, so saving some other setting
+    // never collides with documents numbered in the meantime.
+    ...Object.fromEntries(
+      NUMBERING.map(({ nextKey }) => [nextKey, Number(form[nextKey])]).filter(
+        ([key, value]) => value && value !== loaded?.[key],
+      ),
+    ),
     phone: optional(form.phone),
     email: optional(form.email),
     website: optional(form.website),
@@ -769,66 +783,52 @@ export function SettingsPage() {
             </section>
 
             <section className="space-y-4">
-              <h3 className="text-sm font-semibold text-foreground">Numbering</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field
-                  label="Next invoice number"
-                  htmlFor="next_invoice_number"
-                  className="sm:col-span-2"
-                  hint={
-                    Number(form.next_invoice_number) > 0
-                      ? `The next invoice will be ${String(form.invoice_prefix || 'INV').toUpperCase()}-${String(
-                          Number(form.next_invoice_number),
-                        ).padStart(4, '0')}. It can only go up, so no number is ever used twice.`
-                      : 'It can only go up, so no number is ever used twice.'
-                  }
-                >
-                  <Input
-                    id="next_invoice_number"
-                    type="number"
-                    min={settings?.next_invoice_number ?? 1}
-                    step="1"
-                    value={form.next_invoice_number}
-                    onChange={(event) => set('next_invoice_number', event.target.value)}
-                    className="sm:w-40"
-                  />
-                </Field>
-
-                <Field label="Invoice prefix" htmlFor="invoice_prefix" hint="e.g. INV-0001">
-                  <Input
-                    id="invoice_prefix"
-                    value={form.invoice_prefix}
-                    onChange={(event) => set('invoice_prefix', event.target.value)}
-                    maxLength={8}
-                  />
-                </Field>
-
-                <Field label="Quote prefix" htmlFor="quote_prefix" hint="e.g. QTE-0001">
-                  <Input
-                    id="quote_prefix"
-                    value={form.quote_prefix}
-                    onChange={(event) => set('quote_prefix', event.target.value)}
-                    maxLength={8}
-                  />
-                </Field>
-
-                <Field label="Job number prefix" htmlFor="booking_prefix" hint="e.g. JOB-0001">
-                  <Input
-                    id="booking_prefix"
-                    value={form.booking_prefix}
-                    onChange={(event) => set('booking_prefix', event.target.value)}
-                    maxLength={8}
-                  />
-                </Field>
-
-                <Field label="Report number prefix" htmlFor="job_prefix" hint="e.g. RPT-0001">
-                  <Input
-                    id="job_prefix"
-                    value={form.job_prefix}
-                    onChange={(event) => set('job_prefix', event.target.value)}
-                    maxLength={8}
-                  />
-                </Field>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Numbering</h3>
+                <p className="text-xs text-muted-foreground">
+                  To carry on from another system, set the next number. Numbers only go up, so no
+                  number is ever issued twice. Existing documents keep their numbers.
+                </p>
+              </div>
+              <div className="divide-y divide-border rounded-md border border-border">
+                {NUMBERING.map(({ label, prefixKey, nextKey, fallback }) => {
+                  const next = Number(form[nextKey])
+                  const preview =
+                    next > 0
+                      ? `${String(form[prefixKey] || fallback).toUpperCase()}-${String(next).padStart(4, '0')}`
+                      : '--'
+                  return (
+                    <div
+                      key={nextKey}
+                      className="grid grid-cols-2 items-end gap-3 p-3 sm:grid-cols-[1fr_7rem_8rem_auto]"
+                    >
+                      <p className="col-span-2 text-sm font-medium text-foreground sm:col-span-1 sm:self-center">
+                        {label}
+                      </p>
+                      <Field label="Prefix" htmlFor={prefixKey}>
+                        <Input
+                          id={prefixKey}
+                          value={form[prefixKey]}
+                          onChange={(event) => set(prefixKey, event.target.value)}
+                          maxLength={8}
+                        />
+                      </Field>
+                      <Field label="Next number" htmlFor={nextKey}>
+                        <Input
+                          id={nextKey}
+                          type="number"
+                          min={settings?.[nextKey] ?? 1}
+                          step="1"
+                          value={form[nextKey]}
+                          onChange={(event) => set(nextKey, event.target.value)}
+                        />
+                      </Field>
+                      <p className="col-span-2 text-xs text-muted-foreground sm:col-span-1 sm:pb-2.5">
+                        Next: <span className="font-mono text-foreground">{preview}</span>
+                      </p>
+                    </div>
+                  )
+                })}
               </div>
             </section>
 

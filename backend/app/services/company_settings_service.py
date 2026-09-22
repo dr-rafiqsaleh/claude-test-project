@@ -16,7 +16,13 @@ from app.models.company_settings import (
     EmailTemplates,
     Product,
 )
-from app.models.counter import INVOICE_COUNTER, Counter
+from app.models.counter import (
+    BOOKING_COUNTER,
+    INVOICE_COUNTER,
+    JOB_COUNTER,
+    QUOTE_COUNTER,
+    Counter,
+)
 from app.schemas.company_settings import CompanySettingsUpdate
 
 logger = logging.getLogger(__name__)
@@ -28,6 +34,15 @@ class InvalidLogoError(Exception):
 
 class SettingsError(Exception):
     """Raised when a settings change cannot be applied as asked."""
+
+
+#: The settable "next number" of each numbered document: (setting, counter, name).
+NUMBERING = (
+    ("next_invoice_number", INVOICE_COUNTER, "invoice"),
+    ("next_quote_number", QUOTE_COUNTER, "quote"),
+    ("next_job_number", BOOKING_COUNTER, "job"),  # jobs are stored as bookings
+    ("next_report_number", JOB_COUNTER, "report"),  # reports are stored as jobs
+)
 
 
 def build_settings_payload(settings: CompanySettings) -> dict:
@@ -98,7 +113,8 @@ def build_settings_payload(settings: CompanySettings) -> dict:
 async def settings_payload(settings: CompanySettings) -> dict:
     """`build_settings_payload` plus the number the next invoice will get."""
     payload = build_settings_payload(settings)
-    payload["next_invoice_number"] = await Counter.peek_next(INVOICE_COUNTER)
+    for field, counter, _name in NUMBERING:
+        payload[field] = await Counter.peek_next(counter)
     return payload
 
 
@@ -132,15 +148,22 @@ async def update_settings(
     settings = await get_settings()
     payload = data.model_dump(exclude_unset=True)
 
-    next_invoice = payload.pop("next_invoice_number", None)
-    if next_invoice is not None:
-        # Checked first, so a refused number leaves every other setting unsaved too.
-        if not await Counter.move_next_to(INVOICE_COUNTER, next_invoice):
-            used = await Counter.peek_next(INVOICE_COUNTER) - 1
+    # Every requested number is checked before any is moved, so a refused one
+    # leaves all numbering, and every other setting, as it was.
+    moves = []
+    for field, counter, name in NUMBERING:
+        wanted = payload.pop(field, None)
+        if wanted is None:
+            continue
+        upcoming = await Counter.peek_next(counter)
+        if wanted < upcoming:
             raise SettingsError(
-                f"Invoice number {used} has already been used, so the next invoice "
-                f"must be number {used + 1} or higher"
+                f"{name.capitalize()} number {upcoming - 1} has already been used, so the next "
+                f"{name} must be number {upcoming} or higher"
             )
+        moves.append((counter, wanted))
+    for counter, wanted in moves:
+        await Counter.move_next_to(counter, wanted)
 
     # Secrets are write-only: blank keeps what is saved, anything else replaces it.
     for field, stored in (

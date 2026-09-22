@@ -22,7 +22,7 @@ from pydantic import ValidationError
 from app.database import init_db
 from app.models.booking import Booking
 from app.models.customer import Address, Customer
-from app.models.job import ActivityLevel, JobStatus
+from app.models.job import ActivityLevel, Job, JobStatus
 from app.models.user import User, UserRole
 from app.schemas.company_settings import CompanySettingsUpdate
 from app.schemas.invoice import InvoiceCreate, InvoiceItemSchema
@@ -38,11 +38,16 @@ def ok(message: str) -> None:
     print(f"  ok  {message}")
 
 
-async def completed_job_invoice(office: User, customer: Customer, number: str, price: float):
-    """Complete a priced job, which raises its draft invoice."""
+async def completed_job_invoice(office: User, customer: Customer, number, price: float):
+    """Complete a priced job, which raises its draft invoice.
+
+    With `number` None, the job takes the next job number like a real booking.
+    """
+    from app.services.booking_service import get_next_booking_number  # noqa: PLC0415
+
     start = datetime.utcnow() - timedelta(hours=2)
     booking = Booking(
-        booking_number=number,
+        booking_number=number or await get_next_booking_number(),
         customer_id=customer.id,
         scheduled_start=start,
         scheduled_end=start + timedelta(hours=1),
@@ -164,6 +169,33 @@ async def main(save_to: Path | None) -> None:
             raise AssertionError("moving the invoice number backwards should be refused")
         assert (await company_settings_service.get_settings()).company_name == "QKil Pest Control"
         ok("and a refused number saves nothing else either")
+
+        await company_settings_service.update_settings(
+            CompanySettingsUpdate(next_quote_number=40, next_job_number=300, next_report_number=250)
+        )
+        quote, _ = await quote_service.create_quote(
+            QuoteCreate(customer_id=str(customer.id), items=[QuoteItemSchema(description="Survey", unit_price=50)]),
+            office.id,
+        )
+        numbered = await completed_job_invoice(office, customer, None, 60.0)
+        job_row = await Job.get(numbered.job_id)
+        booking_row = await Booking.get(job_row.booking_id)
+        assert quote.quote_number == "QTE-0040", quote.quote_number
+        assert booking_row.booking_number == "JOB-0300", booking_row.booking_number
+        assert job_row.job_number == "RPT-0250", job_row.job_number
+        ok("quotes, jobs and reports follow their own next numbers too: QTE-0040, JOB-0300, RPT-0250")
+
+        try:
+            await company_settings_service.update_settings(
+                CompanySettingsUpdate(next_quote_number=100, next_report_number=5)
+            )
+        except SettingsError as exc:
+            assert "Report number 250" in str(exc), exc
+        else:
+            raise AssertionError("moving the report number backwards should be refused")
+        payload = await company_settings_service.settings_payload(await company_settings_service.get_settings())
+        assert payload["next_quote_number"] == 41, "a refused change must not move the others"
+        ok("one refused number leaves the others where they were")
 
         print("VAT registered")
         await company_settings_service.update_settings(

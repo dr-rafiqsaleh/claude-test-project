@@ -97,8 +97,11 @@ class CompanySettingsUpdate(BaseModel):
     bank_sort_code: Optional[str] = Field(None, max_length=20)
     bank_account_number: Optional[str] = Field(None, max_length=20)
 
-    #: The number the next invoice will get. It can only move forward.
+    #: The number the next of each document will get. They only move forward.
     next_invoice_number: Optional[int] = Field(None, ge=1, le=9_999_999)
+    next_quote_number: Optional[int] = Field(None, ge=1, le=9_999_999)
+    next_job_number: Optional[int] = Field(None, ge=1, le=9_999_999)
+    next_report_number: Optional[int] = Field(None, ge=1, le=9_999_999)
 
     phone: Optional[str] = Field(None, max_length=40)
     email: Optional[str] = Field(None, max_length=160)
@@ -200,6 +203,9 @@ class CompanySettingsResponse(BaseModel):
     bank_sort_code: Optional[str] = None
     bank_account_number: Optional[str] = None
     next_invoice_number: int = 1
+    next_quote_number: int = 1
+    next_job_number: int = 1
+    next_report_number: int = 1
 
     phone: Optional[str] = None
     email: Optional[str] = None
