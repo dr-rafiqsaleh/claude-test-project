@@ -15,7 +15,7 @@ from app.schemas.user import (
     UserResponseEnvelope,
     UserUpdate,
 )
-from app.services import user_service
+from app.services import audit_service, user_service
 from app.services.role_service import RoleNotFoundError
 from app.services.user_service import UserAlreadyExistsError, UserNotFoundError
 
@@ -54,7 +54,10 @@ async def list_users(
 
 @router.post("", response_model=UserResponseEnvelope, status_code=status.HTTP_201_CREATED, summary="Create a user")
 @router.post("/", response_model=UserResponseEnvelope, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-async def create_user(payload: UserCreate) -> UserResponseEnvelope:
+async def create_user(
+    payload: UserCreate,
+    current_user: User = Depends(require_permission("users.manage")),
+) -> UserResponseEnvelope:
     """Create a new staff account."""
     try:
         user = await user_service.create_user(payload)
@@ -62,6 +65,15 @@ async def create_user(payload: UserCreate) -> UserResponseEnvelope:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except RoleNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    await audit_service.record(
+        "user.created",
+        actor=current_user,
+        resource_type="user",
+        resource_id=user.id,
+        resource_name=user.full_name,
+        metadata={"email": user.email, "role": str(user.role)},
+    )
 
     return UserResponseEnvelope(
         data=UserResponse.model_validate(await user_service.user_payload(user)),
@@ -123,6 +135,19 @@ async def update_user(
     except RoleNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
+    await audit_service.record(
+        "user.updated",
+        actor=current_user,
+        resource_type="user",
+        resource_id=user.id,
+        resource_name=user.full_name,
+        metadata={
+            k: v for k, v in
+            {"role": payload.role, "is_active": payload.is_active, "email": payload.email}.items()
+            if v is not None
+        },
+    )
+
     return UserResponseEnvelope(
         data=UserResponse.model_validate(await user_service.user_payload(user)),
         message="User updated successfully",
@@ -157,6 +182,14 @@ async def deactivate_user(
     except UserNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
+    await audit_service.record(
+        "user.deactivated",
+        actor=current_user,
+        resource_type="user",
+        resource_id=user.id,
+        resource_name=user.full_name,
+    )
+
     return UserResponseEnvelope(
         data=UserResponse.model_validate(await user_service.user_payload(user)),
         message="User deactivated successfully",
@@ -187,6 +220,15 @@ async def delete_user_permanently(
         user = await user_service.delete_user_permanently(user_id)
     except user_service.UserInUseError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    await audit_service.record(
+        "user.deleted",
+        actor=current_user,
+        resource_type="user",
+        resource_id=user.id,
+        resource_name=user.full_name,
+        metadata={"email": user.email},
+    )
 
     return UserResponseEnvelope(
         data=UserResponse.model_validate(await user_service.user_payload(user)),

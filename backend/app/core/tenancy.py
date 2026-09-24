@@ -10,10 +10,20 @@ A context variable rather than a parameter threaded through 12 services: each
 request runs in its own asyncio task, so each gets its own copy and nothing
 leaks between them, and no query can forget to pass it along.
 
-Platform staff (`client_id = None`) are deliberately unscoped: they read across
-every client, which is what the platform pages are for. They cannot *create*
-tenant records without first choosing a client, or the record would belong to
-nobody - see `TenantDocument.insert`.
+There are three states, not two:
+
+  a client id  an ordinary request. Every query is limited to that client.
+  DENIED       platform staff who have not said which client they are working
+               in. Client-scoped queries refuse rather than returning a mix of
+               everybody's records, so a support session is always attributable
+               to one client - which is what makes the audit trail worth having.
+  None         genuinely cross-client work: finding the account behind a login
+               before we know its client, migrations, seeds. Only ever entered
+               deliberately, through `unscoped()`.
+
+DENIED, not None, is the default for platform staff. Reading every client's
+customers at once was never a thing support needs, and it left nothing for a
+client to be told about afterwards.
 """
 
 from contextlib import contextmanager
@@ -22,10 +32,18 @@ from typing import Iterator, Optional
 
 from beanie import PydanticObjectId
 
-#: The client whose data this request may touch. None means unscoped.
-_current_client: ContextVar[Optional[PydanticObjectId]] = ContextVar(
-    "qkil_current_client", default=None
-)
+class _Denied:
+    """Marker for "no client chosen, so no client's records"."""
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "DENIED"
+
+
+#: Platform staff who have not chosen a client. See the module docstring.
+DENIED = _Denied()
+
+#: The client whose data this request may touch.
+_current_client: ContextVar[object] = ContextVar("qkil_current_client", default=None)
 
 
 class TenantScopeError(RuntimeError):
@@ -33,11 +51,21 @@ class TenantScopeError(RuntimeError):
 
 
 def current_client_id() -> Optional[PydanticObjectId]:
-    return _current_client.get()
+    """The client in scope, or None when unscoped. DENIED also reads as None.
+
+    Callers that must tell "no client" from "no client chosen" use
+    `tenant_filter()`, which refuses for DENIED.
+    """
+    value = _current_client.get()
+    return None if isinstance(value, _Denied) else value
 
 
-def set_current_client(client_id: Optional[PydanticObjectId]) -> object:
-    """Set the request's client. Returns the token needed to undo it."""
+def is_denied() -> bool:
+    return isinstance(_current_client.get(), _Denied)
+
+
+def set_current_client(client_id: object) -> object:
+    """Set the request's client, or DENIED. Returns the token needed to undo it."""
     return _current_client.set(client_id)
 
 
@@ -67,14 +95,24 @@ def unscoped() -> Iterator[None]:
 
 
 def tenant_filter() -> dict:
-    """The query fragment that limits a read to the current client."""
-    client_id = _current_client.get()
-    return {} if client_id is None else {"client_id": client_id}
+    """The query fragment that limits a read to the current client.
+
+    Refuses outright when no client has been chosen but one is required: that
+    is a platform admin reaching for client records without saying whose, and
+    answering it would be both a privacy problem and unauditable.
+    """
+    value = _current_client.get()
+    if isinstance(value, _Denied):
+        raise TenantScopeError(
+            "Choose which client you are working in first (send it as the "
+            "X-Client-Id header). QKil staff do not read every client at once."
+        )
+    return {} if value is None else {"client_id": value}
 
 
 def require_client_id() -> PydanticObjectId:
     """The current client, or a refusal. For anything that writes."""
-    client_id = _current_client.get()
+    client_id = current_client_id()
     if client_id is None:
         raise TenantScopeError(
             "No client is in scope. Platform staff must choose a client "

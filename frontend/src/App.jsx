@@ -35,6 +35,7 @@ const QuotesPage = lazy(() => import('@/pages/quotes/QuotesPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const UsersPage = lazy(() => import('@/pages/users/UsersPage'))
 const ClientsPage = lazy(() => import('@/pages/platform/ClientsPage'))
+const AuditPage = lazy(() => import('@/pages/audit/AuditPage'))
 
 function NotFoundPage() {
   return (
@@ -227,6 +228,15 @@ export function App() {
             element={
               <RoleGuard permission="users.manage">
                 <UsersPage />
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="/audit"
+            element={
+              <RoleGuard permission="audit.view">
+                <AuditPage />
               </RoleGuard>
             }
           />

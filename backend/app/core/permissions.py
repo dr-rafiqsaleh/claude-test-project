@@ -68,6 +68,8 @@ PERMISSION_GROUPS: List[dict] = [
         "permissions": [
             {"key": "settings.manage", "label": "Company settings", "description": "Company details, invoicing, email, products and report wording."},
             {"key": "users.manage", "label": "Team and roles", "description": "Add and remove people, and change roles and permissions."},
+            {"key": "audit.view", "label": "Audit trail", "description": "See who changed what, and check the record has not been altered."},
+            {"key": "support.manage", "label": "QKil support access", "description": "Let QKil support into your records for a while, and close it again."},
         ],
     },
 ]

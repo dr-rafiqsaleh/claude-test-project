@@ -3,14 +3,14 @@
 from typing import Callable, Coroutine, Any, Optional
 
 from beanie import PydanticObjectId
-from fastapi import Depends, Header, HTTPException, Query, status
+from fastapi import Depends, Header, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.permissions import ADMIN_ROLE, ALL_PERMISSIONS, DEFAULT_ROLES, PERMISSION_GROUPS
 from app.core.security import ACCESS_TOKEN_TYPE, decode_token
-from app.core.tenancy import set_current_client
+from app.core.tenancy import DENIED, set_current_client
 from app.models.user import User
-from app.services import client_service, role_service
+from app.services import audit_service, client_service, role_service, support_access_service
 from app.services.client_service import ClientUnavailableError
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -28,9 +28,14 @@ CREDENTIALS_EXCEPTION = HTTPException(
 CLIENT_HEADER = "X-Client-Id"
 
 
+#: Methods that change something. GET and HEAD are reads; OPTIONS is a preflight.
+MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
 async def resolve_user_from_token(
     raw_token: Optional[str],
     client_override: Optional[str] = None,
+    request: Optional[Request] = None,
 ) -> User:
     """Decode an access token, load the user, and put their client in scope.
 
@@ -81,19 +86,72 @@ async def resolve_user_from_token(
     set_current_client(await _scope_for(user, client_override))
 
     user._permissions = await role_service.permissions_for(user)
+    await _record_platform_write(user, request)
     return user
 
 
-async def _scope_for(user: User, client_override: Optional[str]) -> Optional[PydanticObjectId]:
-    """The client this request may touch."""
+async def _record_platform_write(user: User, request: Optional[Request]) -> None:
+    """Put a QKil member of staff changing a client's records on the record.
+
+    Done here, where every authenticated request already passes, rather than
+    asked of each route: a control each new endpoint has to remember to call is
+    one that some later endpoint will not, and nothing would fail to show it -
+    an entry simply would not appear.
+
+    Reads are not recorded. They are the ordinary business of supporting
+    someone, they would bury the changes in noise, and what a client needs to
+    know is what was altered.
+
+    It records the request as authorised, so an attempt the route then refuses
+    appears too. Better a trail that says what was tried than one that only
+    proves what succeeded.
+    """
+    if request is None or not user.is_platform_staff:
+        return
+    if request.method not in MUTATING_METHODS:
+        return
+
+    await audit_service.record(
+        "platform.client_write",
+        actor=user,
+        resource_type="request",
+        resource_name=f"{request.method} {request.url.path}",
+        metadata={"method": request.method, "path": request.url.path},
+        ip_address=getattr(request.client, "host", None) if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+
+
+async def _scope_for(user: User, client_override: Optional[str]) -> object:
+    """The client this request may touch: an id, or DENIED.
+
+    QKil staff have to say which client they are working in, and that client has
+    to have let them in. Neither is true by default, which is the point: a
+    support session that is attributable to one client and bounded in time is
+    one the client can be shown afterwards.
+    """
     if not user.is_platform_staff:
         # Ordinary staff are pinned to their own client, header or not.
+        if user.client_id is None:
+            # Not platform staff and in no client: a database that has not been
+            # migrated yet. Refusing is the safe reading - the alternative is
+            # treating them as cross-client and showing them everybody's
+            # records, which is the one mistake this whole design exists to
+            # prevent.
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "This account does not belong to a client yet. Run "
+                    "scripts/migrate_to_multi_client.py to move existing records "
+                    "into a client."
+                ),
+            )
         return user.client_id
 
     if not client_override:
-        # Platform staff with no client chosen read across all of them. They
-        # still cannot create a client's records - see TenantDocument.insert.
-        return None
+        # No client chosen: platform pages still work (the client list is not a
+        # client's data), client records refuse. See app.core.tenancy.
+        return DENIED
 
     try:
         chosen = PydanticObjectId(client_override)
@@ -104,9 +162,19 @@ async def _scope_for(user: User, client_override: Optional[str]) -> Optional[Pyd
         ) from None
 
     try:
-        await client_service.get_client(chosen)
+        client = await client_service.get_client(chosen)
     except client_service.ClientNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    if not await support_access_service.is_open(chosen):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"{client.name} has not opened their records to QKil support. Ask them "
+                "to grant access from their settings, or open break-glass access if "
+                "this cannot wait - either way it expires on its own."
+            ),
+        )
     return chosen
 
 
@@ -157,13 +225,14 @@ def require_permission(*permissions: str) -> Callable[..., Coroutine[Any, Any, U
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     x_client_id: Optional[str] = Header(None, alias=CLIENT_HEADER, include_in_schema=False),
 ) -> User:
     """Resolve the authenticated user from a Bearer access token."""
     if credentials is None:
         raise CREDENTIALS_EXCEPTION
-    return await resolve_user_from_token(credentials.credentials, x_client_id)
+    return await resolve_user_from_token(credentials.credentials, x_client_id, request)
 
 
 async def require_platform_staff(current_user: User = Depends(get_current_user)) -> User:
@@ -177,6 +246,7 @@ async def require_platform_staff(current_user: User = Depends(get_current_user))
 
 
 async def get_current_user_flexible(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     x_client_id: Optional[str] = Header(None, alias=CLIENT_HEADER, include_in_schema=False),
     token: Optional[str] = Query(
@@ -193,7 +263,7 @@ async def get_current_user_flexible(
     endpoints allow the access token to travel in the query string instead.
     """
     raw = credentials.credentials if credentials is not None else token
-    return await resolve_user_from_token(raw, x_client_id)
+    return await resolve_user_from_token(raw, x_client_id, request)
 
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:

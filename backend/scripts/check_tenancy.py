@@ -187,8 +187,11 @@ def main() -> None:
             ok("company settings are per client, so one client's branding is not another's")
 
             print("What platform staff may do")
-            everything = api.get("/api/v1/customers", headers=platform).json()["data"]
-            assert everything["total"] == 2, everything
+            # No client chosen: the client list still works, client records do not.
+            assert api.get("/api/v1/clients", headers=platform).status_code == 200
+            mixed = api.get("/api/v1/customers", headers=platform)
+            assert mixed.status_code == 400, mixed.text
+            assert "client" in mixed.json()["message"].lower(), mixed.json()
             orphan = api.post(
                 "/api/v1/customers",
                 headers=platform,
@@ -198,8 +201,22 @@ def main() -> None:
                 },
             )
             assert orphan.status_code == 400, orphan.text
-            assert "client" in orphan.json()["message"].lower(), orphan.json()
-            ok(f"platform staff see every client's records, but a write with no client is refused: '{orphan.json()['message']}'")
+            ok(f"platform staff must say which client they are in: '{mixed.json()['message']}'")
+
+            # Inside a client they can work, but only while that client is open
+            # to them. Creating the client opened a setup window; closing it
+            # shuts the door, and nothing reopens it but the client.
+            assert api.get("/api/v1/customers", headers=inside(platform, acme_id)).status_code == 200
+            assert api.delete("/api/v1/support-access", headers=ann).status_code == 200
+            shut = api.get("/api/v1/customers", headers=inside(platform, acme_id))
+            assert shut.status_code == 403, shut.text
+            assert "not opened their records" in shut.json()["message"], shut.json()
+            ok(f"once the client closes access, QKil is locked out: '{shut.json()['message'][:60]}...'")
+
+            reopened = api.post("/api/v1/support-access", headers=ann, json={"hours": 4, "reason": "Numbering"})
+            assert reopened.status_code == 201, reopened.text
+            assert api.get("/api/v1/customers", headers=inside(platform, acme_id)).status_code == 200
+            ok("and letting them back in works, for the hours the client chose")
 
             print("Suspending a client")
             assert api.put(f"/api/v1/clients/{beta_id}", headers=platform, json={"status": "suspended"}).status_code == 200

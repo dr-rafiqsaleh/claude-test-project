@@ -8,6 +8,7 @@ import {
   Play,
   Plus,
   Search,
+  ShieldAlert,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -61,6 +62,7 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
+import { breakGlass } from '@/api/supportAccess'
 import { useClients } from '@/hooks/useClients'
 import { useDebounce } from '@/hooks/useDebounce'
 import { toApiError } from '@/lib/api'
@@ -93,6 +95,9 @@ export function ClientsPage() {
   const [saving, setSaving] = useState(false)
   const [pendingDelete, setPendingDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [glassFor, setGlassFor] = useState(null)
+  const [glassReason, setGlassReason] = useState('')
+  const [glassBusy, setGlassBusy] = useState(false)
 
   const debouncedSearch = useDebounce(search, 350)
 
@@ -174,6 +179,25 @@ export function ClientsPage() {
       )
     } catch (err) {
       toastError('Could not change this client', toApiError(err).message)
+    }
+  }
+
+  async function confirmBreakGlass(event) {
+    event.preventDefault()
+    if (!glassFor || glassReason.trim().length < 3) return
+    setGlassBusy(true)
+    try {
+      const grant = await breakGlass({ client_id: glassFor.id, reason: glassReason.trim() })
+      toastSuccess(
+        'Break-glass access open',
+        `You can work in ${glassFor.name} until ${formatDate(grant.expires_at)}. It is on their audit trail.`,
+      )
+      setGlassFor(null)
+      setGlassReason('')
+    } catch (err) {
+      toastError('Could not open break-glass access', toApiError(err).message)
+    } finally {
+      setGlassBusy(false)
     }
   }
 
@@ -338,6 +362,15 @@ export function ClientsPage() {
                               Resume access
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setGlassReason('')
+                              setGlassFor(client)
+                            }}
+                          >
+                            <ShieldAlert className="h-4 w-4" />
+                            Break-glass access
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             disabled={client.user_count > 0}
@@ -465,6 +498,67 @@ export function ClientsPage() {
                   'Save client'
                 ) : (
                   'Add client'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={glassFor !== null}
+        onOpenChange={(open) => {
+          if (glassBusy) return
+          if (!open) setGlassFor(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open {glassFor?.name} without being asked?</DialogTitle>
+            <DialogDescription>
+              Normally a client lets you in themselves. This is for what consent cannot cover - data
+              broken by a bug, a legal hold, an account being abused. It lasts 24 hours, closes on
+              its own, and your reason goes on the client's own audit trail where they will see it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={confirmBreakGlass} className="space-y-4" noValidate>
+            <div className="space-y-1.5">
+              <Label htmlFor="glass-reason">Why is this needed? *</Label>
+              <Textarea
+                id="glass-reason"
+                rows={3}
+                maxLength={500}
+                value={glassReason}
+                onChange={(event) => setGlassReason(event.target.value)}
+                placeholder="Invoice totals corrupted by the 12 Sep import; customer cannot invoice and has asked us to fix it."
+              />
+              <p className="text-xs text-muted-foreground">
+                Write it for the client to read, because they will.
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={glassBusy}
+                onClick={() => setGlassFor(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={glassBusy || glassReason.trim().length < 3}
+              >
+                {glassBusy ? (
+                  <>
+                    <Spinner size="sm" className="text-current" />
+                    Opening...
+                  </>
+                ) : (
+                  'Open break-glass access'
                 )}
               </Button>
             </DialogFooter>

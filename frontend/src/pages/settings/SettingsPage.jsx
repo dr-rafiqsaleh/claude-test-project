@@ -6,6 +6,7 @@ import {
   ClipboardList,
   ExternalLink,
   ImageOff,
+  LifeBuoy,
   Mail,
   Palette,
   Receipt,
@@ -22,6 +23,7 @@ import {
   uploadLogo,
 } from '@/api/settings'
 import { CheckboxField } from '@/components/jobs/JobFormControls'
+import { SupportAccessSettings } from '@/components/settings/SupportAccessSettings'
 import { EmailSettings } from '@/components/settings/EmailSettings'
 import {
   ProductListEditor,
@@ -47,6 +49,7 @@ const TABS = [
   { key: 'reports', label: 'Reports', icon: ClipboardList },
   { key: 'email', label: 'Email', icon: Mail },
   { key: 'users', label: 'Users', icon: UserCog },
+  { key: 'support', label: 'Support access', icon: LifeBuoy },
   { key: 'appearance', label: 'Appearance', icon: Palette },
 ]
 
@@ -979,6 +982,8 @@ export function SettingsPage() {
       ) : null}
 
       {/* ---------------------------------------------------------------- */}
+      {activeTab === 'support' ? <SupportAccessSettings /> : null}
+
       {activeTab === 'users' ? (
         <Card>
           <CardHeader>

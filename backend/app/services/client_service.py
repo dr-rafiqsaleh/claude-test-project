@@ -8,6 +8,11 @@ from beanie import PydanticObjectId
 from app.core.tenancy import acting_as, unscoped
 from app.models.client import Client, ClientStatus
 from app.models.user import User
+from app.services import audit_service
+
+
+#: How long QKil can work in a client it has just created, to set it up.
+SETUP_GRANT_HOURS = 72
 
 
 class ClientError(Exception):
@@ -103,6 +108,7 @@ async def create_client(
     contact_email: Optional[str] = None,
     contact_phone: Optional[str] = None,
     notes: Optional[str] = None,
+    actor: Optional[User] = None,
 ) -> Client:
     """Add a client and give it the three built-in roles to start from."""
     name = (name or "").strip()
@@ -126,6 +132,27 @@ async def create_client(
 
     with acting_as(client.id):
         await role_service.ensure_default_roles()
+        await audit_service.record(
+            "client.created",
+            actor=actor,
+            resource_type="client",
+            resource_id=client.id,
+            resource_name=client.name,
+        )
+
+    # A brand-new client has nobody in it, so there is nobody who could let us
+    # in to create their first administrator. Setting one up is the expected
+    # next step, so creating the client opens a short window for it - recorded
+    # like any other grant, and expiring like any other, so it cannot quietly
+    # become standing access.
+    from app.services import support_access_service  # noqa: PLC0415 - avoids a cycle
+
+    await support_access_service.grant(
+        client.id,
+        granted_by=actor,
+        hours=SETUP_GRANT_HOURS,
+        reason="Setting up a new client: creating its first administrator.",
+    )
 
     return client
 
@@ -137,8 +164,10 @@ async def update_client(
     contact_phone: Optional[str] = None,
     notes: Optional[str] = None,
     status: Optional[ClientStatus] = None,
+    actor: Optional[User] = None,
 ) -> Client:
     client = await get_client(client_id)
+    was = client.status
 
     if name is not None and name.strip() and name.strip() != client.name:
         cleaned = name.strip()
@@ -159,6 +188,18 @@ async def update_client(
 
     client.touch()
     await client.save()
+
+    # Suspending or resuming a client decides whether their whole team can work,
+    # so it goes on their own trail rather than only ours.
+    with acting_as(client.id):
+        await audit_service.record(
+            "client.status_changed" if status is not None and status != was else "client.updated",
+            actor=actor,
+            resource_type="client",
+            resource_id=client.id,
+            resource_name=client.name,
+            metadata={"from": was.value, "to": client.status.value} if status is not None else {},
+        )
     return client
 
 

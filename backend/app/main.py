@@ -14,6 +14,7 @@ from app.config import settings
 from app.core.tenancy import TenantScopeError
 from app.database import close_db, init_db
 from app.routers import (
+    audit,
     auth,
     bookings,
     clients,
@@ -26,6 +27,7 @@ from app.routers import (
     quotes,
     roles,
     search,
+    support_access,
     users,
 )
 from app.services import notification_service
@@ -84,6 +86,8 @@ app.include_router(company_settings.router)
 app.include_router(emails.router)
 app.include_router(roles.router)
 app.include_router(clients.router)
+app.include_router(audit.router)
+app.include_router(support_access.router)
 
 
 @app.exception_handler(TenantScopeError)

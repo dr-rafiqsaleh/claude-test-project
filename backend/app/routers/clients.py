@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from app.config import settings
 from app.core.dependencies import require_platform_staff
 from app.models.client import ClientStatus
+from app.models.user import User
 from app.schemas.common import ApiResponse
 from app.services import client_service
 from app.services.client_service import ClientError, ClientNotFoundError
@@ -116,13 +117,17 @@ async def list_clients(
     summary="Add a client company",
 )
 @router.post("/", response_model=ClientEnvelope, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-async def create_client(payload: ClientCreate) -> ClientEnvelope:
+async def create_client(
+    payload: ClientCreate,
+    current_user: User = Depends(require_platform_staff),
+) -> ClientEnvelope:
     try:
         client = await client_service.create_client(
             name=payload.name,
             contact_email=payload.contact_email,
             contact_phone=payload.contact_phone,
             notes=payload.notes,
+            actor=current_user,
         )
     except ClientError as exc:
         raise _refused(exc) from exc
@@ -140,7 +145,11 @@ async def get_client(client_id: str) -> ClientEnvelope:
 
 
 @router.put("/{client_id}", response_model=ClientEnvelope, summary="Change or suspend a client")
-async def update_client(client_id: str, payload: ClientWrite) -> ClientEnvelope:
+async def update_client(
+    client_id: str,
+    payload: ClientWrite,
+    current_user: User = Depends(require_platform_staff),
+) -> ClientEnvelope:
     try:
         client = await client_service.update_client(
             client_id,
@@ -149,6 +158,7 @@ async def update_client(client_id: str, payload: ClientWrite) -> ClientEnvelope:
             contact_phone=payload.contact_phone,
             notes=payload.notes,
             status=payload.status,
+            actor=current_user,
         )
     except (ClientError, ClientNotFoundError) as exc:
         raise _refused(exc) from exc

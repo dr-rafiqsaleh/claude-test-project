@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, FileText, Home, Receipt, Settings, UserCog, Users } from 'lucide-react'
+import { Building2, ClipboardList, FileText, History, Home, Receipt, Settings, UserCog, Users } from 'lucide-react'
 
 /**
  * The app's navigation, shared by the desktop sidebar and the phone tab bar.
@@ -19,6 +19,7 @@ export const PRIMARY_NAV = [
 /** Running the business rather than doing the work: kept apart. */
 export const ADMIN_NAV = [
   { label: 'Team', to: '/users', icon: UserCog, permission: 'users.manage' },
+  { label: 'Audit', to: '/audit', icon: History, permission: 'audit.view' },
   { label: 'Settings', to: '/settings', icon: Settings, permission: 'settings.manage' },
 ]
 

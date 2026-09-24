@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.core.dependencies import require_permission
+from app.models.user import User
 from app.core.permissions import ADMIN_ROLE, PERMISSION_GROUPS
 from app.schemas.common import ApiResponse
-from app.services import role_service
+from app.services import audit_service, role_service
 from app.services.role_service import RoleError, RoleNotFoundError
 
 router = APIRouter(
@@ -84,27 +85,62 @@ async def list_roles() -> RolesEnvelope:
 
 @router.post("", response_model=RoleEnvelope, status_code=status.HTTP_201_CREATED, summary="Create a role")
 @router.post("/", response_model=RoleEnvelope, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-async def create_role(payload: RoleCreate) -> RoleEnvelope:
+async def create_role(
+    payload: RoleCreate,
+    current_user: User = Depends(require_permission("users.manage")),
+) -> RoleEnvelope:
     try:
         role = await role_service.create_role(payload.name, payload.description, payload.permissions)
     except RoleError as exc:
         raise _refused(exc) from exc
+    await audit_service.record(
+        "role.created",
+        actor=current_user,
+        resource_type="role",
+        resource_id=role.key,
+        resource_name=role.name,
+        metadata={"permissions": sorted(role.permissions)},
+    )
     return RoleEnvelope(data=await _response(role), message=f"Role {role.name} created", success=True)
 
 
 @router.put("/{key}", response_model=RoleEnvelope, summary="Change a role's name or permissions")
-async def update_role(key: str, payload: RoleWrite) -> RoleEnvelope:
+async def update_role(
+    key: str,
+    payload: RoleWrite,
+    current_user: User = Depends(require_permission("users.manage")),
+) -> RoleEnvelope:
     try:
         role = await role_service.update_role(key, payload.name, payload.description, payload.permissions)
     except (RoleError, RoleNotFoundError) as exc:
         raise _refused(exc) from exc
+    # What a role may do decides what everyone holding it may do, so the new
+    # permission set goes on the record, not just "it changed".
+    await audit_service.record(
+        "role.updated",
+        actor=current_user,
+        resource_type="role",
+        resource_id=role.key,
+        resource_name=role.name,
+        metadata={"permissions": sorted(role.permissions)},
+    )
     return RoleEnvelope(data=await _response(role), message=f"Role {role.name} saved", success=True)
 
 
 @router.delete("/{key}", response_model=RoleEnvelope, summary="Delete a role nobody has")
-async def delete_role(key: str) -> RoleEnvelope:
+async def delete_role(
+    key: str,
+    current_user: User = Depends(require_permission("users.manage")),
+) -> RoleEnvelope:
     try:
         role = await role_service.delete_role(key)
     except (RoleError, RoleNotFoundError) as exc:
         raise _refused(exc) from exc
+    await audit_service.record(
+        "role.deleted",
+        actor=current_user,
+        resource_type="role",
+        resource_id=role.key,
+        resource_name=role.name,
+    )
     return RoleEnvelope(data=await _response(role, {}), message=f"Role {role.name} deleted", success=True)
