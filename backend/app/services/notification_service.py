@@ -11,10 +11,12 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from beanie import PydanticObjectId
 
+from app.services import role_service
 from app.models.booking import Booking, BookingStatus
 from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.job import Job
+from app.core.tenancy import tenant_filter
 from app.models.notification import Notification, NotificationType
 from app.models.quote import Quote, QuoteStatus
 from app.models.user import User, UserRole
@@ -150,7 +152,8 @@ async def mark_all_read(user_id: "PydanticObjectId | str") -> int:
         return 0
 
     result = await Notification.get_motor_collection().update_many(
-        {"user_id": oid, "is_read": False},
+        # A raw update skips TenantDocument, so the client goes in by hand.
+        {**tenant_filter(), "user_id": oid, "is_read": False},
         {"$set": {"is_read": True}},
     )
     return int(getattr(result, "modified_count", 0) or 0)
@@ -183,7 +186,8 @@ async def _office_user_ids() -> List[PydanticObjectId]:
     """Every active admin and office staff member."""
     users = await User.find(
         {
-            "role": {"$in": [UserRole.ADMIN.value, UserRole.OFFICE_STAFF.value]},
+            # Office reminders go to everyone who books and manages jobs.
+            "role": {"$in": await role_service.roles_with("jobs.edit")},
             "is_active": True,
         }
     ).to_list()

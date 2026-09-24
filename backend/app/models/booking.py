@@ -4,9 +4,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 
 class BookingStatus(str, Enum):
@@ -45,7 +47,7 @@ STATUS_COLORS: Dict[BookingStatus, str] = {
 }
 
 
-class Booking(Document):
+class Booking(TenantDocument):
     """A scheduled service visit for a customer."""
 
     booking_number: str  # e.g. "JOB-0001" - shown to users as the job number
@@ -98,7 +100,7 @@ class Booking(Document):
     class Settings:
         name = "bookings"
         indexes = [
-            IndexModel([("booking_number", 1)], unique=True, name="uniq_booking_number"),
+            IndexModel([("client_id", 1), ("booking_number", 1)], unique=True, name="uniq_booking_number"),
             IndexModel([("customer_id", 1)], name="idx_customer_id"),
             IndexModel([("technician_id", 1)], name="idx_technician_id"),
             IndexModel([("scheduled_start", 1)], name="idx_scheduled_start"),

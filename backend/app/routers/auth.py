@@ -14,7 +14,11 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.core.dependencies import get_current_user
+from app.core.tenancy import acting_as
+from app.services import client_service
+from app.services.client_service import ClientUnavailableError
 from app.schemas.user import UserResponse, UserResponseEnvelope
+from app.services import user_service
 from app.services.auth_service import InactiveUserError, authenticate_user, create_tokens
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -35,14 +39,24 @@ async def login(payload: LoginRequest) -> LoginApiResponse:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    try:
+        await client_service.assert_usable(user.client_id)
+    except ClientUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
     access_token, refresh_token = create_tokens(user)
+
+    # Their role lives in their own client, so read it in that scope: signing
+    # in is the one moment no scope has been set yet.
+    with acting_as(user.client_id):
+        profile = await user_service.user_payload(user, with_permissions=True)
 
     return LoginApiResponse(
         data=TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            user=UserResponse.model_validate(user),
+            user=UserResponse.model_validate(profile),
         ),
         message="Login successful",
         success=True,
@@ -75,9 +89,14 @@ async def refresh_token(payload: RefreshRequest) -> RefreshApiResponse:
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account has been deactivated")
 
+    try:
+        await client_service.assert_usable(user.client_id)
+    except ClientUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
     access_token = create_access_token(
         str(user.id),
-        extra={"email": user.email, "role": user.role.value},
+        extra={"email": user.email, "role": str(user.role)},
     )
 
     return RefreshApiResponse(
@@ -105,7 +124,7 @@ async def logout(current_user: User = Depends(get_current_user)) -> dict:
 async def read_current_user(current_user: User = Depends(get_current_user)) -> UserResponseEnvelope:
     """Return the profile of the authenticated user."""
     return UserResponseEnvelope(
-        data=UserResponse.model_validate(current_user),
+        data=UserResponse.model_validate(await user_service.user_payload(current_user, with_permissions=True)),
         message="Current user retrieved",
         success=True,
     )

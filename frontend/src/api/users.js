@@ -39,3 +39,9 @@ export async function deleteUser(id) {
   const response = await api.delete(`/users/${id}`)
   return unwrap(response)
 }
+
+/** DELETE /users/{id}/permanent - refused for anyone with work on record. */
+export async function deleteUserPermanently(id) {
+  const response = await api.delete(`/users/${id}/permanent`)
+  return unwrap(response)
+}

@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.config import settings
 from app.models.booking import Booking
+from app.models.client import Client
 from app.models.company_settings import CompanySettings
 from app.models.counter import Counter
 from app.models.customer import Customer
@@ -17,11 +18,13 @@ from app.models.job import Job
 from app.models.notification import Notification
 from app.models.photo import Photo
 from app.models.quote import Quote
+from app.models.role import Role
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
 DOCUMENT_MODELS = [
+    Client,
     User,
     Customer,
     Quote,
@@ -33,6 +36,7 @@ DOCUMENT_MODELS = [
     Notification,
     CompanySettings,
     EmailLog,
+    Role,
 ]
 
 _client: Optional[AsyncIOMotorClient] = None

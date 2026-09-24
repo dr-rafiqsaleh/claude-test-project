@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
+import { EmptyState, ErrorState, PageHeader, Pagination, RefreshButton } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -76,7 +76,7 @@ export function JobsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const user = useAuthStore((state) => state.user)
   const canWrite = useAuthStore((state) => state.canWrite())
-  const isAdmin = useAuthStore((state) => state.isAdmin())
+  const canDelete = useAuthStore((state) => state.can('jobs.delete'))
 
   const customerId = searchParams.get('customer_id') ?? ''
 
@@ -163,6 +163,7 @@ export function JobsPage() {
         description={user?.role === UserRole.TECHNICIAN
         ? 'Your on-site work and inspection reports.'
         : 'Track on-site work, inspection reports and sign-offs.'}
+        actions={<RefreshButton onRefresh={refetch} loading={loading} />}
       />
 
       <div className="flex flex-wrap gap-1 rounded-md border border-border bg-card p-1">
@@ -378,10 +379,10 @@ export function JobsPage() {
                                   onSelect={() => navigate(`/bookings/${job.booking_id}`)}
                                 >
                                   <FileText className="h-4 w-4" />
-                                  View booking
+                                  View job
                                 </DropdownMenuItem>
                               ) : null}
-                              {isAdmin && deletable ? (
+                              {canDelete && deletable ? (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem

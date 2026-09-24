@@ -1,7 +1,9 @@
 """Auto-incrementing counters used to generate human-readable record numbers."""
 
-from beanie import Document
 from pymongo import IndexModel, ReturnDocument
+
+from app.core.tenancy import require_client_id
+from app.models.tenant import TenantDocument
 
 #: Well-known counter names. The `name` field is what separates one sequence
 #: from another, so quotes and bookings each keep their own running total.
@@ -18,9 +20,19 @@ COUNTER_PREFIXES = {
     INVOICE_COUNTER: "INV",
 }
 
+class Counter(TenantDocument):
+    """A named counter, incremented atomically via findOneAndUpdate.
 
-class Counter(Document):
-    """A named counter, incremented atomically via findOneAndUpdate."""
+    Every client counts from one and keeps its own sequence, so two clients
+    both having a QTE-0001 is normal. These methods go through the driver
+    rather than Beanie, so each one puts the client into the query itself -
+    `TenantDocument` cannot reach a raw call.
+    """
+
+    @staticmethod
+    def _key(name: str) -> dict:
+        """The query identifying one client's counter."""
+        return {"client_id": require_client_id(), "name": name}
 
     name: str  # e.g. "quote", "booking", "job", "invoice"
     value: int = 0
@@ -28,7 +40,7 @@ class Counter(Document):
     class Settings:
         name = "counters"
         indexes = [
-            IndexModel([("name", 1)], unique=True, name="uniq_counter_name"),
+            IndexModel([("client_id", 1), ("name", 1)], unique=True, name="uniq_counter_name"),
         ]
 
     @classmethod
@@ -36,7 +48,7 @@ class Counter(Document):
         """Atomically increment `name` and return the new value."""
         collection = cls.get_motor_collection()
         document = await collection.find_one_and_update(
-            {"name": name},
+            cls._key(name),
             {"$inc": {"value": 1}},
             upsert=True,
             return_document=ReturnDocument.AFTER,
@@ -59,7 +71,7 @@ class Counter(Document):
     @classmethod
     async def peek_next(cls, name: str) -> int:
         """The value the next `next_value` call will hand out, without taking it."""
-        document = await cls.get_motor_collection().find_one({"name": name})
+        document = await cls.get_motor_collection().find_one(cls._key(name))
         return int(document.get("value", 0)) + 1 if document else 1
 
     @classmethod
@@ -70,11 +82,12 @@ class Counter(Document):
         twice. Returns False, changing nothing, when `next_value` is behind.
         """
         collection = cls.get_motor_collection()
-        if await collection.find_one({"name": name}) is None:
-            await collection.insert_one({"name": name, "value": next_value - 1})
+        key = cls._key(name)
+        if await collection.find_one(key) is None:
+            await collection.insert_one({**key, "value": next_value - 1})
             return True
         result = await collection.update_one(
-            {"name": name, "value": {"$lte": next_value - 1}},
+            {**key, "value": {"$lte": next_value - 1}},
             {"$set": {"value": next_value - 1}},
         )
         return result.matched_count == 1

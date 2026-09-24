@@ -12,7 +12,7 @@ from fastapi.responses import Response, StreamingResponse
 from app.core.dependencies import (
     get_current_user,
     get_current_user_flexible,
-    require_admin,
+    require_permission,
 )
 from app.models.user import User
 from app.schemas.common import ApiResponse
@@ -54,7 +54,7 @@ async def get_settings(
 @router.put("/", response_model=CompanySettingsEnvelope, include_in_schema=False)
 async def update_settings(
     payload: CompanySettingsUpdate,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("settings.manage")),
 ) -> CompanySettingsEnvelope:
     """Apply a partial update. Admin only."""
     try:
@@ -74,7 +74,7 @@ async def update_settings(
 )
 async def send_test_email(
     payload: TestEmailRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("settings.manage")),
 ) -> ApiResponse[None]:
     """Admin only. A refused send comes back as a 422 saying what to fix."""
     try:
@@ -95,7 +95,7 @@ async def send_test_email(
 )
 async def upload_logo(
     file: UploadFile = File(..., description="PNG, JPEG or WebP, up to 2 MB"),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("settings.manage")),
 ) -> CompanySettingsEnvelope:
     """Store a new company logo, used in the header of every generated PDF."""
     try:
@@ -146,7 +146,7 @@ async def get_logo(
     summary="Remove the company logo",
 )
 async def delete_logo(
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("settings.manage")),
 ) -> CompanySettingsEnvelope:
     """Clear the logo so PDFs fall back to the company name in large text."""
     settings = await company_settings_service.remove_logo(current_user.id)

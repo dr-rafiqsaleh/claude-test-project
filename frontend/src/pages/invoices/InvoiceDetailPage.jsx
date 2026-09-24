@@ -68,7 +68,7 @@ export function InvoiceDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const canWrite = useAuthStore((state) => state.canWrite())
-  const isAdmin = useAuthStore((state) => state.isAdmin())
+  const canCancel = useAuthStore((state) => state.can('invoices.cancel'))
 
   const { invoice, loading, error, refetch, setInvoice } = useInvoice(id)
   const settings = useCompanySettings()
@@ -273,7 +273,7 @@ export function InvoiceDetailPage() {
               </Button>
             ) : null}
 
-            {isAdmin && cancellable ? (
+            {canCancel && cancellable ? (
               <Button variant="destructive" disabled={transitioning} onClick={() => setCancelOpen(true)}>
                 <XCircle className="h-4 w-4" />
                 Cancel invoice

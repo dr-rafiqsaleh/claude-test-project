@@ -2,9 +2,11 @@
 
 from datetime import datetime
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 #: Content types accepted by the photo upload endpoint.
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -13,7 +15,7 @@ ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 
 
-class Photo(Document):
+class Photo(TenantDocument):
     """An inspection photo attached to a job."""
 
     job_id: PydanticObjectId

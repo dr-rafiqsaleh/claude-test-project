@@ -10,7 +10,7 @@ import {
 
 import { NotificationIcon, notificationCategory } from '@/components/notifications/NotificationIcon'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page'
+import { PageHeader, RefreshButton } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import { LoadingState } from '@/components/ui/spinner'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
@@ -112,14 +112,19 @@ export function NotificationsPage() {
         description={unreadCount > 0
         ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.`
         : 'Reminders about jobs, reports, invoices and quotes.'}
-        actions={<Button
-          variant="outline"
-          disabled={busy || unreadCount === 0}
-          onClick={() => void handleMarkAllRead()}
-        >
-          <CheckCheck className="h-4 w-4" />
-          Mark all read
-        </Button>}
+        actions={
+          <>
+            <RefreshButton onRefresh={refresh} loading={isLoading} />
+            <Button
+              variant="outline"
+              disabled={busy || unreadCount === 0}
+              onClick={() => void handleMarkAllRead()}
+            >
+              <CheckCheck className="h-4 w-4" />
+              Mark all read
+            </Button>
+          </>
+        }
       />
 
       <div className="flex flex-wrap gap-2">

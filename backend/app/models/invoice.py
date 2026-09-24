@@ -4,9 +4,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 
 class InvoiceStatus(str, Enum):
@@ -92,7 +94,7 @@ class Payment(BaseModel):
     recorded_by: PydanticObjectId
 
 
-class Invoice(Document):
+class Invoice(TenantDocument):
     """A tax invoice raised against a customer."""
 
     invoice_number: str  # e.g. "INV-0001"
@@ -139,7 +141,7 @@ class Invoice(Document):
     class Settings:
         name = "invoices"
         indexes = [
-            IndexModel([("invoice_number", 1)], unique=True, name="uniq_invoice_number"),
+            IndexModel([("client_id", 1), ("invoice_number", 1)], unique=True, name="uniq_invoice_number"),
             IndexModel([("customer_id", 1)], name="idx_customer_id"),
             IndexModel([("job_id", 1)], name="idx_job_id"),
             IndexModel([("status", 1)], name="idx_status"),

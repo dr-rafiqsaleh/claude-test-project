@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
+import { EmptyState, ErrorState, PageHeader, Pagination, RefreshButton } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -94,7 +94,7 @@ export function BookingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const user = useAuthStore((state) => state.user)
   const canWrite = useAuthStore((state) => state.canWrite())
-  const isAdmin = useAuthStore((state) => state.isAdmin())
+  const canDelete = useAuthStore((state) => state.can('jobs.delete'))
 
   const view = searchParams.get('view') === 'calendar' ? 'calendar' : 'list'
   const customerId = searchParams.get('customer_id') ?? ''
@@ -222,6 +222,8 @@ export function BookingsPage() {
               Calendar
             </button>
           </div>
+
+          {view === 'list' ? <RefreshButton onRefresh={refetch} loading={loading} /> : null}
 
           {canWrite ? (
             <Button asChild>
@@ -436,7 +438,7 @@ export function BookingsPage() {
                                       Cancel booking
                                     </DropdownMenuItem>
                                   ) : null}
-                                  {isAdmin && deletable ? (
+                                  {canDelete && deletable ? (
                                     <>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem

@@ -22,7 +22,7 @@ import { listQuotes } from '@/api/quotes'
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { EmptyState, PageHeader } from '@/components/ui/page'
+import { EmptyState, PageHeader, RefreshButton } from '@/components/ui/page'
 import { Spinner } from '@/components/ui/spinner'
 import { toastError } from '@/components/ui/use-toast'
 import { toApiError } from '@/lib/api'
@@ -157,6 +157,8 @@ function VisitCard({ visit, onStart, starting }) {
 
 function TechnicianToday({ user }) {
   const navigate = useNavigate()
+  // Bumped by the refresh button; the loader below watches it.
+  const [reloads, setReloads] = useState(0)
   const [loading, setLoading] = useState(true)
   const [today, setToday] = useState([])
   const [unfinished, setUnfinished] = useState([])
@@ -189,11 +191,12 @@ function TechnicianToday({ user }) {
       )
       setLoading(false)
     }
+    setLoading(true)
     void load()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloads])
 
   async function startVisit(visit) {
     setStartingId(visit.id)
@@ -224,6 +227,7 @@ function TechnicianToday({ user }) {
                   : `${remaining.length} job${remaining.length === 1 ? '' : 's'} to go`
               }`
         }
+        actions={<RefreshButton onRefresh={() => setReloads((n) => n + 1)} loading={loading} />}
       />
 
       {loading ? (
@@ -392,6 +396,7 @@ async function fetchChartInvoices() {
 }
 
 function OfficeToday({ user }) {
+  const [reloads, setReloads] = useState(0)
   const [loading, setLoading] = useState(true)
   const [visits, setVisits] = useState([])
   const [reportsDue, setReportsDue] = useState(null)
@@ -427,11 +432,13 @@ function OfficeToday({ user }) {
         if (!cancelled) setRevenue({ state: 'failed', series: [] })
       }
     }
+    setLoading(true)
+    setRevenue({ state: 'loading', series: [] })
     void load()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloads])
 
   const show = (value) => (value === null || value === undefined ? '--' : value)
   const drafts = summary ? (summary.invoice_count_by_status?.draft ?? 0) : null
@@ -451,6 +458,7 @@ function OfficeToday({ user }) {
         description={format(new Date(), 'EEEE d MMMM')}
         actions={
           <>
+            <RefreshButton onRefresh={() => setReloads((n) => n + 1)} loading={loading} />
             <Button asChild variant="outline">
               <Link to="/quotes/new">
                 <FileText className="h-4 w-4" />

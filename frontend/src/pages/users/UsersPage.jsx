@@ -8,6 +8,9 @@ import {
   Pencil,
   Plus,
   Search,
+  Shield,
+  Trash2,
+  UserCheck,
   UserCog,
   UserX,
 } from 'lucide-react'
@@ -24,7 +27,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
+import { EmptyState, ErrorState, PageHeader, Pagination, RefreshButton } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
@@ -69,11 +72,15 @@ import {
 } from '@/components/ui/table'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useRoles } from '@/hooks/useRoles'
 import { useUsers } from '@/hooks/useUsers'
+import { RolesTab } from '@/pages/users/RolesTab'
+import { cn } from '@/lib/utils'
+import { getMe } from '@/api/auth'
 import { toApiError } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import { ALL_ROLES, ROLE_LABELS, UserRole } from '@/lib/constants'
+import { ROLE_LABELS, UserRole } from '@/lib/constants'
 
 const PAGE_SIZE = 20
 const ANY = '__any__'
@@ -82,6 +89,16 @@ const ROLE_BADGE = {
   [UserRole.ADMIN]: 'default',
   [UserRole.OFFICE_STAFF]: 'info',
   [UserRole.TECHNICIAN]: 'secondary',
+}
+
+const TABS = [
+  { key: 'people', label: 'People', icon: UserCog },
+  { key: 'roles', label: 'Roles & permissions', icon: Shield },
+]
+
+/** A role's name as the API gave it, falling back to the built-in labels. */
+function roleLabel(user) {
+  return user.role_name ?? ROLE_LABELS[user.role] ?? user.role
 }
 
 const passwordSchema = z
@@ -107,7 +124,7 @@ function buildUserSchema(isEdit) {
       (value) => (isEdit && value === '') || passwordSchema.safeParse(value).success,
       { message: isEdit ? PASSWORD_HINT : `Password is required. ${PASSWORD_HINT}.` },
     ),
-    role: z.nativeEnum(UserRole),
+    role: z.string().min(1, 'Role is required'),
     is_active: z.boolean(),
   })
 }
@@ -123,6 +140,7 @@ const EMPTY_USER = {
 
 export function UsersPage() {
   const currentUser = useAuthStore((state) => state.user)
+  const setCurrentUser = useAuthStore((state) => state.setUser)
 
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState(ANY)
@@ -134,6 +152,11 @@ export function UsersPage() {
   const [formError, setFormError] = useState(null)
   const [pendingDeactivate, setPendingDeactivate] = useState(null)
   const [deactivating, setDeactivating] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [activeTab, setActiveTab] = useState('people')
+
+  const roles = useRoles()
 
   const debouncedSearch = useDebounce(search, 350)
 
@@ -150,7 +173,10 @@ export function UsersPage() {
     return next
   }, [page, debouncedSearch, roleFilter, statusFilter])
 
-  const { users, total, totalPages, loading, error, create, update, remove, refetch } = useUsers(params)
+  const { users, total, totalPages, loading, error, create, update, remove, removePermanently, refetch } =
+    useUsers(params)
+
+  const roleOptions = roles.roles
 
   const isEdit = editing !== null
   const schema = useMemo(() => buildUserSchema(isEdit), [isEdit])
@@ -194,6 +220,7 @@ export function UsersPage() {
           is_active: values.is_active,
           ...(values.password ? { password: values.password } : {}),
         })
+        if (editing.id === currentUser?.id) setCurrentUser(await getMe())
         toastSuccess('User updated', `${values.full_name} was saved.`)
       } else {
         await create({
@@ -211,6 +238,29 @@ export function UsersPage() {
     } catch (err) {
       const apiError = toApiError(err, 'Could not save this user')
       setFormError(apiError.message)
+    }
+  }
+
+  async function reactivate(user) {
+    try {
+      await update(user.id, { is_active: true })
+      toastSuccess('User reactivated', `${user.full_name} can sign in again.`)
+    } catch (err) {
+      toastError('Could not reactivate user', toApiError(err).message)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setDeleting(true)
+    try {
+      await removePermanently(pendingDelete.id)
+      toastSuccess('User deleted', `${pendingDelete.full_name} was removed.`)
+      setPendingDelete(null)
+    } catch (err) {
+      toastError('Could not delete user', toApiError(err).message)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -234,14 +284,62 @@ export function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Users"
-        description="Manage staff accounts and what each person can access."
-        actions={<Button onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          New user
-        </Button>}
+        title="Team"
+        description="Staff accounts, the roles you give them, and what each role may do."
+        actions={
+          <>
+            <RefreshButton
+              onRefresh={activeTab === 'people' ? refetch : roles.refetch}
+              loading={activeTab === 'people' ? loading : roles.loading}
+            />
+            {activeTab === 'people' ? (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                New user
+              </Button>
+            ) : null}
+          </>
+        }
       />
 
+      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+        {TABS.map((tab) => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.key
+
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              aria-pressed={isActive}
+              className={cn(
+                'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted',
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {activeTab === 'roles' ? (
+        <RolesTab
+          roles={roles.roles}
+          permissionGroups={roles.permissionGroups}
+          loading={roles.loading}
+          error={roles.error}
+          refetch={roles.refetch}
+          create={roles.create}
+          update={roles.update}
+          remove={roles.remove}
+        />
+      ) : null}
+
+      {activeTab === 'people' ? (
+      <>
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -263,9 +361,9 @@ export function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ANY}>All roles</SelectItem>
-                  {ALL_ROLES.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {ROLE_LABELS[role]}
+                  {roleOptions.map((role) => (
+                    <SelectItem key={role.key} value={role.key}>
+                      {role.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -348,7 +446,7 @@ export function UsersPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={ROLE_BADGE[user.role]}>{ROLE_LABELS[user.role]}</Badge>
+                        <Badge variant={ROLE_BADGE[user.role] ?? 'outline'}>{roleLabel(user)}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.is_active ? 'default' : 'secondary'}>
@@ -370,6 +468,12 @@ export function UsersPage() {
                               <Pencil className="h-4 w-4" />
                               Edit user
                             </DropdownMenuItem>
+                            {!user.is_active ? (
+                              <DropdownMenuItem onSelect={() => void reactivate(user)}>
+                                <UserCheck className="h-4 w-4" />
+                                Reactivate
+                              </DropdownMenuItem>
+                            ) : null}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               disabled={isSelf || !user.is_active}
@@ -378,6 +482,14 @@ export function UsersPage() {
                             >
                               <UserX className="h-4 w-4" />
                               Deactivate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={isSelf}
+                              onSelect={() => setPendingDelete(user)}
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete permanently
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -392,6 +504,8 @@ export function UsersPage() {
           </>
         )}
       </Card>
+      </>
+      ) : null}
 
       <Dialog
         open={dialogOpen}
@@ -510,13 +624,16 @@ export function UsersPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {ALL_ROLES.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {ROLE_LABELS[role]}
+                        {roleOptions.map((role) => (
+                          <SelectItem key={role.key} value={role.key}>
+                            {role.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormDescription>
+                      What they can do comes from their role. Change a role on the Roles tab.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -603,6 +720,37 @@ export function UsersPage() {
               }}
             >
               {deactivating ? 'Deactivating...' : 'Deactivate user'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this user for good?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `${pendingDelete.full_name} will be removed completely. This cannot be undone. Anyone with jobs, reports, quotes or invoices on record cannot be deleted - deactivate them instead, so the history keeps their name.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault()
+                void confirmDelete()
+              }}
+            >
+              {deleting ? 'Deleting...' : 'Delete permanently'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

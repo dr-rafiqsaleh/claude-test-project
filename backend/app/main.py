@@ -11,10 +11,12 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
+from app.core.tenancy import TenantScopeError
 from app.database import close_db, init_db
 from app.routers import (
     auth,
     bookings,
+    clients,
     company_settings,
     customers,
     emails,
@@ -22,6 +24,7 @@ from app.routers import (
     jobs,
     notifications,
     quotes,
+    roles,
     search,
     users,
 )
@@ -79,6 +82,21 @@ app.include_router(search.router)
 app.include_router(notifications.router)
 app.include_router(company_settings.router)
 app.include_router(emails.router)
+app.include_router(roles.router)
+app.include_router(clients.router)
+
+
+@app.exception_handler(TenantScopeError)
+async def tenant_scope_handler(_request: Request, exc: TenantScopeError) -> JSONResponse:
+    """A write with no client in scope is the caller's mistake, not a crash.
+
+    Platform staff read across every client, so a request of theirs that tries
+    to create a client's record has to say which client first.
+    """
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"data": None, "message": str(exc), "success": False},
+    )
 
 
 @app.exception_handler(StarletteHTTPException)

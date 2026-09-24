@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { getInvoiceSummary } from '@/api/invoices'
 import { Logo } from '@/components/layout/Logo'
 import { cn } from '@/lib/utils'
-import { ADMIN_NAV, PRIMARY_NAV, isNavActive, visibleNav } from '@/lib/navigation'
+import { ADMIN_NAV, PLATFORM_NAV, PRIMARY_NAV, isNavActive, visibleNav } from '@/lib/navigation'
 import { useAuthStore } from '@/store/authStore'
 
 /**
@@ -68,9 +68,10 @@ function SidebarLink({ item, active, showDot }) {
 /** Desktop navigation: a quiet, light rail; the page stays the focus. */
 export function Sidebar({ hasOverdue }) {
   const { pathname } = useLocation()
-  const role = useAuthStore((state) => state.user?.role)
-  const primary = visibleNav(PRIMARY_NAV, role)
-  const admin = visibleNav(ADMIN_NAV, role)
+  const user = useAuthStore((state) => state.user)
+  const primary = visibleNav(PRIMARY_NAV, user)
+  const admin = visibleNav(ADMIN_NAV, user)
+  const platform = visibleNav(PLATFORM_NAV, user)
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
@@ -102,6 +103,18 @@ export function Sidebar({ hasOverdue }) {
             ))}
           </div>
         ) : null}
+
+        {/* Running QKil itself, kept apart from running one company. */}
+        {platform.length > 0 ? (
+          <div className="space-y-1">
+            <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Platform
+            </p>
+            {platform.map((item) => (
+              <SidebarLink key={item.to} item={item} active={isNavActive(item, pathname)} />
+            ))}
+          </div>
+        ) : null}
       </nav>
     </aside>
   )
@@ -113,8 +126,8 @@ export function Sidebar({ hasOverdue }) {
  */
 export function MobileNav({ hasOverdue }) {
   const { pathname } = useLocation()
-  const role = useAuthStore((state) => state.user?.role)
-  const items = visibleNav(PRIMARY_NAV, role)
+  const user = useAuthStore((state) => state.user)
+  const items = visibleNav(PRIMARY_NAV, user)
 
   return (
     <nav

@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.config import settings
-from app.core.dependencies import get_current_user, require_staff
+from app.core.dependencies import require_permission
 from app.models.user import User
 from app.schemas.customer import (
     CustomerCreate,
@@ -35,7 +35,7 @@ async def list_customers(
     city: Optional[str] = Query(None, description="Filter by city"),
     sort_by: str = Query("created_at", description="created_at | updated_at | last_name | first_name"),
     sort_desc: bool = Query(True, description="Sort descending"),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("customers.view")),
 ) -> CustomerListResponse:
     """Return a paginated, searchable list of customers."""
     customers, total = await customer_service.list_customers(
@@ -75,7 +75,7 @@ async def list_customers(
 )
 async def create_customer(
     payload: CustomerCreate,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("customers.edit")),
 ) -> CustomerResponseEnvelope:
     """Create a new customer record."""
     customer = await customer_service.create_customer(payload, created_by=current_user.id)
@@ -90,7 +90,7 @@ async def create_customer(
 @router.get("/{customer_id}", response_model=CustomerResponseEnvelope, summary="Get a customer by id")
 async def get_customer(
     customer_id: str,
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("customers.view")),
 ) -> CustomerResponseEnvelope:
     """Fetch a single customer."""
     customer = await customer_service.get_customer_by_id(customer_id)
@@ -108,7 +108,7 @@ async def get_customer(
 async def update_customer(
     customer_id: str,
     payload: CustomerUpdate,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("customers.edit")),
 ) -> CustomerResponseEnvelope:
     """Update an existing customer."""
     try:
@@ -126,7 +126,7 @@ async def update_customer(
 @router.delete("/{customer_id}", response_model=CustomerResponseEnvelope, summary="Archive a customer")
 async def delete_customer(
     customer_id: str,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("customers.edit")),
 ) -> CustomerResponseEnvelope:
     """Soft-delete a customer by setting is_active to False."""
     try:

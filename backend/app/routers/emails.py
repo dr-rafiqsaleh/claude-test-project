@@ -8,7 +8,7 @@ read and downloaded, never changed or deleted.
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
-from app.core.dependencies import require_staff
+from app.core.dependencies import require_permission
 from app.models.user import User
 from app.schemas.email import (
     DocumentKind,
@@ -46,7 +46,7 @@ def _detail(log) -> EmailLogDetail:
 async def compose_email(
     kind: DocumentKind = Query(...),
     id: str = Query(..., min_length=1),
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("emails.send")),
 ) -> EmailDraftEnvelope:
     """The email a document would be sent with: recipient, subject and message from its template."""
     try:
@@ -63,7 +63,7 @@ async def compose_email(
 @router.post("/send", response_model=EmailLogEnvelope, summary="Email a document to the customer")
 async def send_email(
     payload: SendDocumentEmail,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("emails.send")),
 ) -> EmailLogEnvelope:
     """Send the document as a PDF attachment. A draft quote or invoice becomes sent."""
     try:
@@ -89,7 +89,7 @@ async def send_email(
 async def email_history(
     kind: DocumentKind = Query(...),
     id: str = Query(..., min_length=1),
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("emails.send")),
 ) -> EmailHistoryEnvelope:
     logs = await email_service.history(kind, id)
     return EmailHistoryEnvelope(
@@ -106,7 +106,7 @@ async def email_history(
 )
 async def customer_email_history(
     customer_id: str,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("emails.send")),
 ) -> EmailHistoryEnvelope:
     logs = await email_service.customer_history(customer_id)
     return EmailHistoryEnvelope(
@@ -126,7 +126,7 @@ async def _log_or_404(log_id: str):
 @router.get("/{log_id}", response_model=EmailLogDetailEnvelope, summary="The full record of one email")
 async def email_record(
     log_id: str,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("emails.send")),
 ) -> EmailLogDetailEnvelope:
     log = await _log_or_404(log_id)
     return EmailLogDetailEnvelope(data=_detail(log), message="Email record retrieved", success=True)
@@ -135,7 +135,7 @@ async def email_record(
 @router.get("/{log_id}/attachment", summary="The attachment exactly as it was sent")
 async def email_attachment(
     log_id: str,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("emails.send")),
 ) -> Response:
     log = await _log_or_404(log_id)
     if not log.attachment_content:
@@ -153,7 +153,7 @@ async def email_attachment(
 @router.get("/{log_id}/eml", summary="The email as a .eml file, for Outlook or any mail app")
 async def email_eml(
     log_id: str,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("emails.send")),
 ) -> Response:
     log = await _log_or_404(log_id)
     stamp = log.sent_at.strftime("%Y-%m-%d %H%M")

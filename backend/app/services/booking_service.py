@@ -18,7 +18,7 @@ from app.models.customer import Customer
 from app.models.quote import Quote, QuoteStatus
 from app.models.user import User, UserRole
 from app.schemas.booking import BookingCreate, BookingUpdate, QuoteToBookingRequest
-from app.services import recurrence_service
+from app.services import recurrence_service, role_service
 
 #: Allowed status transitions for the booking lifecycle.
 ALLOWED_TRANSITIONS: Dict[BookingStatus, Set[BookingStatus]] = {
@@ -100,8 +100,10 @@ async def _resolve_technician(technician_id: "PydanticObjectId | str") -> User:
     technician = await User.get(oid)
     if technician is None:
         raise TechnicianNotFoundError("Technician not found")
-    if technician.role != UserRole.TECHNICIAN:
-        raise TechnicianNotFoundError(f"{technician.full_name} is not a technician")
+    if not await role_service.has_permission(technician, "jobs.assignable"):
+        raise TechnicianNotFoundError(
+            f"{technician.full_name}'s role can't be given jobs (it needs 'Can be given jobs')"
+        )
     return technician
 
 
@@ -394,8 +396,14 @@ async def list_bookings(
     date_to: Optional[datetime] = None,
     q: Optional[str] = None,
     no_job: Optional[bool] = None,
+    include_unassigned: bool = False,
 ) -> Tuple[List[dict], int]:
-    """Return a page of booking payloads (names embedded) plus the total count."""
+    """Return a page of booking payloads (names embedded) plus the total count.
+
+    `include_unassigned` widens a technician filter to "theirs, plus the jobs
+    nobody has been given yet", which is what a technician sees: work in the
+    pool is everyone's until someone is put on it.
+    """
     criteria: dict = {}
 
     if status is not None:
@@ -410,7 +418,10 @@ async def list_bookings(
         technician_oid = _to_object_id(technician_id)
         if technician_oid is None:
             return [], 0
-        criteria["technician_id"] = technician_oid
+        # $in with None also matches bookings where the field was never set.
+        criteria["technician_id"] = (
+            {"$in": [technician_oid, None]} if include_unassigned else technician_oid
+        )
 
     if customer_id:
         customer_oid = _to_object_id(customer_id)
@@ -670,6 +681,7 @@ async def get_calendar_events(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     technician_id: Optional[str] = None,
+    include_unassigned: bool = False,
 ) -> List[dict]:
     """Return bookings in a date range, shaped for FullCalendar."""
     criteria: dict = {}
@@ -686,7 +698,9 @@ async def get_calendar_events(
         technician_oid = _to_object_id(technician_id)
         if technician_oid is None:
             return []
-        criteria["technician_id"] = technician_oid
+        criteria["technician_id"] = (
+            {"$in": [technician_oid, None]} if include_unassigned else technician_oid
+        )
 
     query = Booking.find(criteria) if criteria else Booking.find_all()
     bookings = await query.sort("scheduled_start").to_list()
@@ -815,5 +829,5 @@ async def count_bookings(status: Optional[BookingStatus] = None) -> int:
 async def list_technicians() -> List[User]:
     """Return the active technicians available for assignment."""
     return await User.find(
-        {"role": UserRole.TECHNICIAN.value, "is_active": True}
+        {"role": {"$in": await role_service.roles_with("jobs.assignable")}, "is_active": True}
     ).sort("full_name").to_list()

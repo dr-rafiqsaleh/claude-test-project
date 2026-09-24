@@ -11,9 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
-from app.core.dependencies import get_current_user, require_admin, require_staff
+from app.core.dependencies import can, require_permission
 from app.models.quote import QuoteStatus
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.quote import (
     QuoteCreate,
     QuoteListData,
@@ -42,7 +42,7 @@ async def list_quotes(
     quote_status: Optional[QuoteStatus] = Query(None, alias="status", description="Filter by status"),
     customer_id: Optional[str] = Query(None, description="Filter by customer"),
     q: Optional[str] = Query(None, description="Search quote number or customer name"),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("quotes.view")),
 ) -> QuoteListResponse:
     """Return a paginated, filterable list of quotes."""
     payloads, total = await quote_service.list_quotes(
@@ -79,7 +79,7 @@ async def list_quotes(
 )
 async def create_quote(
     payload: QuoteCreate,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("quotes.edit")),
 ) -> QuoteResponseEnvelope:
     """Create a quote with an auto-generated quote number."""
     try:
@@ -97,7 +97,7 @@ async def create_quote(
 @router.get("/{quote_id}", response_model=QuoteResponseEnvelope, summary="Get a quote by id")
 async def get_quote(
     quote_id: str,
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("quotes.view")),
 ) -> QuoteResponseEnvelope:
     """Fetch a single quote."""
     try:
@@ -116,7 +116,7 @@ async def get_quote(
 async def update_quote(
     quote_id: str,
     payload: QuoteUpdate,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("quotes.edit")),
 ) -> QuoteResponseEnvelope:
     """Update a quote. Only quotes still in draft can be edited."""
     try:
@@ -138,7 +138,7 @@ async def update_quote(
 @router.delete("/{quote_id}", response_model=QuoteResponseEnvelope, summary="Delete a draft quote")
 async def delete_quote(
     quote_id: str,
-    _current_user: User = Depends(require_admin),
+    _current_user: User = Depends(require_permission("quotes.delete")),
 ) -> QuoteResponseEnvelope:
     """Permanently delete a draft quote."""
     try:
@@ -159,7 +159,7 @@ async def delete_quote(
 async def update_quote_status(
     quote_id: str,
     payload: QuoteStatusUpdate,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("quotes.edit")),
 ) -> QuoteResponseEnvelope:
     """Move a quote through its lifecycle (draft -> sent -> accepted/rejected)."""
     try:
@@ -167,7 +167,7 @@ async def update_quote_status(
             quote_id,
             payload.status,
             rejection_reason=payload.rejection_reason,
-            is_admin=current_user.role == UserRole.ADMIN,
+            is_admin=can(current_user, "quotes.delete"),
         )
     except QuoteNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -188,7 +188,7 @@ async def update_quote_status(
 @router.get("/{quote_id}/pdf", summary="Download a quote as PDF", response_class=StreamingResponse)
 async def download_quote_pdf(
     quote_id: str,
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("quotes.view")),
 ) -> StreamingResponse:
     """Render the quote as an A4 PDF and stream it back."""
     try:

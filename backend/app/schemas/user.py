@@ -32,7 +32,7 @@ class UserCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     job_title: Optional[str] = Field(default=None, max_length=80)
     password: str = Field(min_length=8, max_length=128)
-    role: UserRole = UserRole.TECHNICIAN
+    role: str = Field(default=UserRole.TECHNICIAN.value, min_length=1, max_length=60)
     is_active: bool = True
 
     @field_validator("password")
@@ -63,7 +63,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
     job_title: Optional[str] = Field(default=None, max_length=80)
     password: Optional[str] = Field(default=None, min_length=8, max_length=128)
-    role: Optional[UserRole] = None
+    role: Optional[str] = Field(default=None, min_length=1, max_length=60)
     is_active: Optional[bool] = None
 
     @field_validator("password")
@@ -100,7 +100,15 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     job_title: Optional[str] = None
-    role: UserRole
+    role: str
+    role_name: Optional[str] = None
+    #: The client company they work for. None for QKil platform staff.
+    client_id: Optional[str] = None
+    #: QKil's own staff, who manage the client list. Not a permission, so a
+    #: client's Admin role can never pick it up.
+    is_platform_staff: bool = False
+    #: Everything this person may do; only on the signed-in user's own record.
+    permissions: List[str] = Field(default_factory=list)
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -109,6 +117,11 @@ class UserResponse(BaseModel):
     @classmethod
     def _coerce_id(cls, value: object) -> str:
         return str(value)
+
+    @field_validator("client_id", mode="before")
+    @classmethod
+    def _coerce_client_id(cls, value: object) -> Optional[str]:
+        return None if value is None else str(value)
 
 
 class UserListData(BaseModel):

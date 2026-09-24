@@ -3,9 +3,11 @@
 from datetime import datetime
 from typing import Optional
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 
 class Address(BaseModel):
@@ -25,7 +27,7 @@ class Address(BaseModel):
         return ", ".join(part for part in parts if part)
 
 
-class Customer(Document):
+class Customer(TenantDocument):
     """A pest-control customer record."""
 
     first_name: str

@@ -86,6 +86,19 @@ export function useUsers(params) {
     [fetchUsers],
   )
 
+  const removePermanently = useCallback(
+    async (id) => {
+      setMutating(true)
+      try {
+        await usersApi.deleteUserPermanently(id)
+        await fetchUsers()
+      } finally {
+        setMutating(false)
+      }
+    },
+    [fetchUsers],
+  )
+
   return {
     users,
     total,
@@ -98,6 +111,7 @@ export function useUsers(params) {
     create,
     update,
     remove,
+    removePermanently,
     mutating,
   }
 }

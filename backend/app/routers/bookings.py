@@ -15,9 +15,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.config import settings
-from app.core.dependencies import get_current_user, require_admin, require_staff
+from app.core.dependencies import can, get_current_user, require_permission
 from app.models.booking import Booking, BookingStatus
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.booking import (
     BookingCreate,
     BookingListData,
@@ -49,14 +49,17 @@ router = APIRouter(prefix="/api/v1/bookings", tags=["bookings"])
 
 
 def _is_technician(user: User) -> bool:
-    return user.role == UserRole.TECHNICIAN
+    """Someone who only sees, and only runs, the jobs they are given."""
+    return not can(user, "jobs.view_all")
 
 
 def _redact_for(user: User, payload: dict) -> dict:
-    """Hide office-only notes from technicians."""
-    if _is_technician(user):
-        payload = dict(payload)
+    """Hide office-only notes, and prices, from people who may not see them."""
+    payload = dict(payload)
+    if not can(user, "jobs.edit"):
         payload["internal_notes"] = None
+    if not can(user, "money.view"):
+        payload["quoted_amount"] = None
     return payload
 
 
@@ -69,11 +72,12 @@ async def _full_payload(booking, customer, technician, quote, notices=None) -> d
 
 
 def _assert_can_view(user: User, payload: dict) -> None:
-    """Technicians may only open bookings assigned to them."""
-    if _is_technician(user) and payload.get("technician_id") != str(user.id):
+    """Technicians see their own jobs, and any job nobody has been given yet."""
+    assigned_to = payload.get("technician_id")
+    if _is_technician(user) and assigned_to is not None and assigned_to != str(user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view bookings assigned to you",
+            detail="This job is assigned to someone else",
         )
 
 
@@ -100,9 +104,11 @@ async def list_bookings(
     current_user: User = Depends(get_current_user),
 ) -> BookingListResponse:
     """Return a paginated, filterable list of bookings."""
-    # Technicians are locked to their own schedule.
+    # Technicians see their own schedule, plus whatever is still unassigned.
+    unassigned_too = False
     if _is_technician(current_user):
         technician_id = str(current_user.id)
+        unassigned_too = True
 
     payloads, total = await booking_service.list_bookings(
         page=page,
@@ -114,6 +120,7 @@ async def list_bookings(
         date_to=date_to,
         q=q,
         no_job=no_job,
+        include_unassigned=unassigned_too,
     )
 
     items = [BookingResponse.model_validate(_redact_for(current_user, p)) for p in payloads]
@@ -139,7 +146,7 @@ async def list_bookings(
 )
 async def create_booking(
     payload: BookingCreate,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("jobs.edit")),
 ) -> BookingResponseEnvelope:
     """Create a booking with an auto-generated booking number.
 
@@ -175,7 +182,7 @@ async def create_booking(
 async def create_booking_from_quote(
     quote_id: str,
     payload: QuoteToBookingRequest,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("jobs.edit")),
 ) -> BookingResponseEnvelope:
     """Create a booking from an accepted quote and mark the quote as converted."""
     notices: list = []
@@ -218,13 +225,16 @@ async def get_calendar(
     current_user: User = Depends(get_current_user),
 ) -> CalendarEventsResponse:
     """Return bookings in a date range formatted for FullCalendar."""
+    unassigned_too = False
     if _is_technician(current_user):
         technician_id = str(current_user.id)
+        unassigned_too = True
 
     events = await booking_service.get_calendar_events(
         date_from=date_from,
         date_to=date_to,
         technician_id=technician_id,
+        include_unassigned=unassigned_too,
     )
 
     return CalendarEventsResponse(
@@ -240,7 +250,7 @@ async def get_calendar(
     summary="List technicians available for assignment",
 )
 async def list_assignable_technicians(
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("jobs.edit")),
 ) -> UserListResponse:
     """Return the active technicians, so office staff can assign a booking."""
     technicians = await booking_service.list_technicians()
@@ -310,7 +320,7 @@ async def get_booking(
 async def update_booking(
     booking_id: str,
     payload: BookingUpdate,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("jobs.edit")),
 ) -> BookingResponseEnvelope:
     """Update a booking. Only scheduled or confirmed bookings can be edited."""
     try:
@@ -360,9 +370,9 @@ async def update_booking_status(
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    if _is_technician(current_user):
-        # A technician runs their own visits end to end: start on arrival,
-        # complete once the report is filed.
+    if not can(current_user, "jobs.edit"):
+        # Someone who doesn't manage jobs runs their own visits end to end:
+        # start on arrival, complete once the report is filed.
         assigned = existing.technician_id is not None and str(existing.technician_id) == str(current_user.id)
         starting = (
             existing.status in (BookingStatus.SCHEDULED, BookingStatus.CONFIRMED)
@@ -377,11 +387,6 @@ async def update_booking_status(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Technicians can only start and complete visits assigned to them",
             )
-    elif current_user.role not in (UserRole.ADMIN, UserRole.OFFICE_STAFF):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to perform this action",
-        )
 
     try:
         booking, customer, technician, quote = await booking_service.update_status(
@@ -411,7 +416,7 @@ async def update_booking_status(
 )
 async def stop_repeating(
     booking_id: str,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("jobs.edit")),
 ) -> BookingResponseEnvelope:
     """Remove the later visits still waiting to be confirmed; keep confirmed ones."""
     try:
@@ -435,7 +440,7 @@ async def stop_repeating(
 @router.delete("/{booking_id}", response_model=BookingResponseEnvelope, summary="Delete a booking")
 async def delete_booking(
     booking_id: str,
-    _current_user: User = Depends(require_admin),
+    _current_user: User = Depends(require_permission("jobs.delete")),
 ) -> BookingResponseEnvelope:
     """Permanently delete a scheduled or cancelled booking."""
     try:

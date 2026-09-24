@@ -163,7 +163,7 @@ export function QuoteDetailPage() {
             <Badge variant={QUOTE_STATUS_BADGE[quote.status]}>
               {QUOTE_STATUS_LABELS[quote.status]}
             </Badge>
-            {quote.converted_to_booking ? <Badge variant="info">Converted</Badge> : null}
+            {quote.converted_to_booking ? <Badge variant="info">Booked</Badge> : null}
           </>
         }
         description={
@@ -249,7 +249,7 @@ export function QuoteDetailPage() {
             {canWrite && isAccepted && !quote.converted_to_booking ? (
               <Button variant="outline" onClick={() => navigate(`/bookings/new?quote_id=${quote.id}`)}>
                 <CalendarClock className="h-4 w-4" />
-                Convert to booking
+                Book the job
               </Button>
             ) : null}
 
@@ -257,7 +257,7 @@ export function QuoteDetailPage() {
               <Button asChild variant="outline">
                 <Link to={`/bookings/${quote.booking_id}`}>
                   <CalendarClock className="h-4 w-4" />
-                  View booking
+                  View job
                 </Link>
               </Button>
             ) : null}

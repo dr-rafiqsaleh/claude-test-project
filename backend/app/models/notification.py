@@ -8,9 +8,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 #: How long a notification survives before MongoDB expires it (30 days).
 NOTIFICATION_TTL_SECONDS = 30 * 24 * 60 * 60
@@ -46,7 +48,7 @@ NOTIFICATION_CATEGORY = {
 }
 
 
-class Notification(Document):
+class Notification(TenantDocument):
     """One notification addressed to a single staff member."""
 
     user_id: PydanticObjectId  # who receives this

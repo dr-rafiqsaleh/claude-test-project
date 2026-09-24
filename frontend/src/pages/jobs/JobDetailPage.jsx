@@ -114,7 +114,7 @@ export function JobDetailPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const canWrite = useAuthStore((state) => state.canWrite())
-  const isAdmin = useAuthStore((state) => state.isAdmin())
+  const canDelete = useAuthStore((state) => state.can('jobs.delete'))
 
   const { job, loading, error, refetch, setJob } = useJob(id)
   const { saveState, saveNow, scheduleSave } = useReportAutosave(id, setJob)
@@ -419,7 +419,7 @@ export function JobDetailPage() {
               </Button>
             ) : null}
 
-            {isAdmin && !isCompleted && !isCancelled ? (
+            {canDelete && !isCompleted && !isCancelled ? (
               <Button variant="destructive" disabled={transitioning} onClick={() => setCancelOpen(true)}>
                 <XCircle className="h-4 w-4" />
                 Cancel

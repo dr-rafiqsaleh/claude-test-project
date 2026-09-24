@@ -16,12 +16,13 @@ from fastapi.responses import StreamingResponse
 
 from app.config import settings
 from app.core.dependencies import (
+    can,
+    forbidden,
     get_current_user_flexible,
-    require_admin,
-    require_staff,
+    require_permission,
 )
 from app.models.invoice import InvoiceStatus
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.invoice import (
     AddPaymentRequest,
     InvoiceCreate,
@@ -48,12 +49,9 @@ router = APIRouter(prefix="/api/v1/invoices", tags=["invoices"])
 
 
 def _assert_not_technician(user: User) -> None:
-    """Invoicing is office-only; technicians never see money."""
-    if user.role == UserRole.TECHNICIAN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Technicians do not have access to invoices",
-        )
+    """Invoices are only for people allowed to see them."""
+    if not can(user, "invoices.view"):
+        raise forbidden("invoices.view")
 
 
 async def _payload_or_404(invoice_id: str) -> dict:
@@ -85,7 +83,7 @@ async def list_invoices(
     ),
     overdue_only: bool = Query(False, description="Only invoices past their due date"),
     q: Optional[str] = Query(None, description="Search invoice number or customer name"),
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("invoices.view")),
 ) -> InvoiceListResponse:
     """Return a paginated, filterable list of invoices."""
     _assert_not_technician(current_user)
@@ -127,7 +125,7 @@ async def list_invoices(
 )
 async def create_invoice(
     payload: InvoiceCreate,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("invoices.edit")),
 ) -> InvoiceResponseEnvelope:
     """Create an invoice with an auto-generated invoice number."""
     try:
@@ -155,7 +153,7 @@ async def create_invoice(
 )
 async def create_invoice_from_job(
     job_id: str,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("invoices.edit")),
 ) -> InvoiceResponseEnvelope:
     """Raise a draft invoice against a job, pulling in its quoted pricing."""
     try:
@@ -184,7 +182,7 @@ async def create_invoice_from_job(
     summary="Invoicing summary for the dashboard",
 )
 async def get_invoice_summary(
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("invoices.view")),
 ) -> InvoiceSummaryResponse:
     """Aggregate totals: invoiced, paid, outstanding and overdue."""
     _assert_not_technician(current_user)
@@ -209,7 +207,7 @@ async def get_invoice_summary(
 )
 async def get_invoice(
     invoice_id: str,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("invoices.view")),
 ) -> InvoiceResponseEnvelope:
     """Fetch a single invoice with its line items and payments."""
     _assert_not_technician(current_user)
@@ -230,7 +228,7 @@ async def get_invoice(
 async def update_invoice(
     invoice_id: str,
     payload: InvoiceUpdate,
-    _current_user: User = Depends(require_staff),
+    _current_user: User = Depends(require_permission("invoices.edit")),
 ) -> InvoiceResponseEnvelope:
     """Update the line items and details. Allowed while draft or sent."""
     try:
@@ -257,14 +255,11 @@ async def update_invoice(
 async def update_invoice_status(
     invoice_id: str,
     payload: InvoiceStatusUpdate,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("invoices.edit")),
 ) -> InvoiceResponseEnvelope:
     """Move an invoice through its lifecycle."""
-    if payload.status == InvoiceStatus.CANCELLED and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only an admin can cancel an invoice",
-        )
+    if payload.status == InvoiceStatus.CANCELLED and not can(current_user, "invoices.cancel"):
+        raise forbidden("invoices.cancel")
 
     try:
         invoice, customer, job, quote = await invoice_service.update_status(
@@ -294,7 +289,7 @@ async def update_invoice_status(
 async def add_invoice_payment(
     invoice_id: str,
     payload: AddPaymentRequest,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("invoices.edit")),
 ) -> InvoiceResponseEnvelope:
     """Record money received against an invoice."""
     try:
@@ -359,7 +354,7 @@ async def download_invoice_pdf(
 )
 async def delete_invoice(
     invoice_id: str,
-    _current_user: User = Depends(require_admin),
+    _current_user: User = Depends(require_permission("invoices.cancel")),
 ) -> InvoiceResponseEnvelope:
     """Permanently delete a draft invoice."""
     try:

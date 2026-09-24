@@ -19,7 +19,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
+from app.core.tenancy import acting_as, unscoped  # noqa: E402
 from app.database import close_db, init_db  # noqa: E402
+from app.models.client import Client  # noqa: E402
+from app.services import client_service  # noqa: E402
 from app.models.booking import Booking, BookingStatus  # noqa: E402
 from app.models.company_settings import CompanySettings  # noqa: E402
 from app.models.counter import (  # noqa: E402
@@ -813,44 +816,57 @@ async def main(reset: bool = False) -> None:
     await init_db()
 
     try:
-        if reset:
-            print("Resetting collections...")
-            await reset_collections()
+        # Everything seeded belongs to one client company, so the whole run
+        # happens inside its scope - the same scope a request runs in.
+        with unscoped():
+            existing = await Client.find_all().sort("created_at").to_list()
+            client = existing[0] if existing else await client_service.create_client(name="QKil Demo")
+        print(f"Seeding into client {client.name} ({client.slug})")
 
-        print("Seeding users...")
-        users = await seed_users()
-
-        admin = next((u for u in users if u.role == UserRole.ADMIN), users[0])
-
-        technician = next((u for u in users if u.role == UserRole.TECHNICIAN), None)
-
-        print("Seeding company settings...")
-        await seed_company_settings(admin)
-
-        print("Seeding customers...")
-        created = await seed_customers(admin)
-
-        print("Seeding jobs...")
-        created_jobs = await seed_jobs(admin, technician)
-
-        print("Seeding invoices...")
-        created_invoices = await seed_invoices(admin)
-
-        total_users = await User.find_all().count()
-        total_customers = await Customer.find_all().count()
-        total_jobs = await Job.find_all().count()
-        total_invoices = await Invoice.find_all().count()
-
-        print("\nSeed complete.")
-        print(f"  users:     {total_users}")
-        print(f"  customers: {total_customers} ({created} new)")
-        print(f"  jobs:      {total_jobs} ({created_jobs} new)")
-        print(f"  invoices:  {total_invoices} ({created_invoices} new)")
-        print("\nDefault credentials:")
-        for spec in SEED_USERS:
-            print(f"  {spec['role'].value:<13} {spec['email']:<18} {spec['password']}")
+        with acting_as(client.id):
+            await seed_everything(reset)
     finally:
         await close_db()
+
+
+async def seed_everything(reset: bool) -> None:
+    """The seed itself. Runs with one client in scope."""
+    if reset:
+        print("Resetting collections...")
+        await reset_collections()
+
+    print("Seeding users...")
+    users = await seed_users()
+
+    admin = next((u for u in users if u.role == UserRole.ADMIN), users[0])
+
+    technician = next((u for u in users if u.role == UserRole.TECHNICIAN), None)
+
+    print("Seeding company settings...")
+    await seed_company_settings(admin)
+
+    print("Seeding customers...")
+    created = await seed_customers(admin)
+
+    print("Seeding jobs...")
+    created_jobs = await seed_jobs(admin, technician)
+
+    print("Seeding invoices...")
+    created_invoices = await seed_invoices(admin)
+
+    total_users = await User.find_all().count()
+    total_customers = await Customer.find_all().count()
+    total_jobs = await Job.find_all().count()
+    total_invoices = await Invoice.find_all().count()
+
+    print("\nSeed complete.")
+    print(f"  users:     {total_users}")
+    print(f"  customers: {total_customers} ({created} new)")
+    print(f"  jobs:      {total_jobs} ({created_jobs} new)")
+    print(f"  invoices:  {total_invoices} ({created_invoices} new)")
+    print("\nDefault credentials:")
+    for spec in SEED_USERS:
+        print(f"  {spec['role'].value:<13} {spec['email']:<18} {spec['password']}")
 
 
 if __name__ == "__main__":

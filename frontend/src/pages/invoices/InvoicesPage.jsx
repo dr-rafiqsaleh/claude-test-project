@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
+import { EmptyState, ErrorState, PageHeader, Pagination, RefreshButton } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -93,7 +93,7 @@ export function InvoicesPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const canWrite = useAuthStore((state) => state.canWrite())
-  const isAdmin = useAuthStore((state) => state.isAdmin())
+  const canCancel = useAuthStore((state) => state.can('invoices.cancel'))
 
   const customerId = searchParams.get('customer_id') ?? ''
 
@@ -211,14 +211,22 @@ export function InvoicesPage() {
       <PageHeader
         title="Invoices"
         description="Bill completed work, chase what is owing and record payments as they land."
-        actions={canWrite ? (
-          <Button asChild>
-            <Link to="/invoices/new">
-              <Plus className="h-4 w-4" />
-              New invoice
-            </Link>
-          </Button>
-        ) : null}
+        actions={
+          <>
+            <RefreshButton
+              loading={loading || summaryLoading}
+              onRefresh={() => Promise.all([refetch(), refetchSummary()])}
+            />
+            {canWrite ? (
+              <Button asChild>
+                <Link to="/invoices/new">
+                  <Plus className="h-4 w-4" />
+                  New invoice
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
       />
 
       {/* Revenue summary ------------------------------------------------- */}
@@ -518,11 +526,11 @@ export function InvoicesPage() {
                                 </DropdownMenuItem>
                               ) : null}
 
-                              {isAdmin && (cancellable || deletable) ? (
+                              {canCancel && (cancellable || deletable) ? (
                                 <DropdownMenuSeparator />
                               ) : null}
 
-                              {isAdmin && cancellable ? (
+                              {canCancel && cancellable ? (
                                 <DropdownMenuItem
                                   onSelect={() => setPendingCancel(invoice)}
                                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -532,7 +540,7 @@ export function InvoicesPage() {
                                 </DropdownMenuItem>
                               ) : null}
 
-                              {isAdmin && isDraft ? (
+                              {canCancel && isDraft ? (
                                 <DropdownMenuItem
                                   onSelect={() => setPendingDelete(invoice)}
                                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"

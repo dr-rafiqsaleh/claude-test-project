@@ -10,16 +10,18 @@ are kept too. Nothing in the app edits or deletes these records.
 from datetime import datetime
 from typing import List, Optional
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 #: Attachments up to this size are kept byte for byte; bigger ones keep only
 #: their name, size and fingerprint (MongoDB documents are capped at 16 MB).
 MAX_KEPT_ATTACHMENT = 12 * 1024 * 1024
 
 
-class EmailLog(Document):
+class EmailLog(TenantDocument):
     """One email sent (or attempted) from QKil, with the document it carried."""
 
     document_type: str  # "quote", "invoice" or "report"

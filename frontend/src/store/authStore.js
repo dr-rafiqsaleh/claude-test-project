@@ -1,7 +1,5 @@
 import { create } from 'zustand'
 
-import { UserRole } from '@/lib/constants'
-
 /** localStorage key holding the long-lived refresh token. */
 export const REFRESH_TOKEN_KEY = 'qkil_refresh'
 
@@ -58,10 +56,20 @@ export const useAuthStore = create((set, get) => ({
     return role !== undefined && roles.includes(role)
   },
 
-  canWrite: () => {
-    const role = get().user?.role
-    return role === UserRole.ADMIN || role === UserRole.OFFICE_STAFF
-  },
+  /** QKil's own staff, who manage the client companies. */
+  isPlatformStaff: () => Boolean(get().user?.is_platform_staff),
 
-  isAdmin: () => get().user?.role === UserRole.ADMIN,
+  /** Whether the signed-in user's role holds a permission. */
+  can: (permission) => Boolean(get().user?.permissions?.includes(permission)),
+
+  // ponytail: canWrite is the union the old Office Staff role stood for, so
+  // every existing call site keeps working. Swap a call site for the exact
+  // can('quotes.edit') / can('invoices.edit') etc. when a custom role needs
+  // finer control than "can change records at all".
+  canWrite: () =>
+    ['customers.edit', 'quotes.edit', 'jobs.edit', 'invoices.edit'].some((permission) =>
+      get().can(permission),
+    ),
+
+  isAdmin: () => get().can('settings.manage'),
 }))

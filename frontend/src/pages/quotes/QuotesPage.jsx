@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
+import { EmptyState, ErrorState, PageHeader, Pagination, RefreshButton } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -70,7 +70,7 @@ export function QuotesPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const canWrite = useAuthStore((state) => state.canWrite())
-  const isAdmin = useAuthStore((state) => state.isAdmin())
+  const canDelete = useAuthStore((state) => state.can('quotes.delete'))
 
   const customerId = searchParams.get('customer_id') ?? ''
 
@@ -130,14 +130,19 @@ export function QuotesPage() {
       <PageHeader
         title="Quotes"
         description="Build, send and track quotes for your customers."
-        actions={canWrite ? (
-          <Button asChild>
-            <Link to="/quotes/new">
-              <Plus className="h-4 w-4" />
-              New quote
-            </Link>
-          </Button>
-        ) : null}
+        actions={
+          <>
+            <RefreshButton onRefresh={refetch} loading={loading} />
+            {canWrite ? (
+              <Button asChild>
+                <Link to="/quotes/new">
+                  <Plus className="h-4 w-4" />
+                  New quote
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
       />
 
       <Card>
@@ -288,7 +293,7 @@ export function QuotesPage() {
                                   Edit
                                 </DropdownMenuItem>
                               ) : null}
-                              {isAdmin && isDraft ? (
+                              {canDelete && isDraft ? (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem

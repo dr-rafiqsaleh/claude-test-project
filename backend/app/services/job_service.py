@@ -352,8 +352,13 @@ async def list_jobs(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     q: Optional[str] = None,
+    include_unassigned: bool = False,
 ) -> Tuple[List[dict], int]:
-    """Return a page of job payloads (names embedded) plus the total count."""
+    """Return a page of job payloads (names embedded) plus the total count.
+
+    `include_unassigned` widens a technician filter to "theirs, plus the jobs
+    nobody has been given yet".
+    """
     criteria: dict = {}
 
     if status is not None:
@@ -363,7 +368,10 @@ async def list_jobs(
         technician_oid = _to_object_id(technician_id)
         if technician_oid is None:
             return [], 0
-        criteria["technician_id"] = technician_oid
+        # $in with None also matches jobs where the field was never set.
+        criteria["technician_id"] = (
+            {"$in": [technician_oid, None]} if include_unassigned else technician_oid
+        )
 
     if customer_id:
         customer_oid = _to_object_id(customer_id)
@@ -564,7 +572,9 @@ async def update_status(
         if user_id is not None and job.technician_id is None:
             # A technician starting an unassigned job takes ownership of it.
             starter = await User.get(user_id)
-            if starter is not None and starter.role == UserRole.TECHNICIAN:
+            from app.services import role_service  # noqa: PLC0415
+
+            if starter is not None and await role_service.has_permission(starter, "jobs.assignable"):
                 job.technician_id = starter.id
                 technician = starter
     elif status == JobStatus.COMPLETED:

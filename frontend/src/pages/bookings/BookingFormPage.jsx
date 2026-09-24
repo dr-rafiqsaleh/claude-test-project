@@ -583,7 +583,7 @@ export function BookingFormPage() {
                           : quotesLoading
                             ? 'Loading quotes...'
                             : quotes.length === 0
-                              ? 'No accepted quotes waiting to be converted.'
+                              ? 'No accepted quotes waiting to be booked.'
                               : 'Selecting a quote fills in the service details below.'}
                       </FormDescription>
                       <FormMessage />

@@ -25,6 +25,7 @@ from reportlab.platypus import (
 from app.models.booking import Booking
 from app.models.counter import INVOICE_COUNTER, Counter
 from app.models.customer import Customer
+from app.core.tenancy import tenant_filter
 from app.models.invoice import (
     DEFAULT_PAYMENT_TERM_DAYS,
     DEFAULT_TERMS,
@@ -827,9 +828,15 @@ async def get_dashboard_summary() -> InvoiceSummary:
     month_start = _start_of_month(now)
 
     collection = Invoice.get_motor_collection()
+    # An aggregation pipeline never sees TenantDocument's filter, so each one
+    # starts by narrowing to the client in scope. `scope` is empty for platform
+    # staff, who are meant to see the figures across every client.
+    scope = tenant_filter()
+    mine = [{"$match": scope}] if scope else []
 
     by_status_cursor = collection.aggregate(
         [
+            *mine,
             {
                 "$group": {
                     "_id": "$status",
@@ -870,6 +877,7 @@ async def get_dashboard_summary() -> InvoiceSummary:
 
     overdue_cursor = collection.aggregate(
         [
+            *mine,
             {
                 "$match": {
                     "status": {"$in": OUTSTANDING_STATUSES},
@@ -886,6 +894,7 @@ async def get_dashboard_summary() -> InvoiceSummary:
 
     collected_cursor = collection.aggregate(
         [
+            *mine,
             {"$match": {"status": {"$ne": InvoiceStatus.CANCELLED.value}}},
             {"$unwind": "$payments"},
             {"$match": {"payments.paid_at": {"$gte": month_start}}},

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -34,6 +34,25 @@ export function PageHeader({ title, description, badge, actions, backTo, backLab
         {actions ? <div className="flex flex-wrap gap-2 sm:justify-end">{actions}</div> : null}
       </div>
     </div>
+  )
+}
+
+/**
+ * Fetches the page's data again. Sits in a PageHeader's actions, so every
+ * screen refreshes the same way and from the same place.
+ */
+export function RefreshButton({ onRefresh, loading, label = 'Refresh' }) {
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      disabled={loading}
+      onClick={() => void onRefresh()}
+      title={label}
+      aria-label={label}
+    >
+      <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+    </Button>
   )
 }
 

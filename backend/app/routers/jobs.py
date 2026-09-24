@@ -17,13 +17,14 @@ from fastapi.responses import Response, StreamingResponse
 
 from app.config import settings
 from app.core.dependencies import (
+    can,
+    forbidden,
     get_current_user,
     get_current_user_flexible,
-    require_admin,
-    require_staff,
+    require_permission,
 )
 from app.models.job import Job, JobStatus
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.job import (
     JobListData,
     JobListResponse,
@@ -51,7 +52,8 @@ router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 
 
 def _is_technician(user: User) -> bool:
-    return user.role == UserRole.TECHNICIAN
+    """Someone who only sees the jobs they are given."""
+    return not can(user, "jobs.view_all")
 
 
 def _is_assigned(user: User, job: Job) -> bool:
@@ -59,19 +61,17 @@ def _is_assigned(user: User, job: Job) -> bool:
 
 
 def _assert_can_view(user: User, job: Job) -> None:
-    """Technicians may only open jobs assigned to them."""
-    if _is_technician(user) and not _is_assigned(user, job):
+    """Technicians see their own jobs, and any job nobody has been given yet."""
+    if _is_technician(user) and job.technician_id is not None and not _is_assigned(user, job):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view jobs assigned to you",
+            detail="This job is assigned to someone else",
         )
 
 
 def _assert_can_edit(user: User, job: Job) -> None:
-    """Office staff, admins and the assigned technician may edit the report."""
-    if user.role in (UserRole.ADMIN, UserRole.OFFICE_STAFF):
-        return
-    if _is_technician(user) and _is_assigned(user, job):
+    """The person given the job may always fill in its report; others need 'Edit any report'."""
+    if can(user, "reports.edit_all") or _is_assigned(user, job):
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -105,9 +105,11 @@ async def list_jobs(
     current_user: User = Depends(get_current_user),
 ) -> JobListResponse:
     """Return a paginated, filterable list of jobs."""
-    # Technicians are locked to their own work.
+    # Technicians see their own work, plus whatever is still unassigned.
+    unassigned_too = False
     if _is_technician(current_user):
         technician_id = str(current_user.id)
+        unassigned_too = True
 
     payloads, total = await job_service.list_jobs(
         page=page,
@@ -118,6 +120,7 @@ async def list_jobs(
         date_from=date_from,
         date_to=date_to,
         q=q,
+        include_unassigned=unassigned_too,
     )
 
     return JobListResponse(
@@ -140,7 +143,7 @@ async def list_jobs(
 )
 async def create_job_from_booking(
     booking_id: str,
-    current_user: User = Depends(require_staff),
+    current_user: User = Depends(require_permission("jobs.edit")),
 ) -> JobResponseEnvelope:
     """Turn a booking into a job, copying across the service info and schedule."""
     try:
@@ -218,13 +221,10 @@ async def update_job_status(
     """Move a job through its lifecycle."""
     existing, _customer, _technician, _booking = await _load_job_or_404(job_id)
 
-    if payload.status == JobStatus.CANCELLED and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only an admin can cancel a job",
-        )
+    if payload.status == JobStatus.CANCELLED and not can(current_user, "jobs.delete"):
+        raise forbidden("jobs.delete")
 
-    if _is_technician(current_user):
+    if not can(current_user, "jobs.edit"):
         allowed_for_technician = (
             existing.status == JobStatus.PENDING and payload.status == JobStatus.IN_PROGRESS
         ) or (
@@ -235,11 +235,6 @@ async def update_job_status(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Technicians can only start and complete jobs assigned to them",
             )
-    elif current_user.role not in (UserRole.ADMIN, UserRole.OFFICE_STAFF):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to perform this action",
-        )
 
     if payload.status == JobStatus.COMPLETED and not job_service.report_has_content(existing):
         raise HTTPException(
@@ -322,7 +317,7 @@ async def download_job_report(
 @router.delete("/{job_id}", response_model=JobResponseEnvelope, summary="Delete a job")
 async def delete_job(
     job_id: str,
-    _current_user: User = Depends(require_admin),
+    _current_user: User = Depends(require_permission("jobs.delete")),
 ) -> JobResponseEnvelope:
     """Permanently delete a pending job and its photos."""
     try:
@@ -455,10 +450,10 @@ async def delete_job_photo(
         )
 
     is_uploader = str(photo.uploaded_by) == str(current_user.id)
-    if not is_uploader and current_user.role != UserRole.ADMIN:
+    if not is_uploader and not can(current_user, "reports.edit_all"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the uploader or an admin can delete this photo",
+            detail="Only the person who took this photo, or someone who can edit any report, can delete it",
         )
 
     payload = photo_service.build_photo_payload(photo)

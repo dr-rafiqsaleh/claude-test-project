@@ -4,9 +4,11 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 
 class QuoteStatus(str, Enum):
@@ -38,7 +40,7 @@ class QuoteItem(BaseModel):
         return round(self.quantity * self.unit_price, 2)
 
 
-class Quote(Document):
+class Quote(TenantDocument):
     """A quote raised against a customer."""
 
     quote_number: str  # e.g. "QTE-0001"
@@ -65,7 +67,7 @@ class Quote(Document):
     class Settings:
         name = "quotes"
         indexes = [
-            IndexModel([("quote_number", 1)], unique=True, name="uniq_quote_number"),
+            IndexModel([("client_id", 1), ("quote_number", 1)], unique=True, name="uniq_quote_number"),
             IndexModel([("customer_id", 1)], name="idx_customer_id"),
             IndexModel([("status", 1)], name="idx_status"),
             IndexModel([("created_at", -1)], name="idx_created_at"),

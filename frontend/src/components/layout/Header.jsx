@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
 import { ROLE_LABELS, UserRole } from '@/lib/constants'
-import { ADMIN_NAV, visibleNav } from '@/lib/navigation'
+import { ADMIN_NAV, PLATFORM_NAV, visibleNav } from '@/lib/navigation'
 import { getTheme, setTheme } from '@/lib/theme'
 import { getInitials } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -52,7 +52,7 @@ export function Header() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
 
   // The sidebar holds the admin links on desktop; on a phone they live here.
-  const adminLinks = visibleNav(ADMIN_NAV, user?.role)
+  const adminLinks = [...visibleNav(ADMIN_NAV, user), ...visibleNav(PLATFORM_NAV, user)]
 
   async function handleLogout() {
     setSigningOut(true)

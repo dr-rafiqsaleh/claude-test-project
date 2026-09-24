@@ -29,7 +29,7 @@ async def authenticate_user(email: str, password: str) -> Optional[User]:
 def create_tokens(user: User) -> Tuple[str, str]:
     """Create an (access_token, refresh_token) pair for the given user."""
     subject = str(user.id)
-    claims = {"email": user.email, "role": user.role.value}
+    claims = {"email": user.email, "role": str(user.role)}
     access = create_access_token(subject, extra=claims)
     refresh = create_refresh_token(subject, extra={"email": user.email})
     return access, refresh

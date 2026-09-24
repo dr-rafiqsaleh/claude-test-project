@@ -9,8 +9,10 @@ from enum import Enum
 from typing import List, Optional
 from uuid import uuid4
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
+
+from app.models.tenant import TenantDocument
 
 #: Image types accepted for the company logo.
 ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
@@ -182,7 +184,7 @@ DEFAULT_REPORT_DECLARATION = (
 )
 
 
-class CompanySettings(Document):
+class CompanySettings(TenantDocument):
     """Singleton settings document."""
 
     # Identity

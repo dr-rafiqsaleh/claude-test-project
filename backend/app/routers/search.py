@@ -9,8 +9,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
-from app.core.dependencies import get_current_user
-from app.models.user import User, UserRole
+from app.core.dependencies import can, get_current_user
+from app.models.user import User
 from app.schemas.search import SearchData, SearchResponse
 from app.services import search_service
 
@@ -34,8 +34,10 @@ async def search(
     """Search customers, quotes, bookings, jobs and invoices in one call."""
     selected = search_service.parse_types(types)
 
-    if current_user.role == UserRole.TECHNICIAN:
-        selected = [name for name in selected if name != "invoices"]
+    # Only search what this person may see.
+    hidden = {name for name, permission in (("invoices", "invoices.view"), ("quotes", "quotes.view"))
+              if not can(current_user, permission)}
+    selected = [name for name in selected if name not in hidden]
 
     payload = await search_service.search_all(q, selected, limit)
     data = SearchData.model_validate(payload)

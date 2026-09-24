@@ -36,8 +36,15 @@ async def get_user_by_id(user_id: PydanticObjectId | str) -> Optional[User]:
     return await User.get(oid)
 
 
+async def _check_role(key: str) -> str:
+    """The role key, if such a role exists (raises role_service.RoleNotFoundError)."""
+    from app.services import role_service  # noqa: PLC0415
+
+    return (await role_service.get_role(key)).key
+
+
 async def create_user(payload: UserCreate) -> User:
-    """Create a new user, rejecting duplicate emails."""
+    """Create a new user, rejecting duplicate emails and unknown roles."""
     email = normalise_email(payload.email)
     if await get_user_by_email(email):
         raise UserAlreadyExistsError(f"A user with email {email} already exists")
@@ -48,7 +55,7 @@ async def create_user(payload: UserCreate) -> User:
         full_name=payload.full_name,
         job_title=payload.job_title,
         hashed_password=hash_password(payload.password),
-        role=payload.role,
+        role=await _check_role(payload.role),
         is_active=payload.is_active,
         created_at=now,
         updated_at=now,
@@ -60,14 +67,14 @@ async def create_user(payload: UserCreate) -> User:
 async def list_users(
     page: int = 1,
     page_size: int = 20,
-    role: Optional[UserRole] = None,
+    role: Optional[str] = None,
     is_active: Optional[bool] = None,
     q: Optional[str] = None,
 ) -> Tuple[List[User], int]:
     """Return a page of users plus the total count."""
     criteria: dict = {}
-    if role is not None:
-        criteria["role"] = role.value
+    if role:
+        criteria["role"] = role
     if is_active is not None:
         criteria["is_active"] = is_active
     if q and q.strip():
@@ -110,8 +117,8 @@ async def update_user(user_id: PydanticObjectId | str, payload: UserUpdate) -> U
     if "job_title" in data:
         user.job_title = data["job_title"]
 
-    if "role" in data:
-        user.role = UserRole(data["role"])
+    if "role" in data and data["role"]:
+        user.role = await _check_role(str(data["role"]))
 
     if "is_active" in data:
         user.is_active = bool(data["is_active"])
@@ -133,9 +140,71 @@ async def deactivate_user(user_id: PydanticObjectId | str) -> User:
     return user
 
 
+class UserInUseError(Exception):
+    """A user with records against their name, who can only be deactivated."""
+
+
+async def user_payload(user: User, with_permissions: bool = False) -> dict:
+    """A user as the API returns them, with their role's name."""
+    from app.services import role_service  # noqa: PLC0415
+
+    payload = user.model_dump(exclude={"hashed_password"})
+    payload["id"] = str(user.id)
+    payload["role_name"] = await role_service.role_name(str(user.role))
+    if with_permissions:
+        payload["permissions"] = sorted(await role_service.permissions_for(user))
+    return payload
+
+
+async def delete_user_permanently(user_id: PydanticObjectId | str) -> User:
+    """Remove a user for good. Only for someone with nothing on record.
+
+    Anyone who has done work in QKil (jobs, reports, quotes, invoices,
+    customers, emails, photos) stays on those records, so they are
+    deactivated instead: they can't sign in, and history keeps their name.
+    """
+    from app.models.booking import Booking  # noqa: PLC0415
+    from app.models.customer import Customer  # noqa: PLC0415
+    from app.models.email_log import EmailLog  # noqa: PLC0415
+    from app.models.invoice import Invoice  # noqa: PLC0415
+    from app.models.job import Job  # noqa: PLC0415
+    from app.models.notification import Notification  # noqa: PLC0415
+    from app.models.photo import Photo  # noqa: PLC0415
+    from app.models.quote import Quote  # noqa: PLC0415
+
+    user = await get_user_by_id(user_id)
+    if user is None:
+        raise UserNotFoundError("User not found")
+
+    checks = (
+        ("job", Booking, ["technician_id", "created_by"]),
+        ("report", Job, ["technician_id", "created_by"]),
+        ("quote", Quote, ["created_by"]),
+        ("invoice", Invoice, ["created_by", "payments.recorded_by"]),
+        ("customer", Customer, ["created_by"]),
+        ("email", EmailLog, ["sent_by"]),
+        ("photo", Photo, ["uploaded_by"]),
+    )
+    found = []
+    for label, model, fields in checks:
+        count = await model.find({"$or": [{field: user.id} for field in fields]}).count()
+        if count:
+            found.append(f"{count} {label}{'' if count == 1 else 's'}")
+    if found:
+        raise UserInUseError(
+            f"{user.full_name} is on {', '.join(found)}, so they can't be deleted without "
+            "losing that history. Deactivate them instead: they can no longer sign in, "
+            "and their name stays on the records."
+        )
+
+    await Notification.find({"user_id": user.id}).delete()
+    await user.delete()
+    return user
+
+
 async def count_active_admins() -> int:
     """Number of active admin accounts (used to prevent lock-out)."""
-    return await User.find(User.role == UserRole.ADMIN, User.is_active == True).count()  # noqa: E712
+    return await User.find({"role": UserRole.ADMIN.value, "is_active": True}).count()
 
 
 def _escape_regex(value: str) -> str:

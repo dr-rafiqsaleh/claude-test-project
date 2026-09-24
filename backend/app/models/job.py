@@ -4,9 +4,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
-from beanie import Document, PydanticObjectId
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
+
+from app.models.tenant import TenantDocument
 
 from app.models.company_settings import ProductCategory
 
@@ -165,7 +167,7 @@ class ReportAssessments(BaseModel):
     site_plan: Optional[AssessmentAnswer] = None
 
 
-class Job(Document):
+class Job(TenantDocument):
     """A completed or in-flight service visit, with its pest inspection report."""
 
     job_number: str  # e.g. "RPT-0001" - shown to users as the report number
@@ -227,7 +229,7 @@ class Job(Document):
     class Settings:
         name = "jobs"
         indexes = [
-            IndexModel([("job_number", 1)], unique=True, name="uniq_job_number"),
+            IndexModel([("client_id", 1), ("job_number", 1)], unique=True, name="uniq_job_number"),
             IndexModel([("booking_id", 1)], name="idx_booking_id"),
             IndexModel([("customer_id", 1)], name="idx_customer_id"),
             IndexModel([("technician_id", 1)], name="idx_technician_id"),

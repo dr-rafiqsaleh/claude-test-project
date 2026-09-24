@@ -169,7 +169,7 @@ export function ActivityFields({ fields, setField, disabled, large = false }) {
       </FormField>
 
       {fields.activity_level !== 'none' ? (
-        <FormField label="Pests found" hint="Pre-ticked from the booking. Tap to change.">
+        <FormField label="Pests found" hint="Pre-ticked from the job. Tap to change.">
           <ChoiceChips
             ariaLabel="Pests found"
             multiple

@@ -11,7 +11,6 @@ import { LoadingState } from '@/components/ui/spinner'
 import { Toaster } from '@/components/ui/toaster'
 import { refreshAccessToken } from '@/lib/api'
 import { readRefreshToken, useAuthStore } from '@/store/authStore'
-import { UserRole } from '@/lib/constants'
 
 // Pages load on first visit, so a phone downloads only the screens it opens.
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
@@ -35,8 +34,7 @@ const QuoteFormPage = lazy(() => import('@/pages/quotes/QuoteFormPage'))
 const QuotesPage = lazy(() => import('@/pages/quotes/QuotesPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const UsersPage = lazy(() => import('@/pages/users/UsersPage'))
-
-const WRITE_ROLES = [UserRole.ADMIN, UserRole.OFFICE_STAFF]
+const ClientsPage = lazy(() => import('@/pages/platform/ClientsPage'))
 
 function NotFoundPage() {
   return (
@@ -133,7 +131,7 @@ export function App() {
           <Route
             path="/customers/new"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="customers.edit">
                 <CustomerFormPage />
               </RoleGuard>
             }
@@ -142,7 +140,7 @@ export function App() {
           <Route
             path="/customers/:id/edit"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="customers.edit">
                 <CustomerFormPage />
               </RoleGuard>
             }
@@ -152,7 +150,7 @@ export function App() {
           <Route
             path="/quotes/new"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="quotes.edit">
                 <QuoteFormPage />
               </RoleGuard>
             }
@@ -161,7 +159,7 @@ export function App() {
           <Route
             path="/quotes/:id/edit"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="quotes.edit">
                 <QuoteFormPage />
               </RoleGuard>
             }
@@ -171,7 +169,7 @@ export function App() {
           <Route
             path="/bookings/new"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="jobs.edit">
                 <BookingFormPage />
               </RoleGuard>
             }
@@ -180,7 +178,7 @@ export function App() {
           <Route
             path="/bookings/:id/edit"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="jobs.edit">
                 <BookingFormPage />
               </RoleGuard>
             }
@@ -194,7 +192,7 @@ export function App() {
           <Route
             path="/invoices"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="invoices.view">
                 <InvoicesPage />
               </RoleGuard>
             }
@@ -202,7 +200,7 @@ export function App() {
           <Route
             path="/invoices/new"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="invoices.edit">
                 <InvoiceFormPage />
               </RoleGuard>
             }
@@ -210,7 +208,7 @@ export function App() {
           <Route
             path="/invoices/:id"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="invoices.view">
                 <InvoiceDetailPage />
               </RoleGuard>
             }
@@ -218,7 +216,7 @@ export function App() {
           <Route
             path="/invoices/:id/edit"
             element={
-              <RoleGuard allow={WRITE_ROLES}>
+              <RoleGuard permission="invoices.edit">
                 <InvoiceFormPage />
               </RoleGuard>
             }
@@ -227,8 +225,17 @@ export function App() {
           <Route
             path="/users"
             element={
-              <RoleGuard allow={[UserRole.ADMIN]}>
+              <RoleGuard permission="users.manage">
                 <UsersPage />
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="/platform/clients"
+            element={
+              <RoleGuard platform>
+                <ClientsPage />
               </RoleGuard>
             }
           />
@@ -236,7 +243,7 @@ export function App() {
           <Route
             path="/settings"
             element={
-              <RoleGuard allow={[UserRole.ADMIN]}>
+              <RoleGuard permission="settings.manage">
                 <SettingsPage />
               </RoleGuard>
             }

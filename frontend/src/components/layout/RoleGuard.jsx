@@ -6,11 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuthStore } from '@/store/authStore'
 import { ROLE_LABELS } from '@/lib/constants'
 
-/** Renders children only for the allowed roles; otherwise a 403 panel (or redirect). */
-export function RoleGuard({ allow, children, redirectTo }) {
+/**
+ * Renders children only when the user may see them; otherwise a 403 panel (or
+ * redirect). Prefer `permission` - it matches what the API actually checks, so
+ * a custom role that was given the permission gets in. `allow` lists role keys.
+ * `platform` is for QKil's own pages: a client's Admin role holds every
+ * permission there is, so platform access can never be one of them.
+ */
+export function RoleGuard({ allow, permission, platform, children, redirectTo }) {
   const user = useAuthStore((state) => state.user)
 
-  if (user && allow.includes(user.role)) {
+  let allowed
+  if (platform) allowed = Boolean(user?.is_platform_staff)
+  else if (permission) allowed = Boolean(user?.permissions?.includes(permission))
+  else allowed = Boolean(user && allow?.includes(user.role))
+
+  if (allowed) {
     return <>{children}</>
   }
 
@@ -28,7 +39,7 @@ export function RoleGuard({ allow, children, redirectTo }) {
           <CardTitle>403 - Access denied</CardTitle>
           <CardDescription>
             {user
-              ? `Your ${ROLE_LABELS[user.role]} account does not have permission to view this page.`
+              ? `Your ${user.role_name ?? ROLE_LABELS[user.role] ?? user.role} account does not have permission to view this page.`
               : 'You do not have permission to view this page.'}
           </CardDescription>
         </CardHeader>

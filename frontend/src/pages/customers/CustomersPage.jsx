@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, PageHeader, Pagination } from '@/components/ui/page'
+import { EmptyState, ErrorState, PageHeader, Pagination, RefreshButton } from '@/components/ui/page'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -122,15 +122,20 @@ export function CustomersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Customers"
-        description="Manage the customer records behind every quote, booking and job."
-        actions={canWrite ? (
-          <Button asChild>
-            <Link to="/customers/new">
-              <Plus className="h-4 w-4" />
-              New customer
-            </Link>
-          </Button>
-        ) : null}
+        description="Manage the customer records behind every quote, job and report."
+        actions={
+          <>
+            <RefreshButton onRefresh={refetch} loading={loading} />
+            {canWrite ? (
+              <Button asChild>
+                <Link to="/customers/new">
+                  <Plus className="h-4 w-4" />
+                  New customer
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
       />
 
       <Card>
