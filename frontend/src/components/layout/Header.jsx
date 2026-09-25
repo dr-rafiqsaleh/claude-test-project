@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { LogOut, Monitor, Moon, Search, Sun, X } from 'lucide-react'
+import { BookOpen, LogOut, Monitor, Moon, Search, Sun, X } from 'lucide-react'
 
 import { logout as logoutRequest } from '@/api/auth'
 import { HeaderSearch } from '@/components/layout/HeaderSearch'
@@ -137,6 +137,12 @@ export function Header() {
                 })}
               </div>
             ) : null}
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => navigate('/guide')}>
+              <BookOpen className="h-4 w-4" />
+              User guide
+            </DropdownMenuItem>
 
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { getInvoiceSummary } from '@/api/invoices'
 import { Logo } from '@/components/layout/Logo'
 import { cn } from '@/lib/utils'
-import { ADMIN_NAV, PLATFORM_NAV, PRIMARY_NAV, isNavActive, visibleNav } from '@/lib/navigation'
+import { ADMIN_NAV, HELP_NAV, PLATFORM_NAV, PRIMARY_NAV, isNavActive, visibleNav } from '@/lib/navigation'
 import { useAuthStore } from '@/store/authStore'
 
 /**
@@ -104,6 +104,13 @@ export function Sidebar({ hasOverdue }) {
             ))}
           </div>
         ) : null}
+
+        <div className="space-y-1">
+          <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Help</p>
+          {HELP_NAV.map((item) => (
+            <SidebarLink key={item.to} item={item} active={isNavActive(item, pathname)} />
+          ))}
+        </div>
 
         {/* Running PestBase itself, kept apart from running one company. */}
         {platform.length > 0 ? (

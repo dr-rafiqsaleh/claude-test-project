@@ -35,6 +35,7 @@ const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const UsersPage = lazy(() => import('@/pages/users/UsersPage'))
 const ClientsPage = lazy(() => import('@/pages/platform/ClientsPage'))
 const EnquiriesPage = lazy(() => import('@/pages/platform/EnquiriesPage'))
+const GuidePage = lazy(() => import('@/pages/guide/GuidePage'))
 const AuditPage = lazy(() => import('@/pages/audit/AuditPage'))
 const PlatformSettingsPage = lazy(() => import('@/pages/platform/PlatformSettingsPage'))
 
@@ -290,6 +291,9 @@ export function App() {
               </RoleGuard>
             }
           />
+
+          <Route path="/guide" element={<GuidePage />} />
+          <Route path="/guide/:sectionId" element={<GuidePage />} />
 
           <Route
             path="/platform/enquiries"
