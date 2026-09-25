@@ -12,14 +12,16 @@ runtime, and nothing here can break sign-in.
 | `terms.html` | Terms and conditions, adapted the same way |
 | `404.html`, `robots.txt`, `sitemap.xml` | The usual |
 | `styles.css` | All the styling; light and dark themes |
+| `partials/footer.html` | The footer on every page, with the company's statutory details |
+| `preview.py` | Local preview that fills in the footer |
 | `favicon.svg` | The wasp, copied from `frontend/public/favicon.svg` |
 
 ## Before publishing
 
-- The registered office address lives only in the footer, so a change of
-  address never touches the privacy policy or terms. The footer is repeated in
-  each page (`index.html`, `privacy.html`, `terms.html`, `404.html`): search
-  for "Registered office" and update all four.
+- The company's details, including the registered office address, live in one
+  file: `partials/footer.html`. Every page pulls it in, and the privacy policy
+  and terms point to the footer, so a change of address is a one-line edit
+  there and nothing else.
 - Create the mailboxes the pages use: `hello@pestbase.co.uk` and
   `privacy@pestbase.co.uk`.
 - Have the privacy policy and terms reviewed. They were adapted from Service
@@ -32,18 +34,26 @@ runtime, and nothing here can break sign-in.
 
 ```bash
 cd marketing
-python3 -m http.server 8080    # http://localhost:8080
+python3 preview.py 8080    # http://localhost:8080
 ```
+
+Use `preview.py` rather than `python3 -m http.server` or opening a file
+directly: those leave out the shared footer.
 
 ## Host it
 
-Any static host works: Cloudflare Pages, Netlify, GitHub Pages or an S3
-bucket - point it at this folder, no build command. Or the included image:
+Use the included image, which serves the site with nginx and fills in the
+footer:
 
 ```bash
 docker build -t pestbase-marketing marketing
 docker run -p 8080:80 pestbase-marketing
 ```
+
+Any other host must support nginx-style server-side includes (`ssi on`).
+Plain static hosts such as Cloudflare Pages, Netlify, GitHub Pages or an S3
+bucket do not, and would publish every page **without its footer** - and so
+without the company details UK law requires.
 
 Then point DNS: `pestbase.co.uk` (and `www`) at the site, and
 `app.pestbase.co.uk` at the portal. The site links to
