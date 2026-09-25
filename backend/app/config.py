@@ -75,6 +75,15 @@ class Settings(BaseSettings):
     AUTH_SMTP_SECURE: bool = False
     CORS_ORIGINS: str = "http://localhost:5173"
 
+    # -- Website contact form -------------------------------------------------
+    #: Where contact-form enquiries are emailed, through the platform's mail
+    #: settings. Every enquiry is also stored, whether or not this is set. The
+    #: website's origin (https://pestbase.co.uk) must be in CORS_ORIGINS.
+    CONTACT_INBOX: str = "hello@pestbase.co.uk"
+    #: At most this many enquiries from one IP address per window.
+    CONTACT_RATE_LIMIT_MAX: int = 5
+    CONTACT_RATE_LIMIT_WINDOW_SECONDS: int = 3600
+
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 500

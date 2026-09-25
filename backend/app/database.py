@@ -12,6 +12,7 @@ from app.models.audit_event import AuditEvent
 from app.models.booking import Booking
 from app.models.client import Client
 from app.models.company_settings import CompanySettings
+from app.models.contact_enquiry import ContactEnquiry
 from app.models.counter import Counter
 from app.models.customer import Customer
 from app.models.email_log import EmailLog
@@ -50,6 +51,7 @@ DOCUMENT_MODELS = [
     SupportGrant,
     LoginAttempt,
     PlatformSettings,
+    ContactEnquiry,
 ]
 
 _client: Optional[AsyncIOMotorClient] = None

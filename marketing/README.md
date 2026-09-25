@@ -1,61 +1,94 @@
 # pestbase.co.uk
 
-The public marketing site for PestBase: static HTML and CSS, no build step and
-no JavaScript beyond the footer's year. It is deliberately separate from the
-portal (`app.pestbase.co.uk`): different release cadence, nothing shared at
-runtime, and nothing here can break sign-in.
+The public website for PestBase, a trading name of Service Record Ltd. Built
+like the app: React 18, Vite, Tailwind, React Router, react-hook-form and zod,
+with the app's theme tokens and UI components (`src/components/ui` is copied
+from `frontend/src/components/ui`). Hosted separately from the app
+(`app.pestbase.co.uk`).
 
-| File | What |
-| --- | --- |
-| `index.html` | The home page |
-| `privacy.html` | Privacy policy, adapted from Service Record Ltd's ServiceRecord policy |
-| `terms.html` | Terms and conditions, adapted the same way |
-| `404.html`, `robots.txt`, `sitemap.xml` | The usual |
-| `styles.css` | All the styling; light and dark themes |
-| `partials/footer.html` | The footer on every page, with the company's statutory details |
-| `preview.py` | Local preview that fills in the footer |
-| `favicon.svg` | The wasp, copied from `frontend/public/favicon.svg` |
+| Page | Route | Source |
+| --- | --- | --- |
+| Home | `/` | `src/pages/HomePage.jsx` |
+| Contact us (form) | `/contact` | `src/pages/ContactPage.jsx` |
+| Privacy policy | `/privacy` | `src/content/privacyContent.js` |
+| Terms and conditions | `/terms` | `src/content/termsContent.js` |
+| Not found | anything else | `src/pages/NotFoundPage.jsx` |
 
-## Before publishing
+## Company details
 
-- The company's details, including the registered office address, live in one
-  file: `partials/footer.html`. Every page pulls it in, and the privacy policy
-  and terms point to the footer, so a change of address is a one-line edit
-  there and nothing else.
-- Create the mailboxes the pages use: `hello@pestbase.co.uk` and
-  `privacy@pestbase.co.uk`.
-- Have the privacy policy and terms reviewed. They were adapted from Service
-  Record Ltd's ServiceRecord documents for what PestBase does: no AI features,
-  no free-trial checks and no named payment provider, but support access,
-  emails sent through the customer's own mail account and pest-control
-  record-keeping responsibilities.
+`src/content/company.js` holds the company's name, number, place of
+registration and registered office. The footer on every page shows them, and
+the privacy policy and terms point to the footer rather than repeating the
+address - so a change of address is a one-line edit there.
 
-## Preview
+## Contact form
+
+The form posts to the app's API, `POST /api/v1/contact` (see
+`backend/app/routers/contact.py`). The API stores every enquiry in the
+`contact_enquiries` collection and emails it to `CONTACT_INBOX` through the
+platform's mail settings (Platform > Settings in the app), with the enquirer as
+the reply-to. If sending fails the enquiry is still kept, marked with the
+reason.
+
+Spam protection: a hidden honeypot field, and at most `CONTACT_RATE_LIMIT_MAX`
+enquiries per IP address per hour (5 by default).
+
+`?topic=` pre-selects the subject - `demo`, `sales`, `support`, `privacy` or
+`other` - which is how "Book a demo" buttons and the privacy policy link in.
+
+On the API server:
+
+```
+CORS_ORIGINS=...,https://pestbase.co.uk   # let the website post to the API
+CONTACT_INBOX=hello@pestbase.co.uk        # where enquiries are emailed
+```
+
+`python scripts/check_contact.py` (from `backend/`) checks the endpoint end to
+end against a throwaway database and a fake mail server.
+
+## Develop
 
 ```bash
 cd marketing
-python3 preview.py 8080    # http://localhost:8080
+npm install
+npm run dev        # http://localhost:5174 - the form posts to the backend on :8000
 ```
 
-Use `preview.py` rather than `python3 -m http.server` or opening a file
-directly: those leave out the shared footer.
+## Build
+
+```bash
+npm run build      # -> dist/
+npm run preview    # serve dist/ locally
+```
+
+`build` bundles the site, then prerenders every page to static HTML
+(`scripts/prerender.mjs`): each page is published with its content, title,
+description and footer already in the HTML, so it reads without JavaScript and
+search engines see everything. React takes over in the browser.
+
+A built site posts the form to `https://app.pestbase.co.uk`. To point it
+elsewhere (a staging API), set `VITE_API_ORIGIN` at build time - see
+`.env.example`.
 
 ## Host it
 
-Use the included image, which serves the site with nginx and fills in the
-footer:
+`dist/` is plain static files, so any static host works - Cloudflare Pages,
+Netlify or S3 (build command `npm run build`, output `dist`, serve `404.html`
+for unknown paths). Or the included image, which builds and serves it with
+nginx:
 
 ```bash
 docker build -t pestbase-marketing marketing
 docker run -p 8080:80 pestbase-marketing
 ```
 
-Any other host must support nginx-style server-side includes (`ssi on`).
-Plain static hosts such as Cloudflare Pages, Netlify, GitHub Pages or an S3
-bucket do not, and would publish every page **without its footer** - and so
-without the company details UK law requires.
-
 Then point DNS: `pestbase.co.uk` (and `www`) at the site, and
-`app.pestbase.co.uk` at the portal. The site links to
-`https://app.pestbase.co.uk/login` for sign-in and uses `hello@pestbase.co.uk`
-as the contact address - change both in `index.html` if they differ.
+`app.pestbase.co.uk` at the app.
+
+## Before publishing
+
+- Create the `hello@pestbase.co.uk` mailbox (or set `CONTACT_INBOX` to another
+  address), and set up the platform's mail settings in the app so enquiries are
+  emailed.
+- Have the privacy policy and terms reviewed. They were adapted from Service
+  Record Ltd's ServiceRecord documents for what PestBase does.

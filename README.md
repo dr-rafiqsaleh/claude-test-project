@@ -243,8 +243,10 @@ Icons and splash screens are generated from `frontend/assets/`:
 
 ## Marketing site (pestbase.co.uk)
 
-`marketing/` is the public website: plain HTML and CSS, no build step, hosted
-separately from the portal. See [`marketing/README.md`](marketing/README.md).
+`marketing/` is the public website: React, Vite and Tailwind like the app,
+prerendered to static pages, with a contact form that posts to
+`POST /api/v1/contact` on this API. Hosted separately from the portal. See
+[`marketing/README.md`](marketing/README.md).
 
 ---
 

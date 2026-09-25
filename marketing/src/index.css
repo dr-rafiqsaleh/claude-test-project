@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme tokens, copied from the app (frontend/src/index.css) so the website and
+ * the app look like one product. Keep the two in step.
+ */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --background: 210 40% 98%; /* #F8FAFC app canvas */
+    --foreground: 222 47% 11%; /* #0F172A */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* PestBase green, deepened from emerald-600 so white text passes AA (5.5:1) */
+    --primary: 163 94% 24%; /* #047857 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%; /* #F1F5F9 */
+    --muted-foreground: 215 19% 35%; /* #475569, 7.2:1 on the canvas */
+
+    --accent: 152 81% 96%; /* #ECFDF5 soft green for selected states */
+    --accent-foreground: 163 88% 20%; /* #065F46 */
+
+    --destructive: 0 72% 51%; /* #DC2626 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%; /* #E2E8F0 */
+    --input: 213 27% 84%; /* #CBD5E1 */
+    --ring: 163 94% 24%;
+
+    --radius: 0.625rem;
+  }
+
+}
+
+/* Dark theme: the website follows the visitor's system setting. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: 220 49% 8%; /* #0B1220 */
+    --foreground: 210 40% 96%;
+
+    --card: 221 39% 11%; /* #111827 */
+    --card-foreground: 210 40% 96%;
+
+    --popover: 221 39% 11%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 158 64% 52%; /* #34D399 */
+    --primary-foreground: 145 80% 10%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 33% 17%; /* #1E293B */
+    --muted-foreground: 215 20% 65%; /* #94A3B8 */
+
+    --accent: 165 58% 10%;
+    --accent-foreground: 156 72% 67%;
+
+    --destructive: 0 84% 60%; /* #EF4444 */
+    --destructive-foreground: 0 0% 4%;
+
+    --border: 217 32% 18%;
+    --input: 215 25% 27%;
+    --ring: 158 64% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'cv11' 1;
+  }
+
+  /* In-page anchors land below the sticky header, not under it. */
+  [id] {
+    scroll-margin-top: 5rem;
+  }
+}

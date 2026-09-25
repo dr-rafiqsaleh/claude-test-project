@@ -38,6 +38,7 @@ htmlcov/
 node_modules/
 dist/
 dist-ssr/
+dist-server/
 build/
 .vite/
 *.local
