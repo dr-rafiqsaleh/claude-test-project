@@ -24,8 +24,9 @@ MODELS = BACKEND / "app" / "models"
 
 #: Not a client's data: the platform's own records, and the base class. Each one
 #: is here because it is deliberately shared or deliberately outside any client -
-#: the client list itself, and how PestBase sends mail for all of them.
-PLATFORM_MODELS = {"client.py", "platform_settings.py", "tenant.py", "__init__.py"}
+#: the client list itself, how PestBase sends mail for all of them, and messages
+#: from the public website's contact form, which arrive before anyone signs in.
+PLATFORM_MODELS = {"client.py", "contact_enquiry.py", "platform_settings.py", "tenant.py", "__init__.py"}
 
 #: A raw driver call is fine as long as the client is in the query. Any one of
 #: these nearby means the author dealt with it.

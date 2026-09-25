@@ -25,6 +25,12 @@ from pathlib import Path
 CHECK_DB = "pestbase_audit_check"
 os.environ["DATABASE_NAME"] = CHECK_DB  # before the app reads its settings
 
+# The accounts below use the reserved .test domain, which email-validator refuses
+# by default; this is its switch for test runs. The app itself stays strict.
+import email_validator  # noqa: E402
+
+email_validator.TEST_ENVIRONMENT = True
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import asyncio  # noqa: E402

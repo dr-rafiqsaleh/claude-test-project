@@ -18,6 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi import HTTPException
 
+from beanie import PydanticObjectId
+
+from app.core.tenancy import set_current_client
 from app.database import close_db, init_db
 from app.models.booking import Booking, BookingStatus
 from app.models.customer import Address, Customer
@@ -72,6 +75,9 @@ async def main() -> None:
     client = await init_db(database_name=CHECK_DB)
     await client.drop_database(CHECK_DB)  # clear leftovers from an interrupted run
     await init_db(database_name=CHECK_DB)  # recreate the indexes
+    # Everything a client owns is scoped to a client since multi-client support;
+    # this run acts as one throwaway client, as check_payment_reminders does.
+    set_current_client(PydanticObjectId())
 
     try:
         office = User(email="office@check.test", full_name="Olive Office", role=UserRole.OFFICE_STAFF)

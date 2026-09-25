@@ -22,16 +22,16 @@ from beanie import PydanticObjectId
 from check_email import FakeMailServer  # noqa: E402 - the same fake server
 
 from app.core.uk_time import from_uk, to_uk
+from app.core.tenancy import set_current_client
 from app.database import init_db
 from app.models.booking import Booking, BookingStatus, RecurrenceType
-from app.models.company_settings import EmailProvider, SmtpSecurity
+from app.models.platform_settings import EmailProvider, SmtpSecurity
 from app.models.customer import Address, Customer
 from app.models.notification import Notification, NotificationType
 from app.models.user import User, UserRole
 from app.routers.bookings import create_booking, get_booking, stop_repeating, update_booking
 from app.schemas.booking import BookingCreate, BookingUpdate
-from app.schemas.company_settings import CompanySettingsUpdate
-from app.services import company_settings_service, notification_service, recurrence_service
+from app.services import notification_service, platform_settings_service, recurrence_service
 
 CHECK_DB = "pestbase_recurring_check"
 
@@ -53,6 +53,9 @@ async def main() -> None:
     client = await init_db(database_name=CHECK_DB)
     await client.drop_database(CHECK_DB)  # clear leftovers from an interrupted run
     await init_db(database_name=CHECK_DB)  # recreate the indexes
+    # Everything a client owns is scoped to a client since multi-client support;
+    # this run acts as one throwaway client, as check_payment_reminders does.
+    set_current_client(PydanticObjectId())
     server = FakeMailServer()
     server.start()
 
@@ -82,11 +85,12 @@ async def main() -> None:
         assert note is not None and note.link == f"/bookings/{one_off.data.id}"
         ok("a one-off job shows in the technician's notifications, and says email isn't set up")
 
-        await company_settings_service.update_settings(
-            CompanySettingsUpdate(
-                email_provider=EmailProvider.SMTP, smtp_host="127.0.0.1", smtp_port=server.port,
-                smtp_security=SmtpSecurity.NONE, smtp_from_email="accounts@example.com",
-            )
+        # Mail is sent with the platform's settings (Platform > Settings), not a client's.
+        await platform_settings_service.update_settings(
+            {
+                "email_provider": EmailProvider.SMTP, "smtp_host": "127.0.0.1", "smtp_port": server.port,
+                "smtp_security": SmtpSecurity.NONE, "smtp_from_email": "accounts@example.com",
+            }
         )
 
         print("A monthly job")
@@ -171,7 +175,9 @@ async def main() -> None:
         weekly = await create_booking(booking(uk(2026, 10, 5), RecurrenceType.WEEKLY), current_user=office)
         count = len(await series(weekly.data.id))
         head = await Booking.get(PydanticObjectId(weekly.data.id))
-        added = await recurrence_service.extend_series(head, now=datetime.utcnow() + timedelta(days=30))
+        # A fixed "a month later", not today plus 30 days: the expected count
+        # below depends on the date, and must not change with the day it runs.
+        added = await recurrence_service.extend_series(head, now=uk(2026, 10, 22))
         # From 5 October: every week up to (not including) 5 October next year.
         assert count == 52, count
         # Thirty days on, the year ahead reaches 22 October: two more weeks.
