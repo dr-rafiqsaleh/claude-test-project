@@ -34,9 +34,3 @@ Then point DNS: `pestbase.co.uk` (and `www`) at the site, and
 `app.pestbase.co.uk` at the portal. The site links to
 `https://app.pestbase.co.uk/login` for sign-in and uses `hello@pestbase.co.uk`
 as the contact address - change both in `index.html` if they differ.
-
-## When the apps are live
-
-Replace the two "Coming soon" badges in the `#mobile` section of `index.html`
-with links to the App Store and Google Play listings, using the official
-badges from Apple and Google.

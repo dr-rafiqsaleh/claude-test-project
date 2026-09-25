@@ -213,15 +213,6 @@ section.alt { background: var(--bg-alt); border-top: 1px solid var(--line); bord
   content: ""; flex: none; width: 20px; height: 20px; margin-top: 3px; border-radius: 50%;
   background: var(--brand) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='white'%3E%3Cpath d='M8.1 13.3 4.8 10l-1.1 1.1 4.4 4.4 8.3-8.3-1.1-1.1z'/%3E%3C/svg%3E") center/16px no-repeat;
 }
-.stores { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.store {
-  display: inline-flex; flex-direction: column; padding: 8px 16px; border-radius: 10px;
-  background: var(--ink); color: var(--bg); line-height: 1.2; min-width: 150px;
-}
-.store small { font-size: 0.7rem; opacity: 0.8; }
-.store strong { font-size: 1rem; }
-.stores-note { color: var(--muted); font-size: 0.9rem; margin-top: 10px; }
-
 .panel {
   background: var(--card); border: 1px solid var(--line); border-radius: 20px;
   padding: 28px; box-shadow: var(--shadow);
