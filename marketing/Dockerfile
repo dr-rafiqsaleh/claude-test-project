@@ -4,7 +4,7 @@
 FROM nginx:1.27-alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY index.html privacy.html 404.html styles.css favicon.svg robots.txt sitemap.xml /usr/share/nginx/html/
+COPY index.html privacy.html terms.html 404.html styles.css favicon.svg robots.txt sitemap.xml /usr/share/nginx/html/
 
 EXPOSE 80
 

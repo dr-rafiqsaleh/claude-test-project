@@ -247,3 +247,33 @@ section.alt { background: var(--bg-alt); border-top: 1px solid var(--line); bord
 .prose h2 { font-size: 1.3rem; margin-top: 2em; }
 .prose p, .prose li { color: var(--muted); }
 .prose .updated { font-size: 0.9rem; }
+
+/* --- legal pages -------------------------------------------------------- */
+
+.prose h3 { font-size: 1.05rem; margin-top: 1.5em; color: var(--ink); }
+.prose ol[type="a"] { padding-left: 1.4em; }
+.prose strong { color: var(--ink); }
+.legal-section { padding: 0; scroll-margin-top: 80px; }
+
+.toc {
+  margin: 32px 0 8px; padding: 20px 24px; border: 1px solid var(--line);
+  border-radius: var(--radius); background: var(--bg-alt);
+}
+.toc h2 { margin: 0 0 8px; font-size: 1rem; }
+.toc ol { margin: 0; padding-left: 0; list-style: none; columns: 2; column-gap: 32px; }
+.toc li { break-inside: avoid; padding: 2px 0; font-size: 0.92rem; }
+.toc a { text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+@media (max-width: 600px) { .toc ol { columns: 1; } }
+
+/* Wide tables scroll inside their own box rather than widening the page. */
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 10px; }
+.table-wrap table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 0.9rem; }
+.table-wrap th, .table-wrap td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.table-wrap thead th { background: var(--bg-alt); color: var(--ink); font-weight: 600; }
+.table-wrap tbody th { color: var(--ink); font-weight: 600; width: 22%; }
+.table-wrap td { color: var(--muted); }
+.table-wrap tr:last-child th, .table-wrap tr:last-child td { border-bottom: 0; }
+
+.legal-entity { display: grid; gap: 4px; }
+.legal-entity small { font-size: 0.8rem; }

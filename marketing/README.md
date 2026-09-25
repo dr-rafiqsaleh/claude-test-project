@@ -8,10 +8,25 @@ runtime, and nothing here can break sign-in.
 | File | What |
 | --- | --- |
 | `index.html` | The home page |
-| `privacy.html` | Privacy policy. **A draft: fill in the `[bracketed]` items and have it reviewed before publishing.** |
+| `privacy.html` | Privacy policy, adapted from Service Record Ltd's ServiceRecord policy |
+| `terms.html` | Terms and conditions, adapted the same way |
 | `404.html`, `robots.txt`, `sitemap.xml` | The usual |
 | `styles.css` | All the styling; light and dark themes |
 | `favicon.svg` | The wasp, copied from `frontend/public/favicon.svg` |
+
+## Before publishing
+
+- Fill in the registered office address: it is `[registered office address]` in
+  the footer of every page and in both legal pages. UK law requires a company's
+  website to show its registered office, company number and place of
+  registration.
+- Create the mailboxes the pages use: `hello@pestbase.co.uk` and
+  `privacy@pestbase.co.uk`.
+- Have the privacy policy and terms reviewed. They were adapted from Service
+  Record Ltd's ServiceRecord documents for what PestBase does: no AI features,
+  no free-trial checks and no named payment provider, but support access,
+  emails sent through the customer's own mail account and pest-control
+  record-keeping responsibilities.
 
 ## Preview
 
