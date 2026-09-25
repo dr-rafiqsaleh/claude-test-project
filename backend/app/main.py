@@ -88,12 +88,19 @@ app.add_middleware(get_middleware())
 # cookies rather than a header the app sets itself. Behind the portal's nginx
 # the two share an origin and none of this is used; it matters when the API is
 # served from somewhere else, such as `npm run dev` against a separate backend.
+#
+# The Android and iOS apps are always "somewhere else": they call the API from
+# capacitor://localhost (iOS) and https://localhost (Android), which must be in
+# CORS_ORIGINS. They carry the session in headers rather than cookies, and the
+# SDK reads the new tokens off the response - which a browser hides from
+# JavaScript on a cross-origin response unless they are exposed here.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-Client-Id", *get_all_cors_headers()],
+    allow_headers=["Content-Type", "X-Client-Id", "Authorization", *get_all_cors_headers()],
+    expose_headers=["front-token", "st-access-token", "st-refresh-token", "anti-csrf"],
 )
 
 app.include_router(auth.router)

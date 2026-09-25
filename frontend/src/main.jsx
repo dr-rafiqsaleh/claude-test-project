@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
 import App from '@/App'
+import { initNativeShell } from '@/lib/nativeShell'
 import { applyTheme, watchSystemTheme } from '@/lib/theme'
 import { initSuperTokens } from '@/supertokens'
 import '@/index.css'
@@ -29,3 +30,5 @@ ReactDOM.createRoot(container).render(
     </BrowserRouter>
   </React.StrictMode>,
 )
+
+initNativeShell()

@@ -39,6 +39,7 @@ import { LoadingState, Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { primeCompanySettings } from '@/hooks/useCompanySettings'
+import { useAuthedSrc } from '@/hooks/useAuthedSrc'
 import { toApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { DEFAULT_PRIMARY_COLOR, MAX_LOGO_BYTES } from '@/lib/constants'
@@ -373,10 +374,9 @@ export function SettingsPage() {
     }
   }
 
-  const logoSrc = useMemo(
-    () => (pendingPreview ? pendingPreview : getLogoUrl(logoVersion)),
-    [pendingPreview, logoVersion],
-  )
+  const savedLogoUrl = useMemo(() => getLogoUrl(logoVersion), [logoVersion])
+  const savedLogoSrc = useAuthedSrc(settings?.has_logo ? savedLogoUrl : null)
+  const logoSrc = pendingPreview || savedLogoSrc
 
   const showLogo = Boolean(pendingPreview) || (settings?.has_logo && !logoBroken)
 

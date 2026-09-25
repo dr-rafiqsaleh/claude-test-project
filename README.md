@@ -183,6 +183,71 @@ npm run preview   # serve the production build locally
 
 ---
 
+## Mobile apps (Android and iOS)
+
+The apps are the portal itself, packaged with [Capacitor](https://capacitorjs.com):
+the same React bundle runs inside a native shell, so every screen, fix and
+feature ships to the web and both apps at once. The native projects live in
+`frontend/android` and `frontend/ios`; the config is `frontend/capacitor.config.json`
+(app id `uk.co.pestbase.app`).
+
+What differs inside the app, and where it is handled:
+
+| In the app | Because | Where |
+| --- | --- | --- |
+| The session travels in headers, not cookies | The app is served from `capacitor://localhost` / `https://localhost`, so the API is cross-origin and a phone's web view drops its cookies | `src/supertokens.js` |
+| Photos and the logo are fetched, then shown from a blob | An `<img>` cannot send a header | `src/hooks/useAuthedSrc.js` |
+| PDFs open the share sheet instead of downloading | A web view ignores `<a download>` | `src/lib/saveFile.js` |
+| Android's back button goes back a screen | Otherwise it closes the app | `src/lib/nativeShell.js` |
+
+Sign-in works as on the web, but use the **six-digit code**: the emailed link
+opens the browser, not the app.
+
+### Server setup the apps need
+
+On the backend serving the apps, add the apps' origins to `CORS_ORIGINS`:
+
+```
+CORS_ORIGINS=https://app.pestbase.co.uk,capacitor://localhost,https://localhost
+```
+
+### Building
+
+```bash
+cd frontend
+cp .env.mobile.example .env.mobile   # set VITE_API_ORIGIN to the live portal
+npm run build:mobile                 # build the bundle and copy it into both apps
+npm run android                      # open in Android Studio - run, or Build > Generate Signed Bundle
+npm run ios                          # open in Xcode (macOS only) - run, or Product > Archive
+```
+
+`build:mobile` refuses to run without `VITE_API_ORIGIN`: without it the app
+would call itself and every request would fail.
+
+Needs Android Studio (with SDK 35) for Android and Xcode 16+ on a Mac for iOS.
+iOS dependencies come through Swift Package Manager, so no CocoaPods.
+
+Icons and splash screens are generated from `frontend/assets/`:
+`npx @capacitor/assets generate --iconBackgroundColor '#059669' --splashBackgroundColor '#047857' --splashBackgroundColorDark '#047857'`.
+
+### Publishing
+
+- **Apple:** an Apple Developer account (£79/year), the app in App Store Connect,
+  screenshots, and the privacy policy URL `https://pestbase.co.uk/privacy.html`.
+  Give App Review a demo account they can sign in to, and a way to get the code,
+  since sign-in is by an emailed code.
+- **Google:** a Play Console account (one-off $25), a signed `.aab`, the
+  data safety form, and the same privacy policy URL.
+
+---
+
+## Marketing site (pestbase.co.uk)
+
+`marketing/` is the public website: plain HTML and CSS, no build step, hosted
+separately from the portal. See [`marketing/README.md`](marketing/README.md).
+
+---
+
 ## Default accounts
 
 Created by `python -m scripts.seed`. There are no passwords: sign-in is

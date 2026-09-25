@@ -1,0 +1,18 @@
+{
+  "appId": "uk.co.pestbase.app",
+  "appName": "PestBase",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#047857",
+      "showSpinner": false
+    }
+  }
+}

@@ -6,9 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useAuthedSrc } from '@/hooks/useAuthedSrc'
 
 /** Full-size view of one inspection photo. */
 export function PhotoLightbox({ jobId, photo, open, onOpenChange }) {
+  const src = useAuthedSrc(photo ? getPhotoUrl(jobId, photo.id) : null)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -23,7 +26,7 @@ export function PhotoLightbox({ jobId, photo, open, onOpenChange }) {
 
         {photo ? (
           <img
-            src={getPhotoUrl(jobId, photo.id)}
+            src={src}
             alt={photo.filename}
             className="max-h-[70vh] w-full rounded-md bg-muted object-contain"
           />

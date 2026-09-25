@@ -1,4 +1,5 @@
 import api, { unwrap } from '@/lib/api'
+import { saveBlob } from '@/lib/saveFile'
 
 function buildParams(params) {
   const query = {}
@@ -55,15 +56,8 @@ export async function getQuotePdf(id) {
   return response.data
 }
 
-/** Fetch the PDF and trigger a browser download. */
+/** Fetch the PDF and download it (or share it, in the app). */
 export async function downloadQuotePdf(id, quoteNumber) {
   const blob = await getQuotePdf(id)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `quote-${quoteNumber}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  await saveBlob(blob, `quote-${quoteNumber}.pdf`)
 }
