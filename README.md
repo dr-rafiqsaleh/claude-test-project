@@ -1,6 +1,6 @@
-# QKil
+# PestBase
 
-QKil is a pest control management platform for small and mid-sized UK
+PestBase is a pest control management platform for small and mid-sized UK
 operators. It covers the whole job lifecycle in one place: capture a customer,
 quote the work, schedule the visit, let the technician file a photographic
 inspection report from their phone, raise the invoice automatically when the
@@ -183,15 +183,17 @@ npm run preview   # serve the production build locally
 
 ---
 
-## Default credentials
+## Default accounts
 
-Created by `python -m scripts.seed`:
+Created by `python -m scripts.seed`. There are no passwords: sign-in is
+passwordless, so use "Email me a sign-in link" on the sign-in page, which
+registers the address the first time it is used.
 
-| Role | Email | Password | Can do |
-| --- | --- | --- | --- |
-| Admin | `admin@qkil.com` | `Admin123!` | Everything, including users and company settings |
-| Office Staff | `office@qkil.com` | `Office123!` | Customers, quotes, bookings, jobs, invoicing |
-| Technician | `tech@qkil.com` | `Tech123!` | Assigned jobs and inspection reports; no access to money |
+| Role | Email | Can do |
+| --- | --- | --- |
+| Admin | `admin@example.com` | Everything, including users and company settings |
+| Office Staff | `office@example.com` | Customers, quotes, jobs, invoicing |
+| Technician | `tech@example.com` | Assigned jobs and inspection reports; no access to money |
 
 The seed also creates 10 sample customers with UK addresses, three
 sample jobs (pending, in progress, completed), three sample invoices (draft,
@@ -223,11 +225,8 @@ Backend, read from `backend/.env`:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MONGODB_URL` | `mongodb://localhost:27017` | MongoDB connection string |
-| `DATABASE_NAME` | `qkil_db` | Database name |
-| `SECRET_KEY` | *(change this)* | JWT signing key |
-| `ALGORITHM` | `HS256` | JWT algorithm |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime |
+| `DATABASE_NAME` | `pestbase_db` | Database name |
+| `SECRET_KEY` | *(set this)* | Encrypts secrets stored in the database. Not sign-in |
 | `ENVIRONMENT` | `development` | Runtime environment |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed origins |
 | `DEFAULT_PAGE_SIZE` | `20` | Default items per page |
@@ -243,7 +242,7 @@ configuration. It lives in the `company_settings` document and is edited at
 ## Project structure
 
 ```
-QKIl/
+PestBase/
 ├── README.md
 ├── backend/
 │   ├── app/

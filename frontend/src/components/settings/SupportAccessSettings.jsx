@@ -28,7 +28,7 @@ const HOUR_CHOICES = [
 ]
 
 /**
- * Lets the client decide whether QKil support can see their records.
+ * Lets the client decide whether PestBase support can see their records.
  *
  * Closed by default, and every grant runs out on its own - so forgetting to
  * close it is not a way to leave it open forever.
@@ -64,7 +64,7 @@ export function SupportAccessSettings() {
       })
       toastSuccess(
         'Support access open',
-        `QKil can help until ${formatDateTime(grant.expires_at)}. It closes on its own.`,
+        `PestBase can help until ${formatDateTime(grant.expires_at)}. It closes on its own.`,
       )
       setReason('')
       await load()
@@ -79,7 +79,7 @@ export function SupportAccessSettings() {
     setBusy(true)
     try {
       await supportApi.closeSupportAccess()
-      toastSuccess('Support access closed', 'QKil can no longer see your records.')
+      toastSuccess('Support access closed', 'PestBase can no longer see your records.')
       await load()
     } catch (err) {
       toastError('Could not close support access', toApiError(err).message)
@@ -96,9 +96,9 @@ export function SupportAccessSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>QKil support access</CardTitle>
+        <CardTitle>PestBase support access</CardTitle>
         <CardDescription>
-          Your customers' details are yours. QKil support cannot see them unless you let them in,
+          Your customers' details are yours. PestBase support cannot see them unless you let them in,
           and any access you give runs out on its own.
         </CardDescription>
       </CardHeader>
@@ -116,10 +116,10 @@ export function SupportAccessSettings() {
           )}
           <div className="text-sm">
             <p className="font-medium text-foreground">
-              {isOpen ? 'Open to QKil support' : 'Closed'}
+              {isOpen ? 'Open to PestBase support' : 'Closed'}
               {current?.break_glass ? (
                 <Badge variant="destructive" className="ml-2">
-                  Opened by QKil
+                  Opened by PestBase
                 </Badge>
               ) : null}
             </p>
@@ -130,7 +130,7 @@ export function SupportAccessSettings() {
               </p>
             ) : (
               <p className="text-muted-foreground">
-                Nobody at QKil can open your customers, jobs or invoices.
+                Nobody at PestBase can open your customers, jobs or invoices.
               </p>
             )}
           </div>
@@ -140,7 +140,7 @@ export function SupportAccessSettings() {
           <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              QKil opened this themselves rather than being asked. Their reason is on your audit
+              PestBase opened this themselves rather than being asked. Their reason is on your audit
               trail, and you can close it now.
             </span>
           </div>
@@ -187,7 +187,7 @@ export function SupportAccessSettings() {
               ) : (
                 <LifeBuoy className="h-4 w-4" />
               )}
-              Let QKil support in
+              Let PestBase support in
             </Button>
           </div>
         )}
@@ -201,7 +201,7 @@ export function SupportAccessSettings() {
                   <span>{formatDateTime(grant.created_at)}</span>
                   <span aria-hidden="true">&rarr;</span>
                   <span>{formatDateTime(grant.revoked_at ?? grant.expires_at)}</span>
-                  {grant.break_glass ? <Badge variant="destructive">Opened by QKil</Badge> : null}
+                  {grant.break_glass ? <Badge variant="destructive">Opened by PestBase</Badge> : null}
                   {grant.revoked_at ? <Badge variant="secondary">Closed early</Badge> : null}
                   {grant.reason ? <span className="text-muted-foreground/80">{grant.reason}</span> : null}
                 </li>

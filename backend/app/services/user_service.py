@@ -1,13 +1,15 @@
 """User CRUD operations."""
 
+import logging
 from datetime import datetime
 from typing import List, Optional, Tuple
 
 from beanie import PydanticObjectId
 
-from app.core.security import hash_password
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class UserAlreadyExistsError(Exception):
@@ -43,8 +45,16 @@ async def _check_role(key: str) -> str:
     return (await role_service.get_role(key)).key
 
 
-async def create_user(payload: UserCreate) -> User:
-    """Create a new user, rejecting duplicate emails and unknown roles."""
+async def create_user(payload: UserCreate, invite: bool = True) -> User:
+    """Create a new user, rejecting duplicate emails and unknown roles.
+
+    There is no password to set. The address is registered with SuperTokens so
+    it can be signed in with, and unless `invite` is off they are emailed a link
+    straight away - otherwise a new colleague has an account they have no way to
+    reach.
+    """
+    from app.core import supertokens  # noqa: PLC0415 - avoids a cycle
+
     email = normalise_email(payload.email)
     if await get_user_by_email(email):
         raise UserAlreadyExistsError(f"A user with email {email} already exists")
@@ -54,13 +64,23 @@ async def create_user(payload: UserCreate) -> User:
         email=email,
         full_name=payload.full_name,
         job_title=payload.job_title,
-        hashed_password=hash_password(payload.password),
         role=await _check_role(payload.role),
         is_active=payload.is_active,
         created_at=now,
         updated_at=now,
     )
+
+    # Before the PestBase record, so a failure there leaves nothing half-made that
+    # an admin would have to notice and clean up.
+    user.auth_user_id, _ = await supertokens.provision_auth_user(email)
     await user.insert()
+
+    if invite and user.is_active:
+        try:
+            await supertokens.send_sign_in_link(email)
+        except Exception:  # noqa: BLE001 - the account is made either way
+            logger.warning("Could not email a sign-in link to %s", email, exc_info=True)
+
     return user
 
 
@@ -108,9 +128,6 @@ async def update_user(user_id: PydanticObjectId | str, payload: UserUpdate) -> U
                 raise UserAlreadyExistsError(f"A user with email {new_email} already exists")
         user.email = new_email
 
-    if "password" in data:
-        user.hashed_password = hash_password(str(data["password"]))
-
     if "full_name" in data:
         user.full_name = str(data["full_name"])
 
@@ -137,6 +154,14 @@ async def deactivate_user(user_id: PydanticObjectId | str) -> User:
     user.is_active = False
     user.touch()
     await user.save()
+
+    # Otherwise a deactivated person carries on working with the session they
+    # already have. Every request checks is_active, so this is belt and braces -
+    # but it is the difference between "locked out now" and "locked out when
+    # their session happens to expire".
+    from app.core import supertokens  # noqa: PLC0415
+
+    await supertokens.end_all_sessions(user.auth_user_id)
     return user
 
 
@@ -148,7 +173,8 @@ async def user_payload(user: User, with_permissions: bool = False) -> dict:
     """A user as the API returns them, with their role's name."""
     from app.services import role_service  # noqa: PLC0415
 
-    payload = user.model_dump(exclude={"hashed_password"})
+    # auth_user_id is SuperTokens' internal handle; nothing outside needs it.
+    payload = user.model_dump(exclude={"auth_user_id"})
     payload["id"] = str(user.id)
     payload["role_name"] = await role_service.role_name(str(user.role))
     if with_permissions:
@@ -159,7 +185,7 @@ async def user_payload(user: User, with_permissions: bool = False) -> dict:
 async def delete_user_permanently(user_id: PydanticObjectId | str) -> User:
     """Remove a user for good. Only for someone with nothing on record.
 
-    Anyone who has done work in QKil (jobs, reports, quotes, invoices,
+    Anyone who has done work in PestBase (jobs, reports, quotes, invoices,
     customers, emails, photos) stays on those records, so they are
     deactivated instead: they can't sign in, and history keeps their name.
     """

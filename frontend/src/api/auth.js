@@ -1,24 +1,30 @@
+import Session from 'supertokens-auth-react/recipe/session'
+
 import api, { unwrap } from '@/lib/api'
 
-/** POST /auth/login - exchange credentials for tokens. */
-export async function login(credentials) {
-  const response = await api.post('/auth/login', credentials)
+/**
+ * Signing in lives in the SuperTokens SDK, not here - see pages/auth/LoginPage.
+ * What is left for the app is the profile behind the session, and ending it.
+ */
+
+/** GET /auth/me - the signed-in user, their role and their permissions. */
+export async function getMe(signal) {
+  const response = await api.get('/auth/me', { signal })
   return unwrap(response)
 }
 
-/** POST /auth/refresh - exchange a refresh token for a new access token. */
-export async function refresh(refreshToken) {
-  const response = await api.post('/auth/refresh', { refresh_token: refreshToken })
-  return unwrap(response).access_token
+/** Whether a session exists at all, without asking the API. */
+export async function hasSession() {
+  return Session.doesSessionExist()
 }
 
-/** POST /auth/logout - invalidate the current session server-side. */
+/** End this session. The SDK clears its cookies as part of this. */
 export async function logout() {
-  await api.post('/auth/logout', {})
+  await Session.signOut()
 }
 
-/** GET /auth/me - fetch the authenticated user's profile. */
-export async function getMe() {
-  const response = await api.get('/auth/me')
-  return unwrap(response)
+/** End every session this account has, on every device. */
+export async function logoutEverywhere() {
+  await api.post('/auth/sign-out-everywhere')
+  await Session.signOut()
 }

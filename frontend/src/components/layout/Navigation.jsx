@@ -104,7 +104,7 @@ export function Sidebar({ hasOverdue }) {
           </div>
         ) : null}
 
-        {/* Running QKil itself, kept apart from running one company. */}
+        {/* Running PestBase itself, kept apart from running one company. */}
         {platform.length > 0 ? (
           <div className="space-y-1">
             <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">

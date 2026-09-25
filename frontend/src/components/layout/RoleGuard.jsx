@@ -10,7 +10,7 @@ import { ROLE_LABELS } from '@/lib/constants'
  * Renders children only when the user may see them; otherwise a 403 panel (or
  * redirect). Prefer `permission` - it matches what the API actually checks, so
  * a custom role that was given the permission gets in. `allow` lists role keys.
- * `platform` is for QKil's own pages: a client's Admin role holds every
+ * `platform` is for PestBase's own pages: a client's Admin role holds every
  * permission there is, so platform access can never be one of them.
  */
 export function RoleGuard({ allow, permission, platform, children, redirectTo }) {

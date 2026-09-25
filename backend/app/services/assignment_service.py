@@ -102,12 +102,15 @@ async def notify_if_assigned(
         logger.exception("Could not notify technician %s in the app", technician.id)
 
     from app.services.company_settings_service import get_settings  # noqa: PLC0415
+    from app.services.platform_settings_service import sending_config  # noqa: PLC0415
 
-    company = await get_settings()
+    # The client decides whether technicians are emailed; the platform decides
+    # whether PestBase can send at all.
+    company = await sending_config(await get_settings())
     if not company.email_technicians:
-        return f"{technician.full_name} can see it in QKil (emailing technicians is switched off)."
+        return f"{technician.full_name} can see it in PestBase (emailing technicians is switched off)."
     if company.email_provider == EmailProvider.NONE:
-        return f"{technician.full_name} can see it in QKil. Set up email to email them too."
+        return f"{technician.full_name} can see it in PestBase. Ask PestBase to set up email to email them too."
 
     template = (company.email_templates or EmailTemplates()).job_assigned
     site_contact = ", ".join(
@@ -145,5 +148,5 @@ async def notify_if_assigned(
         )
     except EmailError as exc:
         logger.warning("Could not email technician %s: %s", technician.email, exc)
-        return f"{technician.full_name} can see it in QKil, but couldn't be emailed: {exc}"
+        return f"{technician.full_name} can see it in PestBase, but couldn't be emailed: {exc}"
     return f"{technician.full_name} has been emailed the details."

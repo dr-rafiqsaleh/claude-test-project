@@ -36,7 +36,7 @@ class AuditEvent(TenantDocument):
     actor_name: Optional[str] = None
     actor_email: Optional[str] = None
     actor_role: Optional[str] = None
-    #: True when the actor was QKil staff rather than someone at the client.
+    #: True when the actor was PestBase staff rather than someone at the client.
     actor_is_platform_staff: bool = False
 
     # What it was done to.

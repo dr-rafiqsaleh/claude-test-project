@@ -1,0 +1,53 @@
+# Local development overlay, selected by scripts/compose.sh.
+#
+# `ports` cannot be un-published by a later override - compose merges the lists
+# rather than replacing them - so the only reliable way to keep a port out of a
+# hosted deployment is to keep it out of base.yml. That is why it is here.
+
+services:
+  backend:
+    ports:
+      - "8000:8000"
+
+    # The operator scripts from disk rather than from the image.
+    #
+    # Without this, a script added to backend/scripts does not exist inside the
+    # container until somebody remembers to rebuild, and
+    # `exec backend python scripts/whatever.py` reports "No such file or
+    # directory" about a file that is plainly there on disk. Local only: a
+    # hosted deployment runs what it built, deliberately.
+    #
+    # Read-only. They are run in here and edited out there.
+    volumes:
+      - ./backend/scripts:/app/scripts:ro
+
+  # Same mount, so a change to scripts/setup.py takes effect on the next `up`
+  # rather than on the next rebuild.
+  setup:
+    # The operator scripts from disk rather than from the image.
+    #
+    # Without this, a script added to backend/scripts does not exist inside the
+    # container until somebody remembers to rebuild, and
+    # `exec backend python scripts/whatever.py` reports "No such file or
+    # directory" about a file that is plainly there on disk. Local only: a
+    # hosted deployment runs what it built, deliberately.
+    #
+    # Read-only. They are run in here and edited out there.
+    volumes:
+      - ./backend/scripts:/app/scripts:ro
+
+
+  frontend:
+    ports:
+      - "3000:80"
+
+  # The stop sign for a bare `docker compose up`.
+  #
+  # Postgres is where this first bites: the volume is initialised with whichever
+  # password won the first `up`, and every later run with a different one fails
+  # authentication in a way that reads like a broken container rather than a
+  # missing --env-file. `:?` turns the silent default into a refusal naming the
+  # fix.
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?not set. Use ./scripts/compose.sh local up -d}

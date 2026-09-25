@@ -150,7 +150,7 @@ export function HeaderSearch({ className, autoFocus = false, onDismiss }) {
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder="Search customers, jobs, invoices..."
-        aria-label="Search QKil"
+        aria-label="Search PestBase"
         role="combobox"
         aria-expanded={showRecent || showResults}
         aria-controls="header-search-results"

@@ -43,7 +43,7 @@ const iconButton =
 export function Header() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
-  const clearAuth = useAuthStore((state) => state.logout)
+  const clearAuth = useAuthStore((state) => state.clear)
   const [signingOut, setSigningOut] = useState(false)
   const [theme, setThemeState] = useState(getTheme)
 
@@ -76,7 +76,7 @@ export function Header() {
     <header className="relative flex h-16 shrink-0 items-center gap-1 border-b border-border bg-card px-3 sm:gap-2 sm:px-6">
       <Link
         to="/dashboard"
-        aria-label="QKil home"
+        aria-label="PestBase home"
         className="mr-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
       >
         <LogoMark size={32} />

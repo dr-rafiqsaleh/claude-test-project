@@ -16,11 +16,6 @@ export async function sendDocumentEmail(payload) {
 }
 
 /** POST /settings/email/test - send a test email with the saved settings (admin only). */
-export async function sendTestEmail(to) {
-  const response = await api.post('/settings/email/test', { to }, { timeout: SEND_TIMEOUT })
-  return response.data
-}
-
 /** GET /emails/history - every email sent (or attempted) for one document. */
 export async function documentEmailHistory(kind, id) {
   const response = await api.get('/emails/history', { params: { kind, id } })

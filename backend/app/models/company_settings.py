@@ -1,7 +1,7 @@
 """Company settings - the single document holding branding and defaults.
 
 There is only ever one of these. Everything that used to be a hard-coded
-"QKil Pest Control" string in a PDF generator now reads from here.
+"PestBase Pest Control" string in a PDF generator now reads from here.
 """
 
 from datetime import datetime
@@ -13,6 +13,12 @@ from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
 from app.models.tenant import TenantDocument
+
+# These describe how mail is sent, which is now the platform's setting rather
+# than a client's - see app.models.platform_settings. Re-exported here because
+# the schemas and the sending code have always imported them from this module,
+# and one definition is what stops the two drifting apart.
+from app.models.platform_settings import EmailProvider, SmtpSecurity  # noqa: E402,F401
 
 #: Image types accepted for the company logo.
 ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
@@ -41,22 +47,6 @@ class Product(BaseModel):
     safety_data_sheet_ref: Optional[str] = None
 
 
-class EmailProvider(str, Enum):
-    """How QKil sends email."""
-
-    NONE = "none"  # not set up yet
-    MICROSOFT_365 = "microsoft365"  # Microsoft Graph, signed in as an app
-    SMTP = "smtp"  # any other provider
-
-
-class SmtpSecurity(str, Enum):
-    """How the SMTP connection is encrypted."""
-
-    STARTTLS = "starttls"  # usually port 587
-    SSL = "ssl"  # usually port 465
-    NONE = "none"
-
-
 class EmailTemplate(BaseModel):
     """The subject and message used when emailing one kind of document."""
 
@@ -69,6 +59,14 @@ EMAIL_PLACEHOLDERS = {
     "common": ["customer_name", "company_name", "company_phone", "company_email", "sender_name"],
     "quote": ["quote_number", "quote_total", "valid_until"],
     "invoice": ["invoice_number", "invoice_total", "amount_due", "due_date", "job_number"],
+    "payment_reminder": [
+        "invoice_number",
+        "invoice_total",
+        "amount_due",
+        "due_date",
+        "days_until_due",
+        "job_number",
+    ],
     "report": ["report_number", "job_number", "service_date", "service_type", "site_address"],
     "job_assigned": [
         "technician_name",
@@ -109,6 +107,25 @@ DEFAULT_INVOICE_EMAIL = EmailTemplate(
     ),
 )
 
+#: Sent automatically, once, when an unpaid invoice comes within three days of
+#: its due date. Nothing is attached: the customer already has the invoice, and
+#: this is a nudge rather than a second copy.
+DEFAULT_PAYMENT_REMINDER_EMAIL = EmailTemplate(
+    subject="Reminder: invoice {invoice_number} is due on {due_date}",
+    body=(
+        "Dear {customer_name},\n\n"
+        "A friendly reminder that invoice {invoice_number} for {amount_due} falls due on "
+        "{due_date} ({days_until_due}).\n\n"
+        "Our bank details are on the invoice. Please use {invoice_number} as the reference "
+        "when you pay.\n\n"
+        "If you have already sent payment, or there is anything wrong with the invoice, "
+        "just reply to this email or call us on {company_phone} and we will sort it out.\n\n"
+        # No {sender_name}: nobody sends this one, so it would only repeat the
+        # company name underneath itself.
+        "Kind regards,\n{company_name}"
+    ),
+)
+
 DEFAULT_REPORT_EMAIL = EmailTemplate(
     subject="Your pest control report for {site_address}",
     body=(
@@ -145,6 +162,9 @@ class EmailTemplates(BaseModel):
 
     quote: EmailTemplate = Field(default_factory=lambda: DEFAULT_QUOTE_EMAIL.model_copy())
     invoice: EmailTemplate = Field(default_factory=lambda: DEFAULT_INVOICE_EMAIL.model_copy())
+    payment_reminder: EmailTemplate = Field(
+        default_factory=lambda: DEFAULT_PAYMENT_REMINDER_EMAIL.model_copy()
+    )
     report: EmailTemplate = Field(default_factory=lambda: DEFAULT_REPORT_EMAIL.model_copy())
     job_assigned: EmailTemplate = Field(
         default_factory=lambda: DEFAULT_JOB_ASSIGNED_EMAIL.model_copy()
@@ -188,8 +208,8 @@ class CompanySettings(TenantDocument):
     """Singleton settings document."""
 
     # Identity
-    company_name: str = "QKil Pest Control"  # the name customers know you by
-    legal_name: Optional[str] = None  # registered company name, e.g. "Quikil Ltd"
+    company_name: str = "PestBase Pest Control"  # the name customers know you by
+    legal_name: Optional[str] = None  # registered company name, e.g. "Acme Pest Control Ltd"
     company_number: Optional[str] = None  # Companies House number, e.g. "12345678"
     vat_number: Optional[str] = None  # UK VAT registration, e.g. "GB123456789"
 
@@ -238,23 +258,18 @@ class CompanySettings(TenantDocument):
     report_rodenticide_guidance: str = DEFAULT_RODENTICIDE_GUIDANCE
     report_declaration: str = DEFAULT_REPORT_DECLARATION
 
-    # Email. Passwords and secrets are stored encrypted (app.core.secrets).
-    email_provider: EmailProvider = EmailProvider.NONE
-    smtp_host: Optional[str] = None
-    smtp_port: Optional[int] = None
-    smtp_security: SmtpSecurity = SmtpSecurity.STARTTLS
-    smtp_username: Optional[str] = None
-    smtp_password_encrypted: Optional[str] = None
-    m365_tenant_id: Optional[str] = None  # directory (tenant) ID, or the domain
-    m365_client_id: Optional[str] = None  # application (client) ID
-    m365_client_secret_encrypted: Optional[str] = None
-    m365_mailbox: Optional[str] = None  # the mailbox emails are sent from
-    smtp_from_email: Optional[str] = None  # the From address, for either provider
-    smtp_from_name: Optional[str] = None
+    # Email. How it is sent - provider, server, credentials, the From address -
+    # is the platform's, in app.models.platform_settings: one mail account serves
+    # every client. What stays here is what this client's own customers see and
+    # act on, which has to differ per client.
     email_reply_to: Optional[str] = None
     email_bcc: Optional[str] = None  # a copy of every email sent, e.g. for the office
     email_templates: EmailTemplates = Field(default_factory=EmailTemplates)
     email_technicians: bool = True  # email a technician when they are given a job
+    #: Email the customer once when an unpaid invoice is three days from due.
+    #: Off by default on purpose: switching it on starts sending mail to this
+    #: client's customers without them doing anything, and that is their call.
+    email_payment_reminders: bool = False
 
     # Appearance
     primary_color: str = "#059669"  # emerald-600

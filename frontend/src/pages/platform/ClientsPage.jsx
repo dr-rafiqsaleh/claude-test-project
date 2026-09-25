@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
+  ArrowRight,
   Building2,
   MoreHorizontal,
   Pause,
@@ -12,6 +13,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import {
   AlertDialog,
@@ -63,6 +65,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { toastError, toastSuccess } from '@/components/ui/use-toast'
 import { breakGlass } from '@/api/supportAccess'
+import { useAuthStore } from '@/store/authStore'
 import { useClients } from '@/hooks/useClients'
 import { useDebounce } from '@/hooks/useDebounce'
 import { toApiError } from '@/lib/api'
@@ -77,13 +80,16 @@ const STATUS_BADGE = { active: 'default', suspended: 'warning', closed: 'seconda
 const EMPTY_CLIENT = { name: '', contact_email: '', contact_phone: '', notes: '' }
 
 /**
- * The client companies using QKil. Platform staff only.
+ * The client companies using PestBase. Platform staff only.
  *
  * Suspending is the everyday lever: it stops everyone at that company signing
  * in without touching a single record. Deleting is only for a client that never
  * got going, and the API refuses it once anyone has been added.
  */
 export function ClientsPage() {
+  const navigate = useNavigate()
+  const setWorkingClient = useAuthStore((state) => state.setWorkingClient)
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(ANY)
   const [page, setPage] = useState(1)
@@ -182,6 +188,22 @@ export function ClientsPage() {
     }
   }
 
+  /**
+   * Step into a client and work as if you were its team.
+   *
+   * Everything from here on carries this client in the request, so the Team,
+   * Settings and Audit pages have something to be about - and every change
+   * lands on that client's own audit trail.
+   */
+  function workInside(client) {
+    setWorkingClient({ id: client.id, name: client.name })
+    toastSuccess(
+      `Working inside ${client.name}`,
+      'Their team, settings and records are now what you see. Use Leave at the top to step back out.',
+    )
+    navigate('/users')
+  }
+
   async function confirmBreakGlass(event) {
     event.preventDefault()
     if (!glassFor || glassReason.trim().length < 3) return
@@ -221,7 +243,7 @@ export function ClientsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Clients"
-        description="The companies using QKil. Each one's customers, jobs and invoices are theirs alone."
+        description="The companies using PestBase. Each one's customers, jobs and invoices are theirs alone."
         actions={
           <>
             <RefreshButton onRefresh={refetch} loading={loading} />
@@ -276,7 +298,7 @@ export function ClientsPage() {
             description={
               isFiltered
                 ? 'Try a different search or clear the filters.'
-                : 'Add the first company to use QKil.'
+                : 'Add the first company to use PestBase.'
             }
             action={
               isFiltered ? (
@@ -347,6 +369,14 @@ export function ClientsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={client.status !== 'active'}
+                            onSelect={() => workInside(client)}
+                          >
+                            <ArrowRight className="h-4 w-4" />
+                            Work inside this client
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem onSelect={() => openEdit(client)}>
                             <Pencil className="h-4 w-4" />
                             Edit details
@@ -412,7 +442,7 @@ export function ClientsPage() {
             <DialogTitle>{editing ? `Edit ${editing.name}` : 'New client'}</DialogTitle>
             <DialogDescription>
               {editing
-                ? 'The company details QKil holds about this client.'
+                ? 'The company details PestBase holds about this client.'
                 : 'Add a company. It starts with the three built-in roles, ready for its first admin.'}
             </DialogDescription>
           </DialogHeader>
@@ -449,7 +479,7 @@ export function ClientsPage() {
                 placeholder="accounts@acmepest.co.uk"
               />
               <p className="text-xs text-muted-foreground">
-                Who QKil contacts about the account, not their own customers.
+                Who PestBase contacts about the account, not their own customers.
               </p>
             </div>
 

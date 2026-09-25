@@ -8,10 +8,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.models.company_settings import (
     EMAIL_PLACEHOLDERS,
-    EmailProvider,
     EmailTemplates,
     ProductCategory,
-    SmtpSecurity,
 )
 from app.schemas.common import ApiResponse
 
@@ -78,6 +76,7 @@ class EmailTemplatesSchema(BaseModel):
     invoice: EmailTemplateSchema
     report: EmailTemplateSchema
     job_assigned: Optional[EmailTemplateSchema] = None
+    payment_reminder: Optional[EmailTemplateSchema] = None
 
 
 def _digits(value: str) -> str:
@@ -130,36 +129,21 @@ class CompanySettingsUpdate(BaseModel):
     report_rodenticide_guidance: Optional[str] = Field(None, max_length=MAX_REPORT_TEXT)
     report_declaration: Optional[str] = Field(None, max_length=MAX_REPORT_TEXT)
 
-    email_provider: Optional[EmailProvider] = None
-    smtp_host: Optional[str] = Field(None, max_length=200)
-    smtp_port: Optional[int] = Field(None, ge=1, le=65535)
-    smtp_security: Optional[SmtpSecurity] = None
-    smtp_username: Optional[str] = Field(None, max_length=200)
     #: Write-only. Left out or blank keeps the password already saved.
-    smtp_password: Optional[str] = Field(None, max_length=500)
-    m365_tenant_id: Optional[str] = Field(None, max_length=200)
-    m365_client_id: Optional[str] = Field(None, max_length=100)
     #: Write-only. Left out or blank keeps the secret already saved.
-    m365_client_secret: Optional[str] = Field(None, max_length=500)
-    m365_mailbox: Optional[str] = Field(None, max_length=200)
-    smtp_from_email: Optional[str] = Field(None, max_length=200)
-    smtp_from_name: Optional[str] = Field(None, max_length=200)
     email_reply_to: Optional[str] = Field(None, max_length=200)
     email_bcc: Optional[str] = Field(None, max_length=200)
     email_templates: Optional[EmailTemplatesSchema] = None
     email_technicians: Optional[bool] = None
+    email_payment_reminders: Optional[bool] = None
 
     primary_color: Optional[str] = Field(None, max_length=9)
 
-    @field_validator("m365_mailbox", "smtp_from_email", "email_reply_to", "email_bcc")
+    @field_validator("email_reply_to", "email_bcc")
     @classmethod
     def _check_addresses(cls, value: Optional[str]) -> Optional[str]:
         return _check_email_address(value)
 
-    @field_validator("smtp_host", "smtp_username", "m365_tenant_id", "m365_client_id")
-    @classmethod
-    def _strip_email_text(cls, value: Optional[str]) -> Optional[str]:
-        return _clean_optional(value)
 
     @field_validator("legal_name", "bank_account_name")
     @classmethod
@@ -238,23 +222,15 @@ class CompanySettingsResponse(BaseModel):
     report_rodenticide_guidance: str = ""
     report_declaration: str = ""
 
-    email_provider: EmailProvider = EmailProvider.NONE
-    smtp_host: Optional[str] = None
-    smtp_port: Optional[int] = None
-    smtp_security: SmtpSecurity = SmtpSecurity.STARTTLS
-    smtp_username: Optional[str] = None
-    smtp_password_set: bool = False
-    m365_tenant_id: Optional[str] = None
-    m365_client_id: Optional[str] = None
-    m365_client_secret_set: bool = False
-    m365_mailbox: Optional[str] = None
-    smtp_from_email: Optional[str] = None
-    smtp_from_name: Optional[str] = None
     email_reply_to: Optional[str] = None
+    #: Whether PestBase has set up email sending at all. The platform's setting, not
+    #: this client's - shown so a client knows why nothing is going out.
+    email_configured: bool = False
     email_bcc: Optional[str] = None
     email_templates: EmailTemplatesSchema
     default_email_templates: EmailTemplatesSchema
     email_technicians: bool = True
+    email_payment_reminders: bool = False
     email_placeholders: dict = Field(default_factory=lambda: EMAIL_PLACEHOLDERS)
 
     primary_color: str = "#059669"

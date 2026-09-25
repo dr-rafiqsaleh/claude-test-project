@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, FileText, History, Home, Receipt, Settings, UserCog, Users } from 'lucide-react'
+import { Building2, ClipboardList, FileText, History, Home, Receipt, Settings, Settings2, UserCog, Users } from 'lucide-react'
 
 /**
  * The app's navigation, shared by the desktop sidebar and the phone tab bar.
@@ -23,14 +23,15 @@ export const ADMIN_NAV = [
   { label: 'Settings', to: '/settings', icon: Settings, permission: 'settings.manage' },
 ]
 
-/** Running QKil itself rather than any one client: platform staff only. */
+/** Running PestBase itself rather than any one client: platform staff only. */
 export const PLATFORM_NAV = [
   { label: 'Clients', to: '/platform/clients', icon: Building2, platform: true },
+  { label: 'Platform settings', to: '/platform/settings', icon: Settings2, platform: true },
 ]
 
 /**
  * Keeps only the items this person may open: a permission comes from their
- * role, `platform` from being QKil staff. Platform access is deliberately not
+ * role, `platform` from being PestBase staff. Platform access is deliberately not
  * a permission - a client's own Admin role holds every permission there is.
  */
 export function visibleNav(items, user) {

@@ -65,14 +65,28 @@ class TenantDocument(Document):
 
     # -- writes -------------------------------------------------------------
 
+    def belongs_to_a_client(self) -> bool:
+        """Whether this particular record must have a client to own it.
+
+        True for everything except the one real exception: a PestBase platform staff
+        account deliberately belongs to no client. Expressed as a hook rather
+        than a special case here, so the exception lives on the model that knows
+        about it - see app.models.user.
+        """
+        return True
+
     def _stamp(self, required: bool) -> None:
         if self.client_id is not None:
+            return
+        if required and not self.belongs_to_a_client():
+            # Deliberately ownerless. Nothing to stamp.
             return
         self.client_id = require_client_id() if required else current_client_id()
 
     async def insert(self, **kwargs: Any):
         # A new record with no owner would belong to nobody and show up for
-        # everybody, so this refuses rather than writing it.
+        # everybody, so this refuses rather than writing it - unless the record
+        # is one of the few that genuinely has no client.
         self._stamp(required=True)
         return await super().insert(**kwargs)
 

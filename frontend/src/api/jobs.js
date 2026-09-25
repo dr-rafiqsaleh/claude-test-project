@@ -1,5 +1,4 @@
 import api, { API_BASE_URL, unwrap } from '@/lib/api'
-import { useAuthStore } from '@/store/authStore'
 
 function buildParams(params) {
   const query = {}
@@ -110,13 +109,11 @@ export async function listPhotos(jobId, signal) {
 /**
  * A URL that renders one photo, safe to drop straight into an `<img src>`.
  *
- * An `<img>` cannot carry an Authorization header, so the access token travels
- * in the query string - the API accepts it there for this endpoint only.
+ * The session cookie goes with an `<img>` request automatically on this origin,
+ * so the URL carries nothing but the ids.
  */
 export function getPhotoUrl(jobId, photoId) {
-  const token = useAuthStore.getState().accessToken
-  const base = `${API_BASE_URL}/jobs/${jobId}/photos/${photoId}`
-  return token ? `${base}?token=${encodeURIComponent(token)}` : base
+  return `${API_BASE_URL}/jobs/${jobId}/photos/${photoId}`
 }
 
 /** DELETE /jobs/{jobId}/photos/{photoId} */

@@ -43,7 +43,7 @@ from app.services import company_settings_service, email_service, invoice_servic
 from app.routers.emails import email_attachment, email_eml, email_record
 from app.services.email_service import Attachment, EmailError, OutgoingEmail
 
-CHECK_DB = "qkil_email_check"
+CHECK_DB = "pestbase_email_check"
 
 
 def ok(message: str) -> None:
@@ -182,7 +182,7 @@ async def main() -> None:
     server.start()
 
     try:
-        office = User(email="office@check.test", full_name="Olive Office", hashed_password="-", role=UserRole.OFFICE_STAFF)
+        office = User(email="office@check.test", full_name="Olive Office", role=UserRole.OFFICE_STAFF)
         await office.insert()
         customer = Customer(
             first_name="Lena",
@@ -217,7 +217,7 @@ async def main() -> None:
             smtp_username="info@example.com",
             smtp_password="s3cret-pass",
             smtp_from_email="accounts@example.com",
-            smtp_from_name="QKil Accounts",
+            smtp_from_name="PestBase Accounts",
             email_reply_to="accounts@example.com",
             email_bcc="office@example.com",
         )

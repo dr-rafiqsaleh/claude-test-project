@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 
-/** QKil pest/bug mark. */
+/** PestBase pest/bug mark. */
 export function LogoMark({ className, size = 32 }) {
   return (
     <svg
@@ -10,7 +10,7 @@ export function LogoMark({ className, size = 32 }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="QKil"
+      aria-label="PestBase"
       className={cn('shrink-0', className)}
     >
       <rect width="24" height="24" rx="6" className="fill-primary" />
@@ -33,13 +33,13 @@ export function LogoMark({ className, size = 32 }) {
   )
 }
 
-/** QKil icon + wordmark. */
+/** PestBase icon + wordmark. */
 export function Logo({ className, size = 32, textClassName, subtitle }) {
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
       <LogoMark size={size} />
       <div className="flex flex-col leading-none">
-        <span className={cn('text-lg font-bold tracking-tight', textClassName)}>QKil</span>
+        <span className={cn('text-lg font-bold tracking-tight', textClassName)}>PestBase</span>
         {subtitle ? (
           <span className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
             {subtitle}

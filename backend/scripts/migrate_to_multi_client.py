@@ -1,4 +1,4 @@
-"""Move an existing single-company QKil database onto multiple clients.
+"""Move an existing single-company PestBase database onto multiple clients.
 
 Everything already in the database belongs to the one company using it, so this
 creates a client for them and stamps its id on every record that has none. Safe
@@ -7,7 +7,7 @@ to run twice: a record that already has a client is left alone.
     python scripts/migrate_to_multi_client.py --name "Acme Pest Control"
     python scripts/migrate_to_multi_client.py --platform-admin you@example.com
 
-`--platform-admin` additionally turns one existing account into QKil platform
+`--platform-admin` additionally turns one existing account into PestBase platform
 staff: it leaves their client, so they can see every client and manage the
 client list. Do this for your own account, not a customer's.
 
@@ -75,11 +75,27 @@ async def stamp(client: Client) -> int:
 
 
 async def promote(email: str) -> None:
-    """Make one account QKil platform staff, belonging to no client."""
+    """Make one account PestBase platform staff, belonging to no client."""
+    wanted = email.strip().lower()
     with unscoped():
-        user = await User.find_one({"email": email.strip().lower()})
+        user = await User.find_one({"email": wanted})
+        if user is None:
+            # Silently doing nothing here is how you end up with no platform
+            # staff and no idea why the Clients page never appears, so this
+            # says what accounts there actually are.
+            everyone = await User.find_all().sort("email").to_list()
+        else:
+            everyone = []
     if user is None:
-        print(f"  no account with the email {email} - nobody was promoted")
+        print(f"  no account with the email {email}. Nobody was promoted.")
+        if everyone:
+            print("  the accounts in this database are:")
+            for person in everyone:
+                marker = " (already platform staff)" if person.is_platform_staff else ""
+                print(f"    {person.email}  -  {person.full_name}{marker}")
+            print("  re-run with --platform-admin set to one of those.")
+        else:
+            print("  this database has no accounts at all yet.")
         return
     user.is_platform_staff = True
     user.client_id = None
@@ -116,6 +132,6 @@ async def main(name: str | None, platform_admin: str | None) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--name", help="Name for the client; defaults to the configured company name")
-    parser.add_argument("--platform-admin", help="Email of an existing account to make QKil platform staff")
+    parser.add_argument("--platform-admin", help="Email of an existing account to make PestBase platform staff")
     args = parser.parse_args()
     raise SystemExit(asyncio.run(main(args.name, args.platform_admin)))

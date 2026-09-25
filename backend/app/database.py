@@ -5,6 +5,7 @@ from typing import Optional
 
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import OperationFailure
 
 from app.config import settings
 from app.models.audit_event import AuditEvent
@@ -14,16 +15,22 @@ from app.models.company_settings import CompanySettings
 from app.models.counter import Counter
 from app.models.customer import Customer
 from app.models.email_log import EmailLog
+from app.core.login_throttle import LoginAttempt
 from app.models.invoice import Invoice
 from app.models.job import Job
 from app.models.notification import Notification
 from app.models.photo import Photo
+from app.models.platform_settings import PlatformSettings
 from app.models.quote import Quote
 from app.models.role import Role
 from app.models.support_grant import SupportGrant
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
+
+#: MongoDB's error code for "index not found with name". Another worker got
+#: there first, which is fine.
+INDEX_NOT_FOUND = 27
 
 DOCUMENT_MODELS = [
     Client,
@@ -41,6 +48,8 @@ DOCUMENT_MODELS = [
     Role,
     AuditEvent,
     SupportGrant,
+    LoginAttempt,
+    PlatformSettings,
 ]
 
 _client: Optional[AsyncIOMotorClient] = None
@@ -67,6 +76,27 @@ def normalised_key(pairs) -> list:
         else:
             normalised.append((field, direction))
     return normalised
+
+
+def text_fields(pairs) -> set:
+    """The fields a declared index searches as text, if any."""
+    items = pairs.items() if hasattr(pairs, "items") else pairs
+    return {field for field, direction in items if direction == "text"}
+
+
+def same_index(declared_key, existing: dict) -> bool:
+    """Whether the index in the database is already the one we declare.
+
+    A text index cannot be compared by its key. MongoDB stores one internally as
+    `[('_fts', 'text'), ('_ftsx', 1)]` whatever fields it covers, and lists the
+    real fields under `weights` - so comparing keys says "changed" every single
+    time, and the index gets dropped and rebuilt on every startup. On a large
+    collection that is an expensive, silent, repeating rebuild.
+    """
+    declared_text = text_fields(declared_key)
+    if declared_text:
+        return declared_text == set((existing.get("weights") or {}).keys())
+    return normalised_key(declared_key) == normalised_key(existing.get("key", []))
 
 
 def _declared_indexes(model) -> list:
@@ -109,19 +139,24 @@ async def _reconcile_indexes(database) -> None:
             if not name or name not in existing:
                 continue
 
-            wanted = normalised_key(spec["key"])
-            current = normalised_key(existing[name].get("key", []))
-            if wanted == current:
+            if same_index(spec["key"], existing[name]):
                 continue
 
             logger.warning(
-                "Replacing index %s on %s: keys changed from %s to %s",
+                "Replacing index %s on %s: it no longer matches what the model declares",
                 name,
                 model.Settings.name,
-                current,
-                wanted,
             )
-            await collection.drop_index(name)
+            try:
+                await collection.drop_index(name)
+            except OperationFailure as exc:
+                # uvicorn runs several workers and each one runs this, so the
+                # index may already be gone - dropped a moment ago by another
+                # worker doing exactly the same thing. That is the desired end
+                # state, not a failure. Anything else is re-raised.
+                if exc.code != INDEX_NOT_FOUND:
+                    raise
+                logger.info("Index %s was already dropped by another worker", name)
 
 
 async def init_db(mongodb_url: Optional[str] = None, database_name: Optional[str] = None) -> AsyncIOMotorClient:

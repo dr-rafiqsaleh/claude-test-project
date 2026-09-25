@@ -97,22 +97,11 @@ const EMPTY_FORM = {
   report_insecticide_guidance: '',
   report_rodenticide_guidance: '',
   report_declaration: '',
-  email_provider: 'none',
-  smtp_host: '',
-  smtp_port: '',
-  smtp_security: 'starttls',
-  smtp_username: '',
-  smtp_password: '',
-  m365_tenant_id: '',
-  m365_client_id: '',
-  m365_client_secret: '',
-  m365_mailbox: '',
-  smtp_from_email: '',
-  smtp_from_name: '',
   email_reply_to: '',
   email_bcc: '',
   email_templates: null,
   email_technicians: true,
+  email_payment_reminders: false,
   primary_color: DEFAULT_PRIMARY_COLOR,
 }
 
@@ -127,17 +116,6 @@ function toForm(settings) {
         .map((key) => [key, settings[key]]),
     ),
     default_tax_rate: Math.round((Number(settings.default_tax_rate ?? 0.2) || 0) * 10000) / 100,
-    smtp_port: settings.smtp_port ?? '',
-    // Secrets are write-only: the form never holds a saved one.
-    smtp_password: '',
-    m365_client_secret: '',
-    // SMTP details saved before there was a provider choice mean SMTP.
-    email_provider:
-      settings.email_provider && settings.email_provider !== 'none'
-        ? settings.email_provider
-        : settings.smtp_host
-          ? 'smtp'
-          : 'none',
     products: (settings.products ?? []).map((product) => ({
       ...product,
       active_ingredient: product.active_ingredient ?? '',
@@ -209,22 +187,10 @@ function toPayload(form, loaded) {
     report_insecticide_guidance: String(form.report_insecticide_guidance ?? '').trim(),
     report_rodenticide_guidance: String(form.report_rodenticide_guidance ?? '').trim(),
     report_declaration: String(form.report_declaration ?? '').trim(),
-    email_provider: form.email_provider || 'none',
-    smtp_host: optional(form.smtp_host),
-    smtp_port: form.smtp_port === '' || form.smtp_port === null ? null : Number(form.smtp_port),
-    smtp_security: form.smtp_security || 'starttls',
-    smtp_username: optional(form.smtp_username),
-    // Only sent when typed: leaving them empty keeps what is saved.
-    ...(form.smtp_password ? { smtp_password: form.smtp_password } : {}),
-    ...(form.m365_client_secret ? { m365_client_secret: form.m365_client_secret } : {}),
-    m365_tenant_id: optional(form.m365_tenant_id),
-    m365_client_id: optional(form.m365_client_id),
-    m365_mailbox: optional(form.m365_mailbox),
-    smtp_from_email: optional(form.smtp_from_email),
-    smtp_from_name: optional(form.smtp_from_name),
     email_reply_to: optional(form.email_reply_to),
     email_bcc: optional(form.email_bcc),
     email_technicians: form.email_technicians !== false,
+    email_payment_reminders: form.email_payment_reminders === true,
     ...(form.email_templates ? { email_templates: form.email_templates } : {}),
     primary_color: String(form.primary_color ?? DEFAULT_PRIMARY_COLOR).trim() || DEFAULT_PRIMARY_COLOR,
   }
@@ -445,7 +411,7 @@ export function SettingsPage() {
         description={
           <>
             Company details, document defaults and branding. These feed every quote, invoice and
-            inspection report QKil generates.
+            inspection report PestBase generates.
           </>
         }
       />
@@ -496,7 +462,7 @@ export function SettingsPage() {
                   id="company_name"
                   value={form.company_name}
                   onChange={(event) => set('company_name', event.target.value)}
-                  placeholder="QKil Pest Control"
+                  placeholder="PestBase Pest Control"
                   hasError={!String(form.company_name ?? '').trim()}
                 />
               </Field>
@@ -504,13 +470,13 @@ export function SettingsPage() {
               <Field
                 label="Registered company name"
                 htmlFor="legal_name"
-                hint="For a limited company, if different, e.g. Quikil Ltd. Printed as 'A trading name of ...'."
+                hint="For a limited company, if different, e.g. Acme Pest Control Ltd. Printed as 'A trading name of ...'."
               >
                 <Input
                   id="legal_name"
                   value={form.legal_name}
                   onChange={(event) => set('legal_name', event.target.value)}
-                  placeholder="Quikil Ltd"
+                  placeholder="Acme Pest Control Ltd"
                 />
               </Field>
 
@@ -542,7 +508,7 @@ export function SettingsPage() {
                   type="email"
                   value={form.email}
                   onChange={(event) => set('email', event.target.value)}
-                  placeholder="admin@qkil.co.uk"
+                  placeholder="admin@pestbase.co.uk"
                 />
               </Field>
 
@@ -551,7 +517,7 @@ export function SettingsPage() {
                   id="website"
                   value={form.website}
                   onChange={(event) => set('website', event.target.value)}
-                  placeholder="www.qkil.co.uk"
+                  placeholder="www.pestbase.co.uk"
                 />
               </Field>
             </div>
@@ -1086,7 +1052,7 @@ export function SettingsPage() {
                   className="text-lg font-bold"
                   style={{ color: form.primary_color }}
                 >
-                  {form.company_name || 'QKil Pest Control'}
+                  {form.company_name || 'PestBase Pest Control'}
                 </span>
                 <span
                   className="h-1 w-full rounded"

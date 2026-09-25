@@ -101,29 +101,18 @@ function roleLabel(user) {
   return user.role_name ?? ROLE_LABELS[user.role] ?? user.role
 }
 
-const passwordSchema = z
-  .string()
-  .min(8, 'At least 8 characters')
-  .regex(/[A-Z]/, 'Must include an uppercase letter')
-  .regex(/[a-z]/, 'Must include a lowercase letter')
-  .regex(/\d/, 'Must include a number')
-
-const PASSWORD_HINT =
-  'At least 8 characters with an uppercase letter, a lowercase letter and a number'
-
 /**
- * One schema shape for both modes. When editing, an empty password means
- * "keep the current one"; when creating, a password is required.
+ * One schema shape for both modes.
+ *
+ * No password field: signing in is passwordless, so creating an account emails
+ * the person a sign-in link instead of handing an administrator a password to
+ * pass on.
  */
 function buildUserSchema(isEdit) {
   return z.object({
     full_name: z.string().trim().min(1, 'Full name is required').max(120),
     job_title: z.string().trim().max(80),
     email: z.string().trim().min(1, 'Email is required').email('Enter a valid email address'),
-    password: z.string().refine(
-      (value) => (isEdit && value === '') || passwordSchema.safeParse(value).success,
-      { message: isEdit ? PASSWORD_HINT : `Password is required. ${PASSWORD_HINT}.` },
-    ),
     role: z.string().min(1, 'Role is required'),
     is_active: z.boolean(),
   })
@@ -133,7 +122,6 @@ const EMPTY_USER = {
   full_name: '',
   job_title: '',
   email: '',
-  password: '',
   role: UserRole.TECHNICIAN,
   is_active: true,
 }
@@ -201,7 +189,6 @@ export function UsersPage() {
       full_name: user.full_name,
       job_title: user.job_title ?? '',
       email: user.email,
-      password: '',
       role: user.role,
       is_active: user.is_active,
     })
@@ -218,7 +205,6 @@ export function UsersPage() {
           email: values.email,
           role: values.role,
           is_active: values.is_active,
-          ...(values.password ? { password: values.password } : {}),
         })
         if (editing.id === currentUser?.id) setCurrentUser(await getMe())
         toastSuccess('User updated', `${values.full_name} was saved.`)
@@ -227,11 +213,10 @@ export function UsersPage() {
           full_name: values.full_name,
           job_title: values.job_title || null,
           email: values.email,
-          password: values.password,
           role: values.role,
           is_active: values.is_active,
         })
-        toastSuccess('User created', `${values.full_name} can now sign in.`)
+        toastSuccess('User created', `${values.full_name} has been emailed a sign-in link.`)
       }
       setDialogOpen(false)
       setEditing(null)
@@ -521,8 +506,8 @@ export function UsersPage() {
             <DialogTitle>{isEdit ? 'Edit user' : 'New user'}</DialogTitle>
             <DialogDescription>
               {isEdit
-                ? 'Update this account. Leave the password blank to keep the current one.'
-                : 'Create a staff account and choose what they can access.'}
+                ? 'Update this account. They sign in with a link emailed to them.'
+                : 'Create a staff account. PestBase emails them a sign-in link - there is no password to pass on.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -577,7 +562,7 @@ export function UsersPage() {
                       <Input
                         {...field}
                         type="email"
-                        placeholder="olivia@qkil.com"
+                        placeholder="olivia@pestbase.com"
                         hasError={Boolean(fieldState.error)}
                       />
                     </FormControl>
@@ -586,30 +571,6 @@ export function UsersPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel>{isEdit ? 'New password' : 'Password *'}</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        autoComplete="new-password"
-                        placeholder="••••••••"
-                        hasError={Boolean(fieldState.error)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {isEdit
-                        ? 'Leave blank to keep the existing password.'
-                        : 'Minimum 8 characters with an uppercase letter, a lowercase letter and a number.'}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={form.control}
@@ -705,7 +666,7 @@ export function UsersPage() {
             <AlertDialogTitle>Deactivate this user?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDeactivate
-                ? `${pendingDeactivate.full_name} will immediately lose access to QKil. The account is kept so their history stays intact, and you can re-activate it later.`
+                ? `${pendingDeactivate.full_name} will immediately lose access to PestBase. The account is kept so their history stays intact, and you can re-activate it later.`
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>

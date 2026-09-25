@@ -30,7 +30,7 @@ from app.schemas.booking import BookingStatusUpdate
 from app.schemas.job import JobStatusUpdate
 from app.services import job_service
 
-CHECK_DB = "qkil_visit_flow_check"
+CHECK_DB = "pestbase_visit_flow_check"
 
 
 def ok(message: str) -> None:
@@ -74,9 +74,9 @@ async def main() -> None:
     await init_db(database_name=CHECK_DB)  # recreate the indexes
 
     try:
-        office = User(email="office@check.test", full_name="Olive Office", hashed_password="-", role=UserRole.OFFICE_STAFF)
-        tech = User(email="tech@check.test", full_name="Tom Tech", hashed_password="-", role=UserRole.TECHNICIAN)
-        other_tech = User(email="other@check.test", full_name="Oscar Other", hashed_password="-", role=UserRole.TECHNICIAN)
+        office = User(email="office@check.test", full_name="Olive Office", role=UserRole.OFFICE_STAFF)
+        tech = User(email="tech@check.test", full_name="Tom Tech", role=UserRole.TECHNICIAN)
+        other_tech = User(email="other@check.test", full_name="Oscar Other", role=UserRole.TECHNICIAN)
         for user in (office, tech, other_tech):
             await user.insert()
         customer = Customer(

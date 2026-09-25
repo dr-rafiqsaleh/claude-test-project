@@ -1,10 +1,10 @@
 """Which client the current request belongs to.
 
-QKil serves several client companies from one database. Every record carries a
+PestBase serves several client companies from one database. Every record carries a
 `client_id`, and every query is filtered by the client the signed-in person
 belongs to. That filter is applied in one place - `TenantDocument` in
 app.models.tenant - reading the client out of the context variable below, which
-`resolve_user_from_token` sets once per request.
+`session_user` sets once per request.
 
 A context variable rather than a parameter threaded through 12 services: each
 request runs in its own asyncio task, so each gets its own copy and nothing
@@ -43,7 +43,7 @@ class _Denied:
 DENIED = _Denied()
 
 #: The client whose data this request may touch.
-_current_client: ContextVar[object] = ContextVar("qkil_current_client", default=None)
+_current_client: ContextVar[object] = ContextVar("pestbase_current_client", default=None)
 
 
 class TenantScopeError(RuntimeError):
@@ -105,7 +105,7 @@ def tenant_filter() -> dict:
     if isinstance(value, _Denied):
         raise TenantScopeError(
             "Choose which client you are working in first (send it as the "
-            "X-Client-Id header). QKil staff do not read every client at once."
+            "X-Client-Id header). PestBase staff do not read every client at once."
         )
     return {} if value is None else {"client_id": value}
 

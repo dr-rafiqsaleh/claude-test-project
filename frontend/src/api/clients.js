@@ -1,6 +1,6 @@
 import api, { unwrap } from '@/lib/api'
 
-/** GET /clients - the client companies using QKil (platform staff only). */
+/** GET /clients - the client companies using PestBase (platform staff only). */
 export async function listClients(params = {}, signal) {
   const query = {}
   if (params.page !== undefined) query.page = params.page

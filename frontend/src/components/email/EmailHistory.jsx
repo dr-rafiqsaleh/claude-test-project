@@ -93,7 +93,7 @@ function EmailRecordDialog({ recordId, onClose }) {
         <DialogHeader>
           <DialogTitle>Email record</DialogTitle>
           <DialogDescription>
-            QKil&apos;s permanent record of this email. It can&apos;t be changed or deleted.
+            PestBase&apos;s permanent record of this email. It can&apos;t be changed or deleted.
           </DialogDescription>
         </DialogHeader>
 

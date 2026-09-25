@@ -1,6 +1,6 @@
 """In-app notifications: creation, retrieval and the passive reminder sweep.
 
-There is no scheduler in QKil. `sweep_notifications()` is idempotent and cheap,
+There is no scheduler in PestBase. `sweep_notifications()` is idempotent and cheap,
 so it runs as a background task every time somebody opens their notifications -
 which, in practice, is far more often than a cron job would fire.
 """
@@ -296,6 +296,15 @@ async def sweep_notifications() -> int:
         await recurrence_service.extend_all_series(now)
     except Exception:  # noqa: BLE001 - must never break a request
         logger.exception("Could not top up repeating jobs")
+
+    # Remind customers about invoices coming due. Separate and swallowed, so a
+    # mail problem never stops the office's own reminders being generated.
+    try:
+        from app.services import invoice_service  # noqa: PLC0415
+
+        await invoice_service.sweep_payment_reminders()
+    except Exception:  # noqa: BLE001 - must never break a request
+        logger.exception("Could not send payment reminders")
 
     try:
         office_ids = await _office_user_ids()

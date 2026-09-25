@@ -20,7 +20,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* QKil green, deepened from emerald-600 so white text passes AA (5.5:1) */
+    /* PestBase green, deepened from emerald-600 so white text passes AA (5.5:1) */
     --primary: 163 94% 24%; /* #047857 */
     --primary-foreground: 0 0% 100%;
 
@@ -131,7 +131,7 @@
 }
 
 /* FullCalendar theming, from the same tokens so it follows light and dark. */
-.qkil-calendar {
+.pestbase-calendar {
   --fc-border-color: hsl(var(--border));
   --fc-page-bg-color: transparent;
   --fc-neutral-bg-color: hsl(var(--muted));
@@ -141,34 +141,34 @@
   --fc-small-font-size: 0.75rem;
 }
 
-.qkil-calendar .fc {
+.pestbase-calendar .fc {
   @apply text-foreground;
 }
 
-.qkil-calendar .fc .fc-col-header-cell-cushion,
-.qkil-calendar .fc .fc-daygrid-day-number {
+.pestbase-calendar .fc .fc-col-header-cell-cushion,
+.pestbase-calendar .fc .fc-daygrid-day-number {
   @apply px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground no-underline;
 }
 
-.qkil-calendar .fc .fc-timegrid-slot-label-cushion,
-.qkil-calendar .fc .fc-timegrid-axis-cushion {
+.pestbase-calendar .fc .fc-timegrid-slot-label-cushion,
+.pestbase-calendar .fc .fc-timegrid-axis-cushion {
   @apply text-[11px] text-muted-foreground;
 }
 
-.qkil-calendar .fc .fc-event {
+.pestbase-calendar .fc .fc-event {
   @apply cursor-pointer overflow-hidden rounded-md border-0 px-1 py-0.5 text-white;
 }
 
-.qkil-calendar .fc .fc-event:hover {
+.pestbase-calendar .fc .fc-event:hover {
   @apply opacity-90;
 }
 
-.qkil-calendar .fc .fc-daygrid-event {
+.pestbase-calendar .fc .fc-daygrid-event {
   @apply whitespace-nowrap;
 }
 
 /* A visit of a repeating job not yet confirmed with the customer. */
-.qkil-calendar .fc .fc-event.qkil-tentative {
+.pestbase-calendar .fc .fc-event.pestbase-tentative {
   @apply opacity-80;
   outline: 1.5px dashed hsl(var(--foreground) / 0.55);
   outline-offset: -2px;
@@ -179,6 +179,6 @@
   );
 }
 
-.qkil-calendar .fc .fc-scrollgrid {
+.pestbase-calendar .fc .fc-scrollgrid {
   @apply rounded-lg;
 }

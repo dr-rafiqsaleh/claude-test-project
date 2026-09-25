@@ -1,4 +1,4 @@
-"""Seed the QKil database with default users, sample customers, jobs and invoices.
+"""Seed the PestBase database with default users, sample customers, jobs and invoices.
 
 Usage (from the backend/ directory, with the venv active):
 
@@ -18,7 +18,6 @@ from typing import List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings  # noqa: E402
-from app.core.security import hash_password  # noqa: E402
 from app.core.tenancy import acting_as, unscoped  # noqa: E402
 from app.database import close_db, init_db  # noqa: E402
 from app.models.client import Client  # noqa: E402
@@ -58,21 +57,18 @@ SAMPLE_SIGNATURE = (
 
 SEED_USERS = [
     {
-        "email": "admin@qkil.com",
+        "email": "admin@example.com",
         "full_name": "Alice Administrator",
-        "password": "Admin123!",
         "role": UserRole.ADMIN,
     },
     {
-        "email": "office@qkil.com",
+        "email": "office@example.com",
         "full_name": "Olivia Office",
-        "password": "Office123!",
         "role": UserRole.OFFICE_STAFF,
     },
     {
-        "email": "tech@qkil.com",
+        "email": "tech@example.com",
         "full_name": "Tom Technician",
-        "password": "Tech123!",
         "role": UserRole.TECHNICIAN,
     },
 ]
@@ -246,7 +242,6 @@ async def seed_users() -> List[User]:
         user = User(
             email=spec["email"],
             full_name=spec["full_name"],
-            hashed_password=hash_password(spec["password"]),
             role=spec["role"],
             is_active=True,
             created_at=now,
@@ -628,7 +623,7 @@ DEFAULT_INVOICE_TERMS = (
 )
 DEFAULT_INVOICE_INSTRUCTIONS = (
     "Bank transfer - Sort Code: 20-00-00  Account No: 12345678  "
-    "Account Name: QKil Pest Control Ltd. Please quote the invoice number as the reference."
+    "Account Name: PestBase Pest Control Ltd. Please quote the invoice number as the reference."
 )
 
 
@@ -761,12 +756,12 @@ async def seed_company_settings(admin: Optional[User] = None) -> bool:
         return False
 
     settings_doc = CompanySettings(
-        company_name="QKil Pest Control",
+        company_name="PestBase Pest Control",
         company_number="12345678",
         vat_number="GB123456789",
         phone="020 7946 0000",
-        email="admin@qkil.co.uk",
-        website="www.qkil.co.uk",
+        email="admin@pestbase.co.uk",
+        website="www.pestbase.co.uk",
         address_street="1 Pest House Lane",
         address_city="London",
         address_county="Greater London",
@@ -777,7 +772,7 @@ async def seed_company_settings(admin: Optional[User] = None) -> bool:
         default_invoice_terms=DEFAULT_INVOICE_TERMS,
         default_payment_instructions=(
             "Sort Code: 20-00-00  Account No: 12345678  "
-            "Account Name: QKil Pest Control Ltd"
+            "Account Name: PestBase Pest Control Ltd"
         ),
         default_quote_valid_days=30,
         default_quote_terms="Quote valid for 30 days. VAT included.",
@@ -820,7 +815,7 @@ async def main(reset: bool = False) -> None:
         # happens inside its scope - the same scope a request runs in.
         with unscoped():
             existing = await Client.find_all().sort("created_at").to_list()
-            client = existing[0] if existing else await client_service.create_client(name="QKil Demo")
+            client = existing[0] if existing else await client_service.create_client(name="PestBase Demo")
         print(f"Seeding into client {client.name} ({client.slug})")
 
         with acting_as(client.id):
@@ -864,13 +859,14 @@ async def seed_everything(reset: bool) -> None:
     print(f"  customers: {total_customers} ({created} new)")
     print(f"  jobs:      {total_jobs} ({created_jobs} new)")
     print(f"  invoices:  {total_invoices} ({created_invoices} new)")
-    print("\nDefault credentials:")
+    print("\nDefault accounts (sign-in is passwordless - use 'Email me a sign-in")
+    print("link' on the sign-in page, which registers the address on first use):")
     for spec in SEED_USERS:
-        print(f"  {spec['role'].value:<13} {spec['email']:<18} {spec['password']}")
+        print(f"  {spec['role'].value:<13} {spec['email']}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Seed the QKil database.")
+    parser = argparse.ArgumentParser(description="Seed the PestBase database.")
     parser.add_argument(
         "--reset",
         action="store_true",

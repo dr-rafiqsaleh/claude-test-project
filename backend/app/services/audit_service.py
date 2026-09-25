@@ -53,9 +53,30 @@ HASHED_FIELDS = (
 SEQ_ATTEMPTS = 5
 
 
+def _as_stored(value: Any) -> Any:
+    """A value as MongoDB will hand it back, not as Python happens to hold it.
+
+    The fingerprint is taken once before the insert and again after re-reading,
+    so anything the database rounds has to be rounded here or the two disagree.
+    BSON dates keep milliseconds; `datetime.utcnow()` keeps microseconds. That
+    one difference made every entry ever written report itself as altered - the
+    hash was over ...127160 and the re-read was over ...127000.
+
+    Applied recursively, so a caller putting a datetime in `metadata` does not
+    quietly reintroduce the same false alarm.
+    """
+    if isinstance(value, datetime):
+        return value.replace(microsecond=(value.microsecond // 1000) * 1000)
+    if isinstance(value, dict):
+        return {key: _as_stored(inner) for key, inner in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_as_stored(inner) for inner in value]
+    return value
+
+
 def _fingerprint(event: AuditEvent) -> str:
     """A deterministic SHA-256 over the entry's contents."""
-    payload = {field: getattr(event, field) for field in HASHED_FIELDS}
+    payload = {field: _as_stored(getattr(event, field)) for field in HASHED_FIELDS}
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 

@@ -170,7 +170,10 @@ async def send(
         return await _send_microsoft_365(settings, email, http_transport)
     if settings.email_provider == EmailProvider.SMTP:
         return await asyncio.to_thread(_send_smtp, settings, email)
-    raise EmailError("Email isn't set up yet. An admin can set it up in Settings > Email.")
+    raise EmailError(
+        "Email isn't set up yet. PestBase configures it for every client under "
+        "Platform > Settings."
+    )
 
 
 # --- SMTP -----------------------------------------------------------------
@@ -578,14 +581,17 @@ async def _document(kind: str, document_id: str) -> dict:
     raise EmailError(f"Only {', '.join(DOCUMENT_KINDS)} can be emailed.")
 
 
-def _context(settings: CompanySettings, document: dict, user: User) -> Dict[str, str]:
+def _context(settings: CompanySettings, document: dict, user: Optional[User]) -> Dict[str, str]:
     customer = document["customer"]
     return {
         "customer_name": customer.full_name if customer else "Customer",
         "company_name": settings.company_name,
         "company_phone": settings.phone or "",
         "company_email": settings.email or "",
-        "sender_name": user.full_name,
+        # None when the app sent it rather than a person, which is what the
+        # automatic payment reminder does. Signing off as the company is the
+        # honest version of "from nobody".
+        "sender_name": user.full_name if user else settings.company_name,
         **document["context"],
     }
 
@@ -647,7 +653,7 @@ def as_eml(log: EmailLog) -> bytes:
     message["Date"] = format_datetime(log.sent_at.replace(tzinfo=timezone.utc))
     if log.message_id:
         message["Message-ID"] = log.message_id
-    message["X-QKil-Record"] = (
+    message["X-PestBase-Record"] = (
         f"{log.status}; {log.provider or 'unknown provider'}; {log.provider_reference or 'no reference'}"
     )
     message.set_content(log.body)
@@ -662,11 +668,23 @@ def as_eml(log: EmailLog) -> bytes:
     return message.as_bytes(policy=policy.SMTP)
 
 
+async def _sending_settings():
+    """This client's settings, with the platform's mail transport over the top.
+
+    Which provider and server email goes through is the platform's setting now;
+    the reply-to address, the office BCC, the templates and the company name in
+    the body are still this client's. Everything below reads one object, as it
+    always did - see app.services.platform_settings_service.
+    """
+    from app.services.company_settings_service import get_settings  # noqa: PLC0415
+    from app.services.platform_settings_service import sending_config  # noqa: PLC0415
+
+    return await sending_config(await get_settings())
+
+
 async def compose(kind: str, document_id: str, user: User) -> dict:
     """A ready-to-send email for a document, from its template."""
-    from app.services.company_settings_service import get_settings  # noqa: PLC0415
-
-    settings = await get_settings()
+    settings = await _sending_settings()
     document = await _document(kind, document_id)
     template = getattr(settings.email_templates or EmailTemplates(), kind)
     context = _context(settings, document, user)
@@ -707,9 +725,7 @@ async def send_document(
     from app.models.job import JobStatus  # noqa: PLC0415
     from app.models.quote import QuoteStatus  # noqa: PLC0415
     from app.services import invoice_service, quote_service  # noqa: PLC0415
-    from app.services.company_settings_service import get_settings  # noqa: PLC0415
-
-    settings = await get_settings()
+    settings = await _sending_settings()
     document = await _document(kind, document_id)
     record = document["record"]
 
@@ -781,6 +797,106 @@ async def send_document(
     return log
 
 
+def _days_until(due: datetime) -> str:
+    """Reads inside a sentence: "in 3 days", "tomorrow", "today"."""
+    days = (due.date() - datetime.utcnow().date()).days
+    if days <= 0:
+        return "today"
+    if days == 1:
+        return "tomorrow"
+    return f"in {days} days"
+
+
+async def send_payment_reminder(settings: CompanySettings, invoice) -> Optional[EmailLog]:
+    """Email the customer that an unpaid invoice is coming due. Never raises.
+
+    Returns the log when an email was attempted, or None when the customer has
+    no address - the caller leaves that invoice unstamped, so the reminder can
+    still go if somebody fills the address in later.
+
+    A refused email is logged as failed and the invoice is stamped anyway. The
+    office already gets the "due soon" alert in the app, and the alternative is
+    retrying on every health check for as long as the mail server is unhappy.
+
+    Nothing is attached. The customer has the invoice; this is a nudge.
+    """
+    document = await _document("invoice", str(invoice.id))
+    customer = document["customer"]
+    if customer is None or not customer.email:
+        return None
+
+    template = (settings.email_templates or EmailTemplates()).payment_reminder
+    context = _context(settings, document, None)
+    context["days_until_due"] = _days_until(invoice.due_date)
+
+    subject = render(template.subject, context)
+    body = re.sub(r"\n{3,}", "\n\n", render(template.body, context)).strip()
+    from_name, from_address = _sender(settings)
+
+    log = EmailLog(
+        document_type="invoice",
+        document_id=invoice.id,
+        document_number=invoice.invoice_number,
+        customer_id=customer.id,
+        from_address=from_address,
+        from_name=from_name,
+        reply_to=settings.email_reply_to,
+        to=[customer.email],
+        bcc=[settings.email_bcc] if settings.email_bcc else [],
+        subject=subject,
+        body=body,
+        provider=settings.email_provider.value,
+        sent_by=None,
+        sent_by_name="Automatic payment reminder",
+    )
+
+    try:
+        receipt = await send(settings, OutgoingEmail(to=[customer.email], subject=subject, body=body))
+    except EmailError as exc:
+        log.status = "failed"
+        log.error = str(exc)
+        await log.insert()
+        logger.warning("Payment reminder for %s refused: %s", invoice.invoice_number, exc)
+        return log
+
+    log.message_id = receipt.message_id
+    log.provider_reference = receipt.reference
+    await log.insert()
+    logger.info("Reminded %s about invoice %s", customer.email, invoice.invoice_number)
+    return log
+
+
+async def send_platform_test(
+    to: str,
+    user: User,
+    *,
+    http_transport: Optional[httpx.AsyncBaseTransport] = None,
+) -> None:
+    """Send a test email using only the platform's mail settings.
+
+    For the platform page, where there is no client in scope. An unsaved
+    CompanySettings supplies the defaults a message needs - a name for the body,
+    no reply-to, no BCC - so this proves the transport works without borrowing
+    any client's configuration.
+    """
+    from app.services.platform_settings_service import sending_config  # noqa: PLC0415
+
+    settings = await sending_config(CompanySettings(company_name="PestBase"))
+    await send(
+        settings,
+        OutgoingEmail(
+            to=[to],
+            subject="Test email from PestBase",
+            body=(
+                f"This is a test of PestBase's platform email settings, sent by "
+                f"{user.full_name}.\n\nIf you are reading this, sending works for "
+                f"every client.\n"
+            ),
+        ),
+        http_transport=http_transport,
+    )
+
+
 async def send_test(
     to: str,
     user: User,
@@ -788,16 +904,14 @@ async def send_test(
     http_transport: Optional[httpx.AsyncBaseTransport] = None,
 ) -> None:
     """Send a short test email with the saved settings."""
-    from app.services.company_settings_service import get_settings  # noqa: PLC0415
-
-    settings = await get_settings()
+    settings = await _sending_settings()
     await send(
         settings,
         OutgoingEmail(
             to=[to],
             subject=f"Test email from {settings.company_name}",
             body=(
-                f"This is a test email from QKil, sent by {user.full_name}.\n\n"
+                f"This is a test email from PestBase, sent by {user.full_name}.\n\n"
                 "If you're reading this, email is set up correctly: quotes, invoices and "
                 "reports can now be emailed to customers."
             ),

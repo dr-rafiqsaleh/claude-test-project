@@ -1,6 +1,6 @@
 """Repeating jobs: booking the visits of a series ahead of time.
 
-The first visit of a repeating job heads its series. From it, QKil books every
+The first visit of a repeating job heads its series. From it, PestBase books every
 later visit up to a year ahead, as tentative ("scheduled") visits the office
 confirms with the customer, or moves, before the day. The series tops itself
 up as time passes (from the reminder sweep), so there is always a year booked,

@@ -1,4 +1,4 @@
-"""Client companies: the platform's own list of who uses QKil."""
+"""Client companies: the platform's own list of who uses PestBase."""
 
 import re
 from typing import List, Optional, Tuple
@@ -11,7 +11,7 @@ from app.models.user import User
 from app.services import audit_service
 
 
-#: How long QKil can work in a client it has just created, to set it up.
+#: How long PestBase can work in a client it has just created, to set it up.
 SETUP_GRANT_HOURS = 72
 
 
@@ -65,7 +65,7 @@ async def assert_usable(client_id: Optional[PydanticObjectId]) -> None:
         raise ClientUnavailableError("This account's client no longer exists") from None
     if not client.is_usable:
         raise ClientUnavailableError(
-            "Access for this company is suspended. Contact QKil support."
+            "Access for this company is suspended. Contact PestBase support."
         )
 
 

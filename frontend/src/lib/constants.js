@@ -1,4 +1,4 @@
-/** Shared domain constants for the QKil frontend. */
+/** Shared domain constants for the PestBase frontend. */
 
 export const UserRole = {
   ADMIN: 'admin',
@@ -514,7 +514,7 @@ export const SEARCH_STATUS_BADGE = {
 }
 
 /** localStorage key holding the last few header searches. */
-export const RECENT_SEARCHES_KEY = 'qkil_recent_searches'
+export const RECENT_SEARCHES_KEY = 'pestbase_recent_searches'
 
 /** How many recent searches the header dropdown remembers. */
 export const MAX_RECENT_SEARCHES = 5

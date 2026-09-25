@@ -1,7 +1,7 @@
 """Shared branding helpers for the invoice, quote and inspection-report PDFs.
 
 Every generated document pulls its company name, contact details, logo and
-accent colour from the one company settings document, so re-branding QKil is a
+accent colour from the one company settings document, so re-branding PestBase is a
 settings change rather than a code change.
 """
 
@@ -18,7 +18,7 @@ from reportlab.platypus import Image
 logger = logging.getLogger(__name__)
 
 #: Fallbacks used when the settings document has not been filled in.
-DEFAULT_COMPANY_NAME = "QKil Pest Control"
+DEFAULT_COMPANY_NAME = "PestBase Pest Control"
 DEFAULT_ACCENT = colors.HexColor("#059669")  # emerald-600
 
 #: Largest a logo may be drawn in a PDF header, in points.
@@ -57,7 +57,7 @@ def company_name(branding: dict) -> str:
 def identity_line(branding: dict) -> str:
     """The legal small print under the company name, e.g.
 
-    "A trading name of Quikil Ltd" and, on a second line,
+    "A trading name of Acme Pest Control Ltd" and, on a second line,
     "Company No: 12345678  |  VAT No: GB...".
 
     Lines are separated by a newline. Empty when none of it is recorded. The

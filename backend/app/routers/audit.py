@@ -87,7 +87,7 @@ async def list_events(
     actor_id: Optional[str] = Query(None, description="Only this person's actions"),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
-    platform_only: bool = Query(False, description="Only what QKil staff changed"),
+    platform_only: bool = Query(False, description="Only what PestBase staff changed"),
 ) -> AuditListResponse:
     events, total = await audit_service.list_events(
         page=page,

@@ -1,4 +1,4 @@
-"""Client companies. QKil platform staff only."""
+"""Client companies. PestBase platform staff only."""
 
 from datetime import datetime
 from typing import List, Optional

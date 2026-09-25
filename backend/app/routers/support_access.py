@@ -1,7 +1,7 @@
-"""Letting QKil support into a client's records, and shutting the door again.
+"""Letting PestBase support into a client's records, and shutting the door again.
 
 Two audiences, two rules. A client opens and closes their own access, which
-needs 'QKil support access'. QKil staff can open it themselves only as
+needs 'PestBase support access'. PestBase staff can open it themselves only as
 break-glass - shorter, reason required, and recorded in the client's own trail
 where they will see it.
 """
@@ -36,7 +36,7 @@ class GrantResponse(BaseModel):
 
 
 class AccessState(BaseModel):
-    """Whether QKil can currently work in this client, and the history."""
+    """Whether PestBase can currently work in this client, and the history."""
 
     open: bool = False
     current: Optional[GrantResponse] = None
@@ -90,7 +90,7 @@ def _own_client(user: User):
     return user.client_id
 
 
-@router.get("", response_model=AccessStateResponse, summary="Is QKil support able to help right now")
+@router.get("", response_model=AccessStateResponse, summary="Is PestBase support able to help right now")
 @router.get("/", response_model=AccessStateResponse, include_in_schema=False)
 async def get_state(
     current_user: User = Depends(require_permission("support.manage")),
@@ -113,7 +113,7 @@ async def get_state(
     "",
     response_model=GrantEnvelope,
     status_code=status.HTTP_201_CREATED,
-    summary="Let QKil support into your records for a while",
+    summary="Let PestBase support into your records for a while",
 )
 @router.post("/", response_model=GrantEnvelope, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def open_access(
@@ -129,7 +129,7 @@ async def open_access(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return GrantEnvelope(
         data=_response(record),
-        message=f"QKil support can help until {record.expires_at:%d %b %Y, %H:%M}. It closes on its own.",
+        message=f"PestBase support can help until {record.expires_at:%d %b %Y, %H:%M}. It closes on its own.",
         success=True,
     )
 
@@ -153,7 +153,7 @@ async def close_access(
     "/break-glass",
     response_model=GrantEnvelope,
     status_code=status.HTTP_201_CREATED,
-    summary="QKil opens a client without being asked",
+    summary="PestBase opens a client without being asked",
 )
 async def break_glass(
     payload: BreakGlassRequest,

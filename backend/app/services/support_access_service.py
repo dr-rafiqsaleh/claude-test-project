@@ -1,4 +1,4 @@
-"""Opening and closing a client to QKil staff."""
+"""Opening and closing a client to PestBase staff."""
 
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -21,7 +21,7 @@ class SupportAccessError(Exception):
 
 
 async def active_grant(client_id: PydanticObjectId) -> Optional[SupportGrant]:
-    """The grant currently letting QKil staff into this client, if any."""
+    """The grant currently letting PestBase staff into this client, if any."""
     now = datetime.utcnow()
     with acting_as(client_id):
         grants = await SupportGrant.find(
@@ -51,7 +51,7 @@ async def grant(
     reason: Optional[str] = None,
     break_glass: bool = False,
 ) -> SupportGrant:
-    """Open this client to QKil staff for a set number of hours."""
+    """Open this client to PestBase staff for a set number of hours."""
     ceiling = BREAK_GLASS_HOURS if break_glass else MAX_HOURS
     if hours < 1:
         raise SupportAccessError("Access has to be open for at least an hour")

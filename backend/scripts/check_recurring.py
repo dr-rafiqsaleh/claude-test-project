@@ -33,7 +33,7 @@ from app.schemas.booking import BookingCreate, BookingUpdate
 from app.schemas.company_settings import CompanySettingsUpdate
 from app.services import company_settings_service, notification_service, recurrence_service
 
-CHECK_DB = "qkil_recurring_check"
+CHECK_DB = "pestbase_recurring_check"
 
 
 def ok(message: str) -> None:
@@ -57,9 +57,9 @@ async def main() -> None:
     server.start()
 
     try:
-        office = User(email="office@check.test", full_name="Olive Office", hashed_password="-", role=UserRole.OFFICE_STAFF)
-        tom = User(email="tom@check.test", full_name="Tom Tech", hashed_password="-", role=UserRole.TECHNICIAN)
-        tara = User(email="tara@check.test", full_name="Tara Tech", hashed_password="-", role=UserRole.TECHNICIAN)
+        office = User(email="office@check.test", full_name="Olive Office", role=UserRole.OFFICE_STAFF)
+        tom = User(email="tom@check.test", full_name="Tom Tech", role=UserRole.TECHNICIAN)
+        tara = User(email="tara@check.test", full_name="Tara Tech", role=UserRole.TECHNICIAN)
         for user in (office, tom, tara):
             await user.insert()
         customer = Customer(
@@ -77,7 +77,7 @@ async def main() -> None:
 
         print("Telling the technician, before email is set up")
         one_off = await create_booking(booking(uk(2026, 11, 2), RecurrenceType.NONE), current_user=office)
-        assert any("can see it in QKil" in notice for notice in one_off.data.notices), one_off.data.notices
+        assert any("can see it in PestBase" in notice for notice in one_off.data.notices), one_off.data.notices
         note = await Notification.find_one({"user_id": tom.id, "type": NotificationType.JOB_ASSIGNED.value})
         assert note is not None and note.link == f"/bookings/{one_off.data.id}"
         ok("a one-off job shows in the technician's notifications, and says email isn't set up")

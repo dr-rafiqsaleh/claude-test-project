@@ -31,7 +31,7 @@ from app.schemas.quote import QuoteCreate, QuoteItemSchema
 from app.services import company_settings_service, invoice_service, job_service, pdf_branding, quote_service
 from app.services.company_settings_service import SettingsError
 
-CHECK_DB = "qkil_invoicing_check"
+CHECK_DB = "pestbase_invoicing_check"
 
 
 def ok(message: str) -> None:
@@ -72,7 +72,7 @@ async def main(save_to: Path | None) -> None:
     await init_db(database_name=CHECK_DB)  # recreate the indexes
 
     try:
-        office = User(email="office@check.test", full_name="Olive Office", hashed_password="-", role=UserRole.OFFICE_STAFF)
+        office = User(email="office@check.test", full_name="Olive Office", role=UserRole.OFFICE_STAFF)
         await office.insert()
         customer = Customer(
             first_name="Lena",
@@ -86,7 +86,7 @@ async def main(save_to: Path | None) -> None:
         print("Bank details and company name")
         settings = await company_settings_service.update_settings(
             CompanySettingsUpdate(
-                company_name="QKil Pest Control",
+                company_name="PestBase Pest Control",
                 legal_name="Example Pest Ltd",
                 company_number="01234567",
                 vat_number="GB999999973",  # kept, but unused until registered
@@ -167,7 +167,7 @@ async def main(save_to: Path | None) -> None:
             ok(f"going back to 10 is refused: {exc}")
         else:
             raise AssertionError("moving the invoice number backwards should be refused")
-        assert (await company_settings_service.get_settings()).company_name == "QKil Pest Control"
+        assert (await company_settings_service.get_settings()).company_name == "PestBase Pest Control"
         ok("and a refused number saves nothing else either")
 
         await company_settings_service.update_settings(

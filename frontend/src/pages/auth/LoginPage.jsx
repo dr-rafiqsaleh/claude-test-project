@@ -1,30 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { AlertCircle, CheckCircle2, Eye, EyeOff, LogIn } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, ArrowLeft, CheckCircle2, Mail, ShieldCheck } from 'lucide-react'
+import Passwordless from 'supertokens-auth-react/recipe/passwordless'
 
-import { login as loginRequest } from '@/api/auth'
+import { getMe } from '@/api/auth'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
-import { toApiError } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
-
-const loginSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
-})
 
 const BRAND_POINTS = [
   'Book jobs and assign technicians in a few taps',
@@ -32,44 +17,167 @@ const BRAND_POINTS = [
   'Invoices raised the moment a job is completed',
 ]
 
+/** Whether this page was opened by following a link from an email. */
+function isMagicLinkLanding() {
+  return window.location.pathname.includes('/verify')
+}
+
+/**
+ * Sign in, without a password.
+ *
+ * You type your email address, PestBase emails you a link and a six-digit code, and
+ * either one signs you in. Nobody has a password to forget, reuse or leak.
+ *
+ * Both are offered on purpose. A link is one tap on the phone the email arrived
+ * on; the code is what a technician needs when the email is on a different
+ * device, or when a site phone will not open links from mail.
+ *
+ * The API deliberately gives the same answer whether an address is unknown,
+ * deactivated or belongs to a suspended client - otherwise this form becomes a
+ * way to find out who has a PestBase account.
+ */
 export function LoginPage() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const setAuth = useAuthStore((state) => state.setAuth)
-  const accessToken = useAuthStore((state) => state.accessToken)
-  const [formError, setFormError] = useState(null)
-  const [showPassword, setShowPassword] = useState(false)
+  const setUser = useAuthStore((state) => state.setUser)
+  const setWorkingClient = useAuthStore((state) => state.setWorkingClient)
 
-  const redirectTo = location.state?.from ?? '/dashboard'
+  const [step, setStep] = useState(isMagicLinkLanding() ? 'link' : 'email')
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
 
-  const form = useForm({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
-    mode: 'onSubmit',
-  })
-
-  useEffect(() => {
-    if (accessToken) navigate(redirectTo, { replace: true })
-  }, [accessToken, navigate, redirectTo])
-
-  async function onSubmit(values) {
-    setFormError(null)
+  /**
+   * Turn a fresh session into a signed-in app.
+   *
+   * SuperTokens having accepted the code is only half of it: the portal draws
+   * every menu and guard from the PestBase profile behind that session, and until
+   * it is loaded `user` is null - which the route guard reads as "not signed
+   * in" and bounces straight back here. So the profile is fetched before
+   * navigating anywhere.
+   */
+  async function finishSignIn() {
+    // A client left over from a previous session in this browser is not this
+    // person's, and for a client's own team it is meaningless.
+    setWorkingClient(null)
     try {
-      const tokens = await loginRequest({ email: values.email.trim(), password: values.password })
-      setAuth(tokens.user, tokens.access_token, tokens.refresh_token)
-      navigate(redirectTo, { replace: true })
-    } catch (err) {
-      const apiError = toApiError(err, 'Unable to sign in. Please try again.')
-      setFormError(apiError.status === 401 ? 'Incorrect email or password.' : apiError.message)
-      form.setValue('password', '')
+      setUser(await getMe())
+      // The index route sends them on by who they are; see HomeRedirect.
+      navigate('/', { replace: true })
+      return true
+    } catch {
+      setError(
+        'You are signed in, but your PestBase account could not be loaded. ' +
+        'Ask an administrator to check the account is active.',
+      )
+      return false
     }
   }
 
-  const submitting = form.formState.isSubmitting
+  // Opened from the email: consume the link and go straight in.
+  useEffect(() => {
+    if (step !== 'link') return
+
+    let cancelled = false
+    async function consumeLink() {
+      try {
+        const result = await Passwordless.consumeCode()
+        if (cancelled) return
+        if (result.status === 'OK') {
+          if (!(await finishSignIn())) setStep('email')
+          return
+        }
+        setError(
+          result.status === 'EXPIRED_USER_INPUT_CODE_ERROR' ||
+          result.status === 'RESTART_FLOW_ERROR'
+            ? 'That link has expired. Ask for a new one.'
+            : 'That link could not be used. Ask for a new one.',
+        )
+        setStep('email')
+      } catch {
+        if (cancelled) return
+        setError('That link could not be used. Ask for a new one.')
+        setStep('email')
+      }
+    }
+
+    void consumeLink()
+    return () => {
+      cancelled = true
+    }
+  }, [step, navigate])
+
+  async function sendCode(event) {
+    event?.preventDefault()
+    setError(null)
+
+    const address = email.trim().toLowerCase()
+    if (!address) {
+      setError('Enter your email address.')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const result = await Passwordless.createCode({ email: address })
+      if (result.status === 'OK') {
+        setStep('code')
+      } else {
+        // GENERAL_ERROR: unknown address, deactivated account, suspended
+        // client, or too many attempts. The server writes the wording.
+        setError(result.fetchResponse ? await messageFrom(result) : 'Could not send a sign-in email.')
+      }
+    } catch {
+      setError('Cannot reach the PestBase server. Check your connection and try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function submitCode(event) {
+    event.preventDefault()
+    setError(null)
+
+    const typed = code.trim()
+    if (!typed) {
+      setError('Enter the code from the email.')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const result = await Passwordless.consumeCode({ userInputCode: typed })
+      if (result.status === 'OK') {
+        await finishSignIn()
+        return
+      }
+      if (result.status === 'INCORRECT_USER_INPUT_CODE_ERROR') {
+        const left = result.maximumCodeInputAttempts - result.failedCodeInputAttemptCount
+        setError(`That code is not right. ${left} attempt${left === 1 ? '' : 's'} left.`)
+      } else if (result.status === 'EXPIRED_USER_INPUT_CODE_ERROR') {
+        setError('That code has expired. Ask for a new one.')
+      } else {
+        setError('Start again and ask for a new code.')
+        setStep('email')
+      }
+    } catch {
+      setError('Cannot reach the PestBase server. Check your connection and try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function messageFrom(result) {
+    try {
+      return (await result.fetchResponse.clone().json()).message || 'Could not send a sign-in email.'
+    } catch {
+      return 'Could not send a sign-in email.'
+    }
+  }
 
   return (
     <div className="grid min-h-dvh bg-background lg:grid-cols-2">
-      {/* Brand panel: what QKil is for, on screens with room for it */}
+      {/* Brand panel: what PestBase is for, on screens with room for it */}
       <div className="hidden flex-col justify-between bg-primary p-12 text-primary-foreground lg:flex">
         <Logo size={40} textClassName="text-xl text-primary-foreground" />
         <div className="max-w-md space-y-6">
@@ -94,97 +202,138 @@ export function LoginPage() {
             <Logo size={40} subtitle="Pest Control" />
           </div>
 
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Enter your QKil email and password.</p>
-
-          {formError ? (
-            <div
-              role="alert"
-              className="mt-6 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{formError}</span>
+          {step === 'link' ? (
+            <div className="space-y-4 text-center">
+              <Spinner />
+              <p className="text-sm text-muted-foreground">Signing you in...</p>
             </div>
           ) : null}
 
-          <div className="mt-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field, fieldState }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="email"
-                      autoComplete="email"
-                      placeholder="you@qkil.co.uk"
-                      className="h-11"
-                      hasError={Boolean(fieldState.error)}
-                      disabled={submitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          {step === 'email' ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                We will email you a link and a code. There is no password to remember.
+              </p>
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field, fieldState }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        {...field}
-                        type={showPassword ? 'text' : 'password'}
-                        autoComplete="current-password"
-                        placeholder="••••••••"
-                        className="h-11 pr-11"
-                        hasError={Boolean(fieldState.error)}
-                        disabled={submitting}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((v) => !v)}
-                        className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        aria-pressed={showPassword}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {error ? <ErrorNote message={error} /> : null}
 
-            <Button type="submit" className="h-11 w-full" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Spinner size="sm" className="text-current" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  <LogIn className="h-4 w-4" />
-                  Sign in
-                </>
-              )}
-            </Button>
-          </form>
-        </Form>
-          </div>
+              <form onSubmit={sendCode} className="mt-6 space-y-4" noValidate>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    autoFocus
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@pestbase.co.uk"
+                    className="h-11"
+                    disabled={busy}
+                  />
+                </div>
 
-          <p className="mt-8 text-sm text-muted-foreground">Need access? Ask your administrator to add you.</p>
+                <Button type="submit" className="h-11 w-full" disabled={busy}>
+                  {busy ? (
+                    <>
+                      <Spinner size="sm" className="text-current" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4" />
+                      Email me a sign-in link
+                    </>
+                  )}
+                </Button>
+              </form>
+            </>
+          ) : null}
+
+          {step === 'code' ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Check your email</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                We sent a link and a six-digit code to{' '}
+                <span className="font-medium text-foreground">{email.trim().toLowerCase()}</span>. Tap
+                the link, or type the code here.
+              </p>
+
+              {error ? <ErrorNote message={error} /> : null}
+
+              <form onSubmit={submitCode} className="mt-6 space-y-4" noValidate>
+                <div className="space-y-1.5">
+                  <Label htmlFor="code">Code</Label>
+                  <Input
+                    id="code"
+                    // A numeric keypad on a phone, and the OS offers the code
+                    // straight from the email notification.
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    placeholder="123456"
+                    className="h-11 text-center text-lg tracking-[0.3em]"
+                    disabled={busy}
+                  />
+                </div>
+
+                <Button type="submit" className="h-11 w-full" disabled={busy}>
+                  {busy ? (
+                    <>
+                      <Spinner size="sm" className="text-current" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4" />
+                      Sign in
+                    </>
+                  )}
+                </Button>
+
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setStep('email')
+                      setCode('')
+                      setError(null)
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Different email
+                  </button>
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    disabled={busy}
+                    onClick={() => void sendCode()}
+                  >
+                    Send another
+                  </button>
+                </div>
+              </form>
+            </>
+          ) : null}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ErrorNote({ message }) {
+  return (
+    <div
+      role="alert"
+      className="mt-6 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
     </div>
   )
 }

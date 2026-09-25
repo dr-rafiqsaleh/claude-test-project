@@ -207,7 +207,7 @@ export function CustomerFormPage() {
         title={isEdit ? 'Edit customer' : 'New customer'}
         description={isEdit
         ? 'Update the contact and address details for this customer.'
-        : 'Add a new customer to the QKil database.'}
+        : 'Add a new customer to the PestBase database.'}
       />
 
       {submitError ? (

@@ -1,130 +1,63 @@
-"""Authentication routes."""
+"""Who is signed in, and signing out.
 
-from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, HTTPException, status
+Signing *in* is not here: SuperTokens serves it at AUTH_API_BASE_PATH (/auth by
+default), and app.core.supertokens decides who is allowed through. What is left
+for PestBase is the profile the portal needs and ending a session.
+"""
 
-from app.core.security import REFRESH_TOKEN_TYPE, create_access_token, decode_token
+import logging
+
+from fastapi import APIRouter, Depends, Request
+from supertokens_python.recipe.session import SessionContainer
+
+from app.core.dependencies import get_current_user, _verified_session
+from app.core.supertokens import end_all_sessions
 from app.models.user import User
-from app.schemas.auth import (
-    AccessTokenResponse,
-    LoginApiResponse,
-    LoginRequest,
-    RefreshApiResponse,
-    RefreshRequest,
-    TokenResponse,
-)
-from app.core.dependencies import get_current_user
-from app.core.tenancy import acting_as
-from app.services import client_service
-from app.services.client_service import ClientUnavailableError
-from app.schemas.user import UserResponse, UserResponseEnvelope
+from app.schemas.user import UserResponseEnvelope, UserResponse
 from app.services import user_service
-from app.services.auth_service import InactiveUserError, authenticate_user, create_tokens
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=LoginApiResponse, summary="Sign in with email and password")
-async def login(payload: LoginRequest) -> LoginApiResponse:
-    """Authenticate a user and issue an access + refresh token pair."""
-    try:
-        user = await authenticate_user(payload.email, payload.password)
-    except InactiveUserError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    try:
-        await client_service.assert_usable(user.client_id)
-    except ClientUnavailableError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-
-    access_token, refresh_token = create_tokens(user)
-
-    # Their role lives in their own client, so read it in that scope: signing
-    # in is the one moment no scope has been set yet.
-    with acting_as(user.client_id):
-        profile = await user_service.user_payload(user, with_permissions=True)
-
-    return LoginApiResponse(
-        data=TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            user=UserResponse.model_validate(profile),
-        ),
-        message="Login successful",
-        success=True,
-    )
-
-
-@router.post("/refresh", response_model=RefreshApiResponse, summary="Exchange a refresh token for a new access token")
-async def refresh_token(payload: RefreshRequest) -> RefreshApiResponse:
-    """Issue a fresh access token from a valid refresh token."""
-    claims = decode_token(payload.refresh_token)
-    if claims is None or claims.get("type") != REFRESH_TOKEN_TYPE:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    subject = claims.get("sub")
-    if not subject:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-
-    try:
-        user = await User.get(PydanticObjectId(subject))
-    except Exception:  # noqa: BLE001 - malformed subject
-        user = None
-
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User no longer exists")
-
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account has been deactivated")
-
-    try:
-        await client_service.assert_usable(user.client_id)
-    except ClientUnavailableError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-
-    access_token = create_access_token(
-        str(user.id),
-        extra={"email": user.email, "role": str(user.role)},
-    )
-
-    return RefreshApiResponse(
-        data=AccessTokenResponse(access_token=access_token, token_type="bearer"),
-        message="Token refreshed",
-        success=True,
-    )
-
-
-@router.post("/logout", summary="Sign out the current user")
-async def logout(current_user: User = Depends(get_current_user)) -> dict:
-    """Log the current user out.
-
-    Tokens are stateless, so the client is responsible for discarding them. This
-    endpoint validates the session and confirms the sign-out.
-    """
-    return {
-        "data": {"user_id": str(current_user.id)},
-        "message": "Logged out successfully",
-        "success": True,
-    }
-
-
 @router.get("/me", response_model=UserResponseEnvelope, summary="Get the currently authenticated user")
-async def read_current_user(current_user: User = Depends(get_current_user)) -> UserResponseEnvelope:
-    """Return the profile of the authenticated user."""
+async def read_current_user(
+    current_user: User = Depends(get_current_user),
+) -> UserResponseEnvelope:
+    """The signed-in user, with their role's permissions.
+
+    The portal calls this on load and after anything that changes what the person
+    may do, because the menus and buttons are drawn from `permissions`.
+    """
     return UserResponseEnvelope(
-        data=UserResponse.model_validate(await user_service.user_payload(current_user, with_permissions=True)),
+        data=UserResponse.model_validate(
+            await user_service.user_payload(current_user, with_permissions=True)
+        ),
         message="Current user retrieved",
         success=True,
     )
+
+
+@router.post("/sign-out", summary="Sign out of this device")
+async def sign_out(session: SessionContainer = Depends(_verified_session)) -> dict:
+    """End this session.
+
+    SuperTokens' own /auth/signout does the same thing and the portal's SDK calls
+    it; this exists for anything speaking to the API directly.
+    """
+    await session.revoke_session()
+    return {"data": None, "message": "Signed out", "success": True}
+
+
+@router.post("/sign-out-everywhere", summary="Sign out of every device")
+async def sign_out_everywhere(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """End every session this account has, on every device.
+
+    What you want after losing a phone, which is a real risk for technicians.
+    """
+    await end_all_sessions(current_user.auth_user_id)
+    return {"data": None, "message": "Signed out on every device", "success": True}

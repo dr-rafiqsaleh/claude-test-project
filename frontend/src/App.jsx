@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 
-import { getMe } from '@/api/auth'
+import { getMe, hasSession } from '@/api/auth'
 import { AppShell } from '@/components/layout/AppShell'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
 import { RoleGuard } from '@/components/layout/RoleGuard'
@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingState } from '@/components/ui/spinner'
 import { Toaster } from '@/components/ui/toaster'
-import { refreshAccessToken } from '@/lib/api'
-import { readRefreshToken, useAuthStore } from '@/store/authStore'
+import { useAuthStore } from '@/store/authStore'
 
 // Pages load on first visit, so a phone downloads only the screens it opens.
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
@@ -36,6 +35,20 @@ const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const UsersPage = lazy(() => import('@/pages/users/UsersPage'))
 const ClientsPage = lazy(() => import('@/pages/platform/ClientsPage'))
 const AuditPage = lazy(() => import('@/pages/audit/AuditPage'))
+const PlatformSettingsPage = lazy(() => import('@/pages/platform/PlatformSettingsPage'))
+
+/**
+ * Where a signed-in person lands.
+ *
+ * PestBase's own staff belong to no client, so the dashboard - which is entirely a
+ * client's own jobs, quotes and invoices - has nothing to show them and every
+ * request it makes is refused for want of a client. They start on the client
+ * list instead, which is their actual work.
+ */
+function HomeRedirect() {
+  const isPlatformStaff = useAuthStore((state) => Boolean(state.user?.is_platform_staff))
+  return <Navigate to={isPlatformStaff ? '/platform/clients' : '/dashboard'} replace />
+}
 
 function NotFoundPage() {
   return (
@@ -56,30 +69,26 @@ function NotFoundPage() {
 }
 
 /**
- * Restores the session on first load: the access token lives in memory only, so
- * a page refresh exchanges the stored refresh token for a new one.
+ * Works out on first load whether somebody is signed in.
+ *
+ * SuperTokens owns the session and refreshes it itself, so there is no token to
+ * restore - the question is only whether a session exists and, if it does, which
+ * PestBase account is behind it. `doesSessionExist` answers the first without a
+ * round trip, so a signed-out visitor reaches the sign-in page immediately.
  */
 function useSessionBootstrap() {
   const setStatus = useAuthStore((state) => state.setStatus)
   const setUser = useAuthStore((state) => state.setUser)
-  const logout = useAuthStore((state) => state.logout)
+  const clear = useAuthStore((state) => state.clear)
 
   useEffect(() => {
     let cancelled = false
 
     async function bootstrap() {
-      if (!readRefreshToken()) {
-        if (!cancelled) setStatus('unauthenticated')
-        return
-      }
-
       setStatus('restoring')
 
-      const token = await refreshAccessToken()
-      if (cancelled) return
-
-      if (!token) {
-        logout()
+      if (!(await hasSession())) {
+        if (!cancelled) clear()
         return
       }
 
@@ -87,9 +96,25 @@ function useSessionBootstrap() {
         const user = await getMe()
         if (cancelled) return
         setUser(user)
-        setStatus('authenticated')
       } catch {
-        if (!cancelled) logout()
+        if (cancelled) return
+
+        // A chosen client can be refused - its support access may have run out
+        // since it was picked - and that is not a reason to sign anybody out.
+        // Step back out of it and ask again as ourselves.
+        if (useAuthStore.getState().workingClient) {
+          useAuthStore.getState().setWorkingClient(null)
+          try {
+            setUser(await getMe())
+            return
+          } catch {
+            /* falls through to signing out, below */
+          }
+        }
+
+        // A session the API will not accept: deactivated, or its client
+        // suspended. Treated as signed out, which sends them to /login.
+        clear()
       }
     }
 
@@ -97,7 +122,7 @@ function useSessionBootstrap() {
     return () => {
       cancelled = true
     }
-  }, [setStatus, setUser, logout])
+  }, [setStatus, setUser, clear])
 }
 
 export function App() {
@@ -106,8 +131,9 @@ export function App() {
   return (
     <>
       <Routes>
+        {/* /login and /login/verify, which is where an emailed link lands. */}
         <Route
-          path="/login"
+          path="/login/*"
           element={
             <Suspense fallback={<LoadingState className="min-h-dvh" />}>
               <LoginPage />
@@ -122,7 +148,7 @@ export function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<HomeRedirect />} />
           <Route path="/dashboard" element={<DashboardPage />} />
 
           <Route path="/search" element={<SearchPage />} />
@@ -237,6 +263,15 @@ export function App() {
             element={
               <RoleGuard permission="audit.view">
                 <AuditPage />
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="/platform/settings"
+            element={
+              <RoleGuard platform>
+                <PlatformSettingsPage />
               </RoleGuard>
             }
           />

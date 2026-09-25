@@ -2,7 +2,7 @@
  * Light / dark / system theme. Light is the default; the choice is remembered
  * per browser. Applied before the first render (see main.jsx) so there is no flash.
  */
-const STORAGE_KEY = 'qkil-theme'
+const STORAGE_KEY = 'pestbase-theme'
 
 export const THEMES = ['light', 'dark', 'system']
 

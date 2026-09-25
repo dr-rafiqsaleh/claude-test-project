@@ -8,7 +8,7 @@ import re
 from typing import Dict, FrozenSet, List, Optional
 
 from app.core.permissions import ADMIN_ROLE, ALL_PERMISSIONS, DEFAULT_ROLES
-from app.core.tenancy import current_client_id
+from app.core.tenancy import TenantScopeError, current_client_id
 from app.models.role import Role
 from app.models.user import User
 
@@ -71,7 +71,10 @@ async def permissions_for_role(key: str) -> FrozenSet[str]:
     if cache_key not in _cache:
         try:
             role = await get_role(key)
-        except RoleNotFoundError:
+        # TenantScopeError: PestBase platform staff, who belong to no client and so
+        # have no client's roles to read. Holding no role's permissions is the
+        # right answer for them - what they may do comes from is_platform_staff.
+        except (RoleNotFoundError, TenantScopeError):
             return frozenset()
         _cache[cache_key] = frozenset(role.permissions) & ALL_PERMISSIONS
     return _cache[cache_key]
@@ -87,11 +90,18 @@ async def has_permission(user: User, permission: str) -> bool:
 
 
 async def role_name(key: str) -> str:
+    """A role's display name. Never raises - it is a label, not a decision.
+
+    Falls back to a prettified key when the role cannot be read at all. That
+    happens for PestBase platform staff: they belong to no client, so there is no
+    client's role collection to look in, and a profile request of theirs must not
+    fail over the wording of a badge.
+    """
     cache_key = (current_client_id(), key)
     if cache_key not in _names:
         try:
             _names[cache_key] = (await get_role(key)).name
-        except RoleNotFoundError:
+        except (RoleNotFoundError, TenantScopeError):
             _names[cache_key] = key.replace("_", " ").title()
     return _names[cache_key]
 

@@ -817,6 +817,74 @@ async def sweep_overdue_invoices() -> int:
     return len(invoices)
 
 
+#: How many days before the due date the customer is reminded.
+PAYMENT_REMINDER_DAYS = 3
+
+
+async def due_for_payment_reminder(now: Optional[datetime] = None) -> List[Invoice]:
+    """Unpaid invoices within three days of falling due, not yet reminded.
+
+    Four conditions, and each one is doing a job:
+
+    * `status` sent or partially paid - a draft has not gone out, and paid,
+      cancelled or written-off invoices are settled. A partially paid one still
+      owes something, so it still gets chased.
+    * `due_date` no later than three days away, so it is the reminder the
+      customer expects.
+    * `due_date` not in the past. An invoice already overdue wants a different
+      email, not one saying payment "falls due" - and that is the office's
+      overdue alert, not this.
+    * `payment_reminder_sent_at` unset, which is what makes this send once. The
+      sweep runs on every health check, so without it the customer would be
+      emailed every few seconds. `None` also matches invoices written before the
+      field existed, which is what we want: they have not been reminded either.
+    """
+    now = now or datetime.utcnow()
+    return await Invoice.find(
+        {
+            "status": {"$in": [InvoiceStatus.SENT.value, InvoiceStatus.PARTIALLY_PAID.value]},
+            "due_date": {
+                "$gte": now,
+                "$lte": now + timedelta(days=PAYMENT_REMINDER_DAYS),
+            },
+            "payment_reminder_sent_at": None,
+        }
+    ).to_list()
+
+
+async def sweep_payment_reminders() -> int:
+    """Email each customer once about an invoice coming due. Returns how many.
+
+    Silent unless the client has switched reminders on and PestBase can send
+    mail at all. Called from the notification sweep, which rides on the health
+    check - so this must stay cheap when there is nothing to do, which the
+    indexed query on status and due_date makes it.
+    """
+    from app.models.company_settings import EmailProvider  # noqa: PLC0415
+    from app.services import email_service  # noqa: PLC0415
+    from app.services.company_settings_service import get_settings  # noqa: PLC0415
+    from app.services.platform_settings_service import sending_config  # noqa: PLC0415
+
+    settings = await sending_config(await get_settings())
+    if not settings.email_payment_reminders:
+        return 0
+    if settings.email_provider == EmailProvider.NONE:
+        return 0
+
+    sent = 0
+    for invoice in await due_for_payment_reminder():
+        log = await email_service.send_payment_reminder(settings, invoice)
+        if log is None:
+            # No address to send to. Left unstamped so it can still go out if
+            # somebody adds one before the due date.
+            continue
+        invoice.payment_reminder_sent_at = datetime.utcnow()
+        invoice.touch()
+        await invoice.save()
+        sent += 1
+    return sent
+
+
 # ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------

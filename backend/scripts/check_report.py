@@ -56,7 +56,7 @@ from app.services import (
     job_service,
 )
 
-CHECK_DB = "qkil_report_check"
+CHECK_DB = "pestbase_report_check"
 
 #: A 1x1 transparent PNG, standing in for a drawn signature.
 SIGNATURE = (
@@ -93,12 +93,11 @@ async def main(save_to: Path | None) -> None:
     await init_db(database_name=CHECK_DB)  # recreate the indexes
 
     try:
-        office = User(email="office@check.test", full_name="Olive Office", hashed_password="-", role=UserRole.OFFICE_STAFF)
+        office = User(email="office@check.test", full_name="Olive Office", role=UserRole.OFFICE_STAFF)
         tech = User(
             email="tech@check.test",
             full_name="Tom Tech",
             job_title="Senior Technician",
-            hashed_password="-",
             role=UserRole.TECHNICIAN,
         )
         for user in (office, tech):

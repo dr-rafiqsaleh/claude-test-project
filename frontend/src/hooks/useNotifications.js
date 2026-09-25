@@ -111,7 +111,7 @@ function stopPolling() {
  * markAllRead, deleteNotification, refresh }`.
  */
 export function useNotifications({ poll = true } = {}) {
-  const isAuthenticated = useAuthStore((store) => Boolean(store.accessToken && store.user))
+  const isAuthenticated = useAuthStore((store) => Boolean(store.user))
   const [snapshot, setSnapshot] = useState(state)
 
   useEffect(() => {

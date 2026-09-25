@@ -22,7 +22,7 @@ from app.schemas.company_settings import (
     CompanySettingsUpdate,
 )
 from app.schemas.email import TestEmailRequest
-from app.services import company_settings_service, email_service
+from app.services import company_settings_service
 from app.services.company_settings_service import (
     InvalidLogoError,
     SettingsError,
@@ -65,26 +65,6 @@ async def update_settings(
             detail=str(exc),
         ) from exc
     return await _envelope(settings, "Company settings saved")
-
-
-@router.post(
-    "/email/test",
-    response_model=ApiResponse[None],
-    summary="Send a test email with the saved email settings",
-)
-async def send_test_email(
-    payload: TestEmailRequest,
-    current_user: User = Depends(require_permission("settings.manage")),
-) -> ApiResponse[None]:
-    """Admin only. A refused send comes back as a 422 saying what to fix."""
-    try:
-        await email_service.send_test(payload.to, current_user)
-    except email_service.EmailError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        ) from exc
-    return ApiResponse[None](data=None, message=f"Test email sent to {payload.to}", success=True)
 
 
 # Declared before the GET so the multipart upload is matched first.

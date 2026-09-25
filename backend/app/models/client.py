@@ -1,4 +1,4 @@
-"""A client company using QKil.
+"""A client company using PestBase.
 
 One row per business paying for the app. Every other collection points back
 here through `client_id`, and `status` is what stops a closed client's people
@@ -18,7 +18,7 @@ from pymongo import IndexModel
 
 
 class ClientStatus(str, Enum):
-    """Whether the client may use QKil."""
+    """Whether the client may use PestBase."""
 
     ACTIVE = "active"
     #: Temporarily switched off - nobody can sign in, nothing is deleted.

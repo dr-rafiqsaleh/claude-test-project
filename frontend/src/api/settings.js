@@ -1,5 +1,4 @@
 import api, { API_BASE_URL, unwrap } from '@/lib/api'
-import { useAuthStore } from '@/store/authStore'
 
 /** GET /settings - company profile, document defaults and appearance. */
 export async function getSettings(signal) {
@@ -33,16 +32,10 @@ export async function removeLogo() {
 /**
  * A URL that renders the company logo, safe to use in an `<img src>`.
  *
- * An image tag cannot carry an Authorization header, so the access token
- * travels in the query string - the API accepts it there for this endpoint.
- * The `v` cache-buster makes a freshly uploaded logo show up immediately.
+ * The session cookie goes with an image request on this origin by itself. `v`
+ * is a cache-buster, so a freshly uploaded logo shows up immediately.
  */
 export function getLogoUrl(version) {
-  const token = useAuthStore.getState().accessToken
-  const params = new URLSearchParams()
-  if (token) params.set('token', token)
-  if (version) params.set('v', String(version))
-
-  const query = params.toString()
-  return query ? `${API_BASE_URL}/settings/logo?${query}` : `${API_BASE_URL}/settings/logo`
+  const base = `${API_BASE_URL}/settings/logo`
+  return version ? `${base}?v=${encodeURIComponent(String(version))}` : base
 }

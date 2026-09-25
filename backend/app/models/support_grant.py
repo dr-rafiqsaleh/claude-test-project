@@ -1,6 +1,6 @@
-"""Permission for QKil staff to work inside one client, for a while.
+"""Permission for PestBase staff to work inside one client, for a while.
 
-A client's records are their own customers' details. QKil staff can reach every
+A client's records are their own customers' details. PestBase staff can reach every
 client because supporting them requires it, but reaching and reading are not the
 same thing, so the door is shut by default and the client opens it.
 
@@ -34,16 +34,16 @@ BREAK_GLASS_HOURS = 24
 
 
 class SupportGrant(TenantDocument):
-    """One period during which QKil staff may work inside this client."""
+    """One period during which PestBase staff may work inside this client."""
 
     #: Who opened it. For a client grant, someone at the client; for
-    #: break-glass, the QKil account that opened it without being asked.
+    #: break-glass, the PestBase account that opened it without being asked.
     granted_by: Optional[PydanticObjectId] = None
     granted_by_name: Optional[str] = None
     granted_by_email: Optional[str] = None
     #: Why, in the client's or the operator's own words.
     reason: Optional[str] = None
-    #: True when QKil opened this itself rather than being asked.
+    #: True when PestBase opened this itself rather than being asked.
     break_glass: bool = False
 
     expires_at: datetime

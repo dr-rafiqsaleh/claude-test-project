@@ -99,7 +99,7 @@ export function SearchPage() {
   const urlQuery = searchParams.get('q') ?? ''
   const [typeFilter, setTypeFilter] = useState(ALL)
 
-  // Technicians never see invoices anywhere in QKil, so the tab is hidden too.
+  // Technicians never see invoices anywhere in PestBase, so the tab is hidden too.
   const availableTypes = useMemo(
     () => (isTechnician ? SEARCH_TYPES.filter((type) => type !== 'invoices') : SEARCH_TYPES),
     [isTechnician],
@@ -150,7 +150,7 @@ export function SearchPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search customers, jobs, invoices..."
-                aria-label="Search QKil"
+                aria-label="Search PestBase"
                 className="h-12 pl-12 text-base"
               />
             </div>

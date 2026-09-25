@@ -1,4 +1,4 @@
-"""QKil API application entrypoint."""
+"""PestBase API application entrypoint."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -7,10 +7,13 @@ from typing import AsyncIterator
 from fastapi import BackgroundTasks, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from supertokens_python import get_all_cors_headers
+from supertokens_python.framework.fastapi import get_middleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
+from app.core.supertokens import init_supertokens
 from app.core.tenancy import TenantScopeError
 from app.database import close_db, init_db
 from app.routers import (
@@ -24,6 +27,7 @@ from app.routers import (
     invoices,
     jobs,
     notifications,
+    platform_settings,
     quotes,
     roles,
     search,
@@ -36,23 +40,32 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
 )
-logger = logging.getLogger("qkil")
+logger = logging.getLogger("pestbase")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Open the database connection on startup and close it on shutdown."""
-    logger.info("Starting QKil API (environment=%s)", settings.ENVIRONMENT)
+    logger.info("Starting PestBase API (environment=%s)", settings.ENVIRONMENT)
     await init_db()
     try:
         yield
     finally:
         await close_db()
-        logger.info("QKil API shut down")
+        logger.info("PestBase API shut down")
 
+
+# Before the app is built, not in the lifespan: get_middleware() and
+# get_all_cors_headers() below both ask SuperTokens for its configuration, and
+# they run while this module is being imported - long before any lifespan.
+#
+# Safe this early because init only configures the SDK. The sign-in overrides it
+# registers do look up PestBase accounts, but they run on a request, by which time
+# the lifespan has opened the database.
+init_supertokens()
 
 app = FastAPI(
-    title="QKil API",
+    title="PestBase API",
     description=(
         "Pest control management platform - Phase 8 "
         "(auth, users, customers, quotes, bookings, jobs, inspection reports, "
@@ -65,12 +78,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# SuperTokens has to see the request before the routes do: it serves its own
+# endpoints under AUTH_API_BASE_PATH and refreshes an expiring session. Added
+# before CORS so that CORS still wraps it - middleware runs in reverse order of
+# addition.
+app.add_middleware(get_middleware())
+
+# allow_credentials, and the SuperTokens headers, because the session lives in
+# cookies rather than a header the app sets itself. Behind the portal's nginx
+# the two share an origin and none of this is used; it matters when the API is
+# served from somewhere else, such as `npm run dev` against a separate backend.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Client-Id", *get_all_cors_headers()],
 )
 
 app.include_router(auth.router)
@@ -88,6 +111,7 @@ app.include_router(roles.router)
 app.include_router(clients.router)
 app.include_router(audit.router)
 app.include_router(support_access.router)
+app.include_router(platform_settings.router)
 
 
 @app.exception_handler(TenantScopeError)
@@ -132,7 +156,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 async def health_check(background_tasks: BackgroundTasks) -> dict:
     """Simple liveness probe.
 
-    Doubles as the heartbeat for the reminder sweep: QKil has no scheduler, so
+    Doubles as the heartbeat for the reminder sweep: PestBase has no scheduler, so
     generating notifications rides along with the health check and the
     notifications list endpoint. The sweep is de-duplicated and never blocks
     the response.
@@ -146,7 +170,7 @@ async def health_check(background_tasks: BackgroundTasks) -> dict:
             "database": settings.DATABASE_NAME,
             "version": app.version,
         },
-        "message": "QKil API is healthy",
+        "message": "PestBase API is healthy",
         "success": True,
     }
 
@@ -155,7 +179,7 @@ async def health_check(background_tasks: BackgroundTasks) -> dict:
 async def root() -> dict:
     """Root endpoint pointing at the docs."""
     return {
-        "data": {"name": "QKil API", "version": app.version, "docs": "/docs"},
-        "message": "Welcome to the QKil API",
+        "data": {"name": "PestBase API", "version": app.version, "docs": "/docs"},
+        "message": "Welcome to the PestBase API",
         "success": True,
     }

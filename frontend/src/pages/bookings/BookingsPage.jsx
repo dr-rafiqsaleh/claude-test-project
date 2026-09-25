@@ -656,7 +656,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
           </div>
         ) : null}
 
-        <div className="qkil-calendar min-h-[600px]">
+        <div className="pestbase-calendar min-h-[600px]">
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -666,7 +666,7 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
             events={events}
             datesSet={handleDatesSet}
             eventContent={renderEventContent}
-            eventClassNames={(arg) => (arg.event.extendedProps?.tentative ? ['qkil-tentative'] : [])}
+            eventClassNames={(arg) => (arg.event.extendedProps?.tentative ? ['pestbase-tentative'] : [])}
             eventClick={(info) => {
               info.jsEvent.preventDefault()
               onSelectBooking(info.event.id)

@@ -8,7 +8,6 @@ from typing import Optional, Tuple
 from beanie import PydanticObjectId
 from fastapi import UploadFile
 
-from app.core.secrets import encrypt_secret
 from app.models.company_settings import (
     ALLOWED_LOGO_TYPES,
     MAX_LOGO_BYTES,
@@ -43,6 +42,7 @@ NUMBERING = (
     ("next_job_number", BOOKING_COUNTER, "job"),  # jobs are stored as bookings
     ("next_report_number", JOB_COUNTER, "report"),  # reports are stored as jobs
 )
+from app.services.platform_settings_service import SECRET_FIELDS, TRANSPORT_FIELDS
 
 
 def build_settings_payload(settings: CompanySettings) -> dict:
@@ -86,19 +86,6 @@ def build_settings_payload(settings: CompanySettings) -> dict:
         "report_insecticide_guidance": settings.report_insecticide_guidance,
         "report_rodenticide_guidance": settings.report_rodenticide_guidance,
         "report_declaration": settings.report_declaration,
-        # Passwords and secrets never leave the server: only whether one is saved.
-        "email_provider": settings.email_provider,
-        "smtp_host": settings.smtp_host,
-        "smtp_port": settings.smtp_port,
-        "smtp_security": settings.smtp_security,
-        "smtp_username": settings.smtp_username,
-        "smtp_password_set": bool(settings.smtp_password_encrypted),
-        "m365_tenant_id": settings.m365_tenant_id,
-        "m365_client_id": settings.m365_client_id,
-        "m365_client_secret_set": bool(settings.m365_client_secret_encrypted),
-        "m365_mailbox": settings.m365_mailbox,
-        "smtp_from_email": settings.smtp_from_email,
-        "smtp_from_name": settings.smtp_from_name,
         "email_reply_to": settings.email_reply_to,
         "email_bcc": settings.email_bcc,
         "email_templates": (settings.email_templates or EmailTemplates()).model_dump(),
@@ -110,9 +97,23 @@ def build_settings_payload(settings: CompanySettings) -> dict:
     }
 
 
+async def _platform_can_send() -> bool:
+    from app.services import platform_settings_service  # noqa: PLC0415
+
+    return platform_settings_service.is_configured(
+        await platform_settings_service.get_settings()
+    )
+
+
 async def settings_payload(settings: CompanySettings) -> dict:
-    """`build_settings_payload` plus the number the next invoice will get."""
+    """`build_settings_payload`, the next numbers, and whether PestBase can send.
+
+    `email_configured` is the platform's, not this client's: they cannot change
+    it, but their page says so rather than leaving them wondering why nothing
+    arrives.
+    """
     payload = build_settings_payload(settings)
+    payload["email_configured"] = await _platform_can_send()
     for field, counter, _name in NUMBERING:
         payload[field] = await Counter.peek_next(counter)
     return payload
@@ -165,14 +166,10 @@ async def update_settings(
     for counter, wanted in moves:
         await Counter.move_next_to(counter, wanted)
 
-    # Secrets are write-only: blank keeps what is saved, anything else replaces it.
-    for field, stored in (
-        ("smtp_password", "smtp_password_encrypted"),
-        ("m365_client_secret", "m365_client_secret_encrypted"),
-    ):
-        value = payload.pop(field, None)
-        if value:
-            setattr(settings, stored, encrypt_secret(value))
+    # How mail is sent belongs to the platform now, so a client cannot set it
+    # here even by posting the fields directly.
+    for field in TRANSPORT_FIELDS | set(SECRET_FIELDS):
+        payload.pop(field, None)
 
     if payload.get("email_templates") is not None:
         templates = payload.pop("email_templates")
@@ -293,7 +290,7 @@ async def get_settings_for_pdf() -> dict:
         settings = CompanySettings()
 
     return {
-        "company_name": settings.company_name or "QKil Pest Control",
+        "company_name": settings.company_name or "PestBase Pest Control",
         "legal_name": settings.legal_name or "",
         "company_number": settings.company_number or "",
         # A VAT number means nothing on a document until the business is registered.

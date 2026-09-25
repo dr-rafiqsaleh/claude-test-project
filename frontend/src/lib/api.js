@@ -1,83 +1,54 @@
 import axios from 'axios'
 
-import { clearRefreshToken, readRefreshToken, useAuthStore } from '@/store/authStore'
+import { API_ORIGIN } from '@/config/authPaths'
+import { useAuthStore } from '@/store/authStore'
 
-export const API_BASE_URL = '/api/v1'
+export const API_BASE_URL = `${API_ORIGIN}/api/v1`
 
+/**
+ * The API client.
+ *
+ * No Authorization header and no refresh logic: the session lives in cookies
+ * that SuperTokens' `Session.init()` manages, and its interceptor on
+ * XMLHttpRequest attaches them and silently refreshes an expiring session
+ * underneath axios. `withCredentials` is what lets it.
+ *
+ * A 401 therefore means the session is genuinely gone - the refresh has already
+ * been tried and failed - so the only thing left is to send them to sign in.
+ */
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
   timeout: 20000,
 })
 
-/** Bare client used for the refresh call so interceptors cannot recurse. */
-const refreshClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
-  timeout: 20000,
-})
-
+/**
+ * PestBase staff say which client they are working inside; the API refuses client
+ * records until they do. A client's own team never sets this - the API pins
+ * them to their own client regardless of what the header says.
+ */
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) {
-    config.headers.set('Authorization', `Bearer ${token}`)
+  const working = useAuthStore.getState().workingClient
+  if (working?.id) {
+    config.headers.set('X-Client-Id', working.id)
   }
   return config
 })
 
-let refreshPromise = null
-
-/** Exchange the stored refresh token for a new access token. */
-export async function refreshAccessToken() {
-  if (refreshPromise) return refreshPromise
-
-  refreshPromise = (async () => {
-    const refreshToken = readRefreshToken()
-    if (!refreshToken) return null
-
-    try {
-      const response = await refreshClient.post('/auth/refresh', { refresh_token: refreshToken })
-      const accessToken = response.data.data.access_token
-      useAuthStore.getState().setAccessToken(accessToken)
-      return accessToken
-    } catch {
-      clearRefreshToken()
-      return null
-    } finally {
-      refreshPromise = null
-    }
-  })()
-
-  return refreshPromise
-}
-
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const original = error.config
-
-    const isAuthEndpoint =
-      typeof original?.url === 'string' &&
-      (original.url.includes('/auth/login') || original.url.includes('/auth/refresh'))
-
-    if (
-      error.response?.status === 401 &&
-      original &&
-      !original._retry &&
-      !original._skipAuthRefresh &&
-      !isAuthEndpoint
-    ) {
-      original._retry = true
-
-      const newToken = await refreshAccessToken()
-      if (newToken) {
-        original.headers.set('Authorization', `Bearer ${newToken}`)
-        return api(original)
-      }
-
-      useAuthStore.getState().logout()
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear the profile and let the router notice. Deliberately NOT a
+      // `window.location.assign('/login')`, which this used to do: a hard
+      // navigation tears the page down mid-flight, so one unlucky 401 - during
+      // sign-in, or from a background poll - threw away the sign-in that was
+      // half-finished and landed the person back on the sign-in page with no
+      // idea why. Clearing the store lets ProtectedRoute redirect on the next
+      // render, and lets whoever made the call see the error and say something.
+      useAuthStore.getState().clear()
     }
-
     return Promise.reject(error)
   },
 )
@@ -92,7 +63,7 @@ export function toApiError(error, fallback = 'Something went wrong') {
     if (error.code === 'ECONNABORTED') {
       message = 'The request timed out. Please try again.'
     } else if (!error.response) {
-      message = 'Cannot reach the QKil server. Check that the API is running.'
+      message = 'Cannot reach the PestBase server. Check that the API is running.'
     }
 
     return {

@@ -5,9 +5,9 @@ Three things worth proving, because each is a promise rather than a feature:
 
   the trail records what happened      changes to users and roles appear
   the trail says when it was altered   editing a stored entry is detected
-  support access is the client's       QKil is locked out until let in, every
+  support access is the client's       PestBase is locked out until let in, every
                                        visit is time-boxed, and every change
-                                       QKil makes shows up on the client's trail
+                                       PestBase makes shows up on the client's trail
 
 Runs against a throwaway database, which it creates and drops; your own
 database is never touched. From backend/:
@@ -22,7 +22,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-CHECK_DB = "qkil_audit_check"
+CHECK_DB = "pestbase_audit_check"
 os.environ["DATABASE_NAME"] = CHECK_DB  # before the app reads its settings
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -31,15 +31,14 @@ import asyncio  # noqa: E402
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.core.security import hash_password  # noqa: E402
 from app.core.tenancy import acting_as  # noqa: E402
 from app.database import init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.audit_event import AuditEvent  # noqa: E402
 from app.models.support_grant import SupportGrant  # noqa: E402
 from app.models.user import User  # noqa: E402
+from scripts._signin import CoreUnreachable, inside, sign_in as _sign_in  # noqa: E402
 
-PASSWORD = "Check-pass-123"
 
 
 def ok(message: str) -> None:
@@ -51,9 +50,8 @@ async def reset() -> None:
     await connection.drop_database(CHECK_DB)
     await init_db(database_name=CHECK_DB)
     await User(
-        email="platform@qkil.com",
+        email="platform@example.com",
         full_name="Pat Platform",
-        hashed_password=hash_password(PASSWORD),
         role="admin",
         is_platform_staff=True,
         client_id=None,
@@ -100,17 +98,12 @@ def main() -> None:
     try:
         with TestClient(app) as api:
             def sign_in(email: str) -> dict:
-                response = api.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
-                assert response.status_code == 200, response.text
-                return {"Authorization": f"Bearer {response.json()['data']['access_token']}"}
+                return asyncio.run(_sign_in(api, email))
 
-            def inside(headers: dict, client_id: str) -> dict:
-                return {**headers, "X-Client-Id": client_id}
-
-            platform = sign_in("platform@qkil.com")
+            platform = sign_in("platform@example.com")
 
             print("Setting up a client")
-            created = api.post("/api/v1/clients", headers=platform, json={"name": "Acme Pest Control"})
+            created = api.post("/api/v1/clients", **platform, json={"name": "Acme Pest Control"})
             assert created.status_code == 201, created.text
             client_id = created.json()["data"]["id"]
 
@@ -119,93 +112,93 @@ def main() -> None:
             # administrator, and the client could never be set up at all.
             admin = api.post(
                 "/api/v1/users",
-                headers=inside(platform, client_id),
-                json={"email": "ann@acme.test", "full_name": "Ann Acme", "password": PASSWORD, "role": "admin"},
+                **inside(platform, client_id),
+                json={"email": "ann@acme.test", "full_name": "Ann Acme", "role": "admin"},
             )
             assert admin.status_code == 201, admin.text
             ann = sign_in("ann@acme.test")
             ok("a new client opens a setup window, so its first administrator can be created")
 
             print("The trail records what happened")
-            trail = api.get("/api/v1/audit", headers=ann).json()["data"]
+            trail = api.get("/api/v1/audit", **ann).json()["data"]
             kinds = [entry["event_type"] for entry in trail["items"]]
             assert "client.created" in kinds, kinds
             assert "user.created" in kinds, kinds
             assert "support_access.granted" in kinds, kinds
-            # The setup window was opened by QKil, so the client can see that.
+            # The setup window was opened by PestBase, so the client can see that.
             platform_entries = [e for e in trail["items"] if e["actor_is_platform_staff"]]
             assert platform_entries, trail["items"]
-            ok(f"{trail['total']} entries, including what QKil staff did: {sorted(set(kinds))}")
+            ok(f"{trail['total']} entries, including what PestBase staff did: {sorted(set(kinds))}")
 
-            # A write by QKil inside the client appears without the route asking.
-            before = api.get("/api/v1/audit", headers=ann).json()["data"]["total"]
+            # A write by PestBase inside the client appears without the route asking.
+            before = api.get("/api/v1/audit", **ann).json()["data"]["total"]
             api.post(
                 "/api/v1/users",
-                headers=inside(platform, client_id),
-                json={"email": "temp@acme.test", "full_name": "Temp Tech", "password": PASSWORD, "role": "technician"},
+                **inside(platform, client_id),
+                json={"email": "temp@acme.test", "full_name": "Temp Tech", "role": "technician"},
             )
-            after = api.get("/api/v1/audit", headers=ann, params={"platform_only": True}).json()["data"]
+            after = api.get("/api/v1/audit", **ann, params={"platform_only": True}).json()["data"]
             writes = [e for e in after["items"] if e["event_type"] == "platform.client_write"]
             assert writes, after["items"]
             assert "POST" in (writes[0]["resource_name"] or ""), writes[0]
-            assert api.get("/api/v1/audit", headers=ann).json()["data"]["total"] > before
-            ok(f"a change QKil makes is recorded on its own: '{writes[0]['resource_name']}'")
+            assert api.get("/api/v1/audit", **ann).json()["data"]["total"] > before
+            ok(f"a change PestBase makes is recorded on its own: '{writes[0]['resource_name']}'")
 
             print("The trail says when it has been altered")
-            chain = api.get("/api/v1/audit/verify", headers=ann).json()["data"]
+            chain = api.get("/api/v1/audit/verify", **ann).json()["data"]
             assert chain["valid"] is True, chain
             assert chain["total_events"] > 3, chain
             ok(f"the chain checks out across all {chain['total_events']} entries")
 
             broken_at = asyncio.run(tamper_with(client_id))
-            after_tamper = api.get("/api/v1/audit/verify", headers=ann).json()["data"]
+            after_tamper = api.get("/api/v1/audit/verify", **ann).json()["data"]
             assert after_tamper["valid"] is False, after_tamper
             assert after_tamper["broken_at_seq"] == broken_at, (after_tamper, broken_at)
             ok(f"editing entry {broken_at} in the database is caught: '{after_tamper['detail']}'")
 
             print("Support access belongs to the client")
             asyncio.run(expire_grants(client_id))
-            locked = api.get("/api/v1/customers", headers=inside(platform, client_id))
+            locked = api.get("/api/v1/customers", **inside(platform, client_id))
             assert locked.status_code == 403, locked.text
-            ok("once the window runs out, QKil is locked out again without anyone acting")
+            ok("once the window runs out, PestBase is locked out again without anyone acting")
 
-            state = api.get("/api/v1/support-access", headers=ann).json()["data"]
+            state = api.get("/api/v1/support-access", **ann).json()["data"]
             assert state["open"] is False, state
             assert len(state["history"]) >= 1, state
             ok("the client can see it is closed, and every past visit")
 
-            too_long = api.post("/api/v1/support-access", headers=ann, json={"hours": 999})
+            too_long = api.post("/api/v1/support-access", **ann, json={"hours": 999})
             assert too_long.status_code == 422, too_long.text
-            opened = api.post("/api/v1/support-access", headers=ann, json={"hours": 4, "reason": "Numbering"})
+            opened = api.post("/api/v1/support-access", **ann, json={"hours": 4, "reason": "Numbering"})
             assert opened.status_code == 201, opened.text
             assert opened.json()["data"]["break_glass"] is False
-            assert api.get("/api/v1/customers", headers=inside(platform, client_id)).status_code == 200
+            assert api.get("/api/v1/customers", **inside(platform, client_id)).status_code == 200
             ok("the client opens it for the hours they choose, and longer than the ceiling is refused")
 
-            assert api.delete("/api/v1/support-access", headers=ann).status_code == 200
-            assert api.get("/api/v1/customers", headers=inside(platform, client_id)).status_code == 403
+            assert api.delete("/api/v1/support-access", **ann).status_code == 200
+            assert api.get("/api/v1/customers", **inside(platform, client_id)).status_code == 403
             ok("and can shut it again at once")
 
             print("Break-glass")
             no_reason = api.post(
                 "/api/v1/support-access/break-glass",
-                headers=platform,
+                **platform,
                 json={"client_id": client_id, "reason": ""},
             )
             assert no_reason.status_code == 422, no_reason.text
             glass = api.post(
                 "/api/v1/support-access/break-glass",
-                headers=platform,
+                **platform,
                 json={"client_id": client_id, "reason": "Invoice totals corrupted by the import."},
             )
             assert glass.status_code == 201, glass.text
             assert glass.json()["data"]["break_glass"] is True
             assert glass.json()["data"]["hours_left"] <= 24, glass.json()["data"]
-            assert api.get("/api/v1/customers", headers=inside(platform, client_id)).status_code == 200
-            ok("QKil can open a client without being asked, briefly, and only with a reason")
+            assert api.get("/api/v1/customers", **inside(platform, client_id)).status_code == 200
+            ok("PestBase can open a client without being asked, briefly, and only with a reason")
 
             reasons = [
-                entry for entry in api.get("/api/v1/audit", headers=ann).json()["data"]["items"]
+                entry for entry in api.get("/api/v1/audit", **ann).json()["data"]["items"]
                 if entry["event_type"] == "support_access.break_glass"
             ]
             assert reasons, "break-glass did not reach the client's trail"
@@ -214,10 +207,10 @@ def main() -> None:
 
             # A client's own admin holds every permission there is, and still
             # cannot reach the platform's client list or another client.
-            assert api.get("/api/v1/clients", headers=ann).status_code == 403
+            assert api.get("/api/v1/clients", **ann).status_code == 403
             assert api.post(
                 "/api/v1/support-access/break-glass",
-                headers=ann,
+                **ann,
                 json={"client_id": client_id, "reason": "trying it on"},
             ).status_code == 403
             ok("a client's own Admin cannot open the client list or use break-glass")
@@ -228,4 +221,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CoreUnreachable as exc:
+        print(f"\n{exc}")
+        raise SystemExit(2) from exc

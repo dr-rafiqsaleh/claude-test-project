@@ -22,7 +22,7 @@ MAX_KEPT_ATTACHMENT = 12 * 1024 * 1024
 
 
 class EmailLog(TenantDocument):
-    """One email sent (or attempted) from QKil, with the document it carried."""
+    """One email sent (or attempted) from PestBase, with the document it carried."""
 
     document_type: str  # "quote", "invoice" or "report"
     document_id: PydanticObjectId

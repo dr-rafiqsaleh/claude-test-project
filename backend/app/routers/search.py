@@ -2,7 +2,7 @@
 
 A single endpoint backs both the header quick-search dropdown and the full
 search results page. Invoices are only searched for admins and office staff -
-technicians never see money anywhere in QKil.
+technicians never see money anywhere in PestBase.
 """
 
 from typing import Optional
@@ -17,7 +17,7 @@ from app.services import search_service
 router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 
-@router.get("", response_model=SearchResponse, summary="Search across QKil")
+@router.get("", response_model=SearchResponse, summary="Search across PestBase")
 @router.get("/", response_model=SearchResponse, include_in_schema=False)
 async def search(
     q: str = Query(..., min_length=2, max_length=120, description="Search term"),

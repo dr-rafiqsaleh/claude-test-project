@@ -1,5 +1,4 @@
 import api, { API_BASE_URL, unwrap } from '@/lib/api'
-import { useAuthStore } from '@/store/authStore'
 
 function buildParams(params) {
   const query = {}
@@ -74,13 +73,11 @@ export async function getInvoiceSummary(signal) {
 /**
  * A URL that renders an invoice PDF, safe to use in an `<a download>`.
  *
- * A plain anchor cannot carry an Authorization header, so the access token
- * travels in the query string - the API accepts it there for this endpoint.
+ * The session lives in a cookie on this origin, and the browser sends it on a
+ * plain anchor's request by itself, so there is nothing to add here.
  */
 export function getInvoicePdfUrl(id) {
-  const token = useAuthStore.getState().accessToken
-  const base = `${API_BASE_URL}/invoices/${id}/pdf`
-  return token ? `${base}?token=${encodeURIComponent(token)}` : base
+  return `${API_BASE_URL}/invoices/${id}/pdf`
 }
 
 /** GET /invoices/{id}/pdf - returns the rendered PDF as a Blob. */

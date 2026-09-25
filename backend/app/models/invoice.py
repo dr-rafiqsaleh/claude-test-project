@@ -118,6 +118,9 @@ class Invoice(TenantDocument):
     # Dates
     issue_date: datetime = Field(default_factory=datetime.utcnow)
     due_date: datetime = Field(default_factory=datetime.utcnow)
+    #: When the automatic "due soon" reminder went to the customer. Set once and
+    #: never cleared: it is what stops the sweep sending it again on every pass.
+    payment_reminder_sent_at: Optional[datetime] = None
     sent_at: Optional[datetime] = None
     paid_at: Optional[datetime] = None  # set when fully paid
 

@@ -2,15 +2,21 @@ fastapi==0.111.0
 uvicorn[standard]==0.29.0
 beanie==1.26.0
 motor==3.4.0
-pydantic==2.7.1
+# Pinned, though nothing imports it directly: motor 3.4.0 reads private names out
+# of pymongo (`_QUERY_OPTIONS`) that pymongo 4.9 removed, so an unpinned install
+# picks up a version beanie cannot even import. It fails at startup, in motor's
+# own code, naming neither package - so the pin has to stay until motor is
+# upgraded too.
+pymongo==4.8.0
+# 2.10.6 or newer is required by supertokens-python; this exact version is the
+# one verified against beanie 1.26 and pydantic-settings 2.2.1.
+pydantic==2.13.5
 pydantic-settings==2.2.1
 email-validator==2.1.1
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-bcrypt==3.2.2
 python-multipart==0.0.9
 httpx==0.27.0
 pytest==8.2.0
 pytest-asyncio==0.23.7
 python-dotenv==1.0.1
 reportlab==4.2.0
+supertokens-python==0.31.3

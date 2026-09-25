@@ -787,7 +787,7 @@ export function BookingFormPage() {
 
               {!series?.isLaterVisit && watchedRecurrence && watchedRecurrence !== 'none' ? (
                 <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                  QKil books the visits for the next 12 months straight away, and keeps a year
+                  PestBase books the visits for the next 12 months straight away, and keeps a year
                   booked ahead. They start as tentative: confirm each with the customer from the
                   job or the calendar, or move it first. The technician is emailed once for the
                   whole series.

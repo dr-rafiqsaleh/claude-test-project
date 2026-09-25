@@ -1,0 +1,194 @@
+# PestBase stack: portal, API, SuperTokens and the datastores.
+#
+# Use scripts/compose.sh, which combines this file with the local overlay and
+# the selected environment's variables. A direct `docker compose` call is
+# undocumented on purpose: leaving out the env file builds a portal compiled to
+# call the wrong origin, and the build looks entirely normal.
+#
+# The pattern, the image pins and most of these notes come from ServiceRecord's
+# deploy/compose/base.yml, which runs this in production. What is deliberately
+# NOT carried over: the Mongo replica set (PestBase uses no multi-document
+# transactions, so a standalone is one less moving part), Stripe, and the
+# prod/dev environment descriptors - add those when PestBase is deployed to a host.
+#
+# supertokens, postgres and mongo are not published to the host, so nothing
+# collides with a standalone container you may already be running. Stop any
+# existing one anyway: two SuperTokens cores against different Postgres
+# instances will confuse the sign-in flow long before you work out why.
+
+# Docker's json-file driver grows without bound. On a small host one chatty
+# container fills the disk and everything stops, including whatever you would
+# have used to find out why.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # --- datastores --------------------------------------------------------
+
+  mongo:
+    image: mongo:7
+    command: ["mongod", "--bind_ip_all", "--quiet"]
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks: [app]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.hello().ok ? 0 : 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # SuperTokens keeps its own users, sessions and one-time codes here. Nothing
+  # of PestBase's goes in Postgres - the app's data stays in Mongo.
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: supertokens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supertokens_local_only}
+      POSTGRES_DB: supertokens
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [app]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supertokens -d supertokens"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Pinned deliberately, and not to :latest.
+  #
+  # supertokens-python 0.31.3 speaks exactly one Core Driver Interface version
+  # (SUPPORTED_CDI_VERSIONS = ['5.4']). A core that drops 5.4 stops talking to
+  # the SDK, and the failure appears at startup as a version negotiation error
+  # naming neither the image nor the upgrade that caused it. On :latest that
+  # happens on an unrelated day, during a rebuild.
+  #
+  # 11.4.1 advertises 5.4. To re-verify after changing either side:
+  #   python -c "from supertokens_python.constants import SUPPORTED_CDI_VERSIONS as v; print(v)"
+  #   docker exec <container> bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 && printf "GET /apiversion HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n" >&3 && cat <&3'
+  supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:11.4.1
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_CONNECTION_URI: postgresql://supertokens:${POSTGRES_PASSWORD:-supertokens_local_only}@postgres:5432/supertokens
+    networks: [app]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3567 && echo -e 'GET /hello HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep 'Hello'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- application -------------------------------------------------------
+
+  # One-shot: indexes, the first client, its admin, the platform staff account,
+  # and a SuperTokens identity for each. Then it exits and the backend starts.
+  #
+  # A second run finds every step already done and writes nothing, so it costs
+  # a couple of seconds on later `up` and never acts twice.
+  setup:
+    build:
+      context: ./backend
+    depends_on:
+      mongo:
+        condition: service_healthy
+      supertokens:
+        condition: service_healthy
+    env_file:
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+    environment:
+      # Corrections for values that are only right outside a container.
+      MONGODB_URL: mongodb://mongo:27017
+      SUPERTOKENS_CONNECTION_URI: http://supertokens:3567
+    # A finished job must stay finished: the default policy reads a clean exit
+    # as something to restart, and it would run forever.
+    restart: "no"
+    command: ["python", "scripts/setup.py"]
+    networks: [app]
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      supertokens:
+        condition: service_healthy
+      # Not service_started: the first client and the platform account have to
+      # exist before anyone can sign in.
+      setup:
+        condition: service_completed_successfully
+
+    # One source of truth for secrets, so there is no second copy to drift.
+    env_file:
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+
+    environment:
+      # "localhost" inside a container is the container itself; service names
+      # are what compose resolves on the shared network.
+      MONGODB_URL: mongodb://mongo:27017
+      SUPERTOKENS_CONNECTION_URI: http://supertokens:3567
+      # The portal and the API are the same origin behind the frontend's nginx,
+      # so these are the browser-facing values, not container ones.
+      AUTH_API_DOMAIN: ${AUTH_API_DOMAIN:-http://localhost:3000}
+      AUTH_WEBSITE_DOMAIN: ${AUTH_WEBSITE_DOMAIN:-http://localhost:3000}
+
+    networks: [app]
+    logging: *default-logging
+
+    # Any HTTP status counts, 404 included: the question is whether the ASGI app
+    # is routing, not what it says about "/". uvicorn does not answer at all
+    # until startup finishes, so a reply proves the app came up rather than that
+    # the container is merely alive. python rather than curl - the image is
+    # python:3.12-slim and has neither curl nor wget.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import http.client;c=http.client.HTTPConnection('127.0.0.1',8000,timeout=5);c.request('GET','/');c.getresponse()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Compiled into the bundle, so a change needs --build, not restart.
+        # Empty means "same origin", which is what nginx below gives us: the
+        # portal and the API share an origin, so SuperTokens' cookies are
+        # first-party and no CORS is involved between them at all.
+        VITE_API_ORIGIN: ${VITE_API_ORIGIN:-}
+        # Must match the backend's AUTH_API_BASE_PATH / AUTH_WEBSITE_BASE_PATH.
+        VITE_AUTH_API_BASE_PATH: ${VITE_AUTH_API_BASE_PATH:-/auth}
+        VITE_AUTH_WEBSITE_BASE_PATH: ${VITE_AUTH_WEBSITE_BASE_PATH:-/login}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks: [app]
+    logging: *default-logging
+
+networks:
+  app:
+    name: ${APP_NETWORK_NAME:-pestbase-app}
+
+# Named explicitly, not left to Compose. An unnamed volume is called
+# <project>_<key>, so the volume holding every client's data would be renamed -
+# which means replaced with an empty one - by changing the project name. Pinning
+# the names here makes the project name a label again.
+volumes:
+  mongo-data:
+    name: ${MONGO_VOLUME_NAME:-pestbase-mongo-data}
+  postgres-data:
+    name: ${POSTGRES_VOLUME_NAME:-pestbase-postgres-data}

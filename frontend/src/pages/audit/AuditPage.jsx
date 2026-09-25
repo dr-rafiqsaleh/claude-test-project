@@ -170,7 +170,7 @@ export function AuditPage() {
             className="lg:ml-auto"
           >
             <Building2 className="h-4 w-4" />
-            Only QKil staff
+            Only PestBase staff
           </Button>
         </CardContent>
       </Card>
@@ -186,7 +186,7 @@ export function AuditPage() {
             title={platformOnly || typeFilter !== ANY ? 'Nothing matches' : 'Nothing recorded yet'}
             description={
               platformOnly
-                ? 'Nobody at QKil has changed anything in your account.'
+                ? 'Nobody at PestBase has changed anything in your account.'
                 : 'Changes to your team, roles and account will appear here.'
             }
           />
@@ -221,7 +221,7 @@ export function AuditPage() {
                       <span className="text-sm text-foreground">{event.actor_name ?? 'System'}</span>
                       {event.actor_is_platform_staff ? (
                         <Badge variant="warning" className="ml-2">
-                          QKil staff
+                          PestBase staff
                         </Badge>
                       ) : null}
                       {event.actor_email ? (

@@ -22,8 +22,10 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 MODELS = BACKEND / "app" / "models"
 
-#: Not a client's data: the platform's own client list, and the base class.
-PLATFORM_MODELS = {"client.py", "tenant.py", "__init__.py"}
+#: Not a client's data: the platform's own records, and the base class. Each one
+#: is here because it is deliberately shared or deliberately outside any client -
+#: the client list itself, and how PestBase sends mail for all of them.
+PLATFORM_MODELS = {"client.py", "platform_settings.py", "tenant.py", "__init__.py"}
 
 #: A raw driver call is fine as long as the client is in the query. Any one of
 #: these nearby means the author dealt with it.
@@ -70,9 +72,30 @@ def unscoped_raw_calls() -> list:
     return problems
 
 
+def compile_errors() -> list:
+    """Every file that will not compile.
+
+    `ast.parse` is not enough on its own: it accepts `await` in a function that
+    is not async, which is exactly the mistake a refactor makes when a helper
+    turns async and its callers do not.
+    """
+    problems = []
+    for path in sorted((BACKEND / "app").rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        try:
+            # compile() rather than py_compile, so nothing is written anywhere.
+            compile(path.read_text(encoding="utf-8"), str(path), "exec")
+        except SyntaxError as exc:
+            problems.append(
+                f"{path.relative_to(BACKEND)}:{exc.lineno} does not compile: {exc.msg}"
+            )
+    return problems
+
+
 def main() -> int:
     models = document_models()
-    problems = unscoped_models() + unscoped_raw_calls()
+    problems = compile_errors() + unscoped_models() + unscoped_raw_calls()
 
     for problem in problems:
         print(f"FAIL {problem}")
@@ -84,6 +107,7 @@ def main() -> int:
         )
         return 1
 
+    print("ok  every file under app/ compiles")
     print(f"ok  {len(models)} client collection(s), all scoped through TenantDocument")
     print("ok  every raw driver query names the client")
     return 0

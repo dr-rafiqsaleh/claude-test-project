@@ -15,6 +15,17 @@ from app.config import settings
 
 
 def _fernet() -> Fernet:
+    # Do not "finish the rename to PestBase" here. The "qkil-" below is not a
+    # label, it is key material: it is part of the key every stored secret was
+    # encrypted with - the SMTP password, the Microsoft 365 client secret.
+    # Changing it renames nothing and makes all of them undecryptable.
+    if not settings.SECRET_KEY:
+        # Deriving from "" would work, and would give every PestBase install on
+        # earth the same encryption key. Refuse instead.
+        raise RuntimeError(
+            "SECRET_KEY is not set, so stored secrets cannot be encrypted. "
+            "Put a long random value in backend/.env - see .env.example."
+        )
     digest = hashlib.sha256(f"qkil-stored-secrets:{settings.SECRET_KEY}".encode()).digest()
     return Fernet(base64.urlsafe_b64encode(digest))
 
