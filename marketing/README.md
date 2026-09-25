@@ -8,7 +8,7 @@ runtime, and nothing here can break sign-in.
 | File | What |
 | --- | --- |
 | `index.html` | The home page |
-| `privacy.html` | Privacy policy - also the URL both app stores require. **A draft: fill in the `[bracketed]` items and have it reviewed before publishing.** |
+| `privacy.html` | Privacy policy. **A draft: fill in the `[bracketed]` items and have it reviewed before publishing.** |
 | `404.html`, `robots.txt`, `sitemap.xml` | The usual |
 | `styles.css` | All the styling; light and dark themes |
 | `favicon.svg` | The wasp, copied from `frontend/public/favicon.svg` |
