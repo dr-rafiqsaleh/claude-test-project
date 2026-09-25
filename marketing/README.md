@@ -16,10 +16,10 @@ runtime, and nothing here can break sign-in.
 
 ## Before publishing
 
-- Fill in the registered office address: it is `[registered office address]` in
-  the footer of every page and in both legal pages. UK law requires a company's
-  website to show its registered office, company number and place of
-  registration.
+- The registered office address lives only in the footer, so a change of
+  address never touches the privacy policy or terms. The footer is repeated in
+  each page (`index.html`, `privacy.html`, `terms.html`, `404.html`): search
+  for "Registered office" and update all four.
 - Create the mailboxes the pages use: `hello@pestbase.co.uk` and
   `privacy@pestbase.co.uk`.
 - Have the privacy policy and terms reviewed. They were adapted from Service
