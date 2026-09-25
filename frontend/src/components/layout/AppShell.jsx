@@ -39,7 +39,12 @@ function FieldShell() {
 export function AppShell() {
   const isFieldForm = useMatch('/jobs/:id/report')
   const canWrite = useAuthStore((state) => state.canWrite())
-  const hasOverdue = useOverdueInvoices(canWrite && !isFieldForm)
+  // PestBase staff have no invoices of their own until they choose a client to
+  // work in; asking before then is refused.
+  const clientInView = useAuthStore((state) =>
+    state.user?.is_platform_staff ? state.workingClient?.id ?? null : state.user?.client_id ?? null,
+  )
+  const hasOverdue = useOverdueInvoices(canWrite && Boolean(clientInView) && !isFieldForm, clientInView)
 
   if (isFieldForm) {
     return <FieldShell />

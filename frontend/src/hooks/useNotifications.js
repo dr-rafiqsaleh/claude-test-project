@@ -111,7 +111,12 @@ function stopPolling() {
  * markAllRead, deleteNotification, refresh }`.
  */
 export function useNotifications({ poll = true } = {}) {
-  const isAuthenticated = useAuthStore((store) => Boolean(store.user))
+  // Notifications belong to a client: PestBase staff have none until they choose
+  // one to work in, and switching client means a different list.
+  const clientInView = useAuthStore((store) =>
+    !store.user ? null : store.user.is_platform_staff ? store.workingClient?.id ?? null : store.user.client_id ?? 'own',
+  )
+  const isAuthenticated = Boolean(clientInView)
   const [snapshot, setSnapshot] = useState(state)
 
   useEffect(() => {
@@ -128,13 +133,13 @@ export function useNotifications({ poll = true } = {}) {
       return
     }
     void loadAll()
-  }, [isAuthenticated])
+  }, [isAuthenticated, clientInView])
 
   useEffect(() => {
     if (!poll || !isAuthenticated) return undefined
     startPolling()
     return stopPolling
-  }, [poll, isAuthenticated])
+  }, [poll, isAuthenticated, clientInView])
 
   const refresh = useCallback(() => loadAll(), [])
 

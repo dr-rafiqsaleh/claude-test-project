@@ -11,7 +11,7 @@ import { useAuthStore } from '@/store/authStore'
  * Whether money is past its due date, so Invoices can carry a red dot. A hint,
  * not shared data - fetched once by the shell and handed to both navs.
  */
-export function useOverdueInvoices(enabled) {
+export function useOverdueInvoices(enabled, scope) {
   const [hasOverdue, setHasOverdue] = useState(false)
 
   useEffect(() => {
@@ -30,7 +30,8 @@ export function useOverdueInvoices(enabled) {
         // A missing summary must never break navigation.
       })
     return () => controller.abort()
-  }, [enabled])
+    // `scope`: the client in view, so switching client asks again.
+  }, [enabled, scope])
 
   return hasOverdue
 }
