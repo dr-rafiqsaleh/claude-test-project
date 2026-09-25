@@ -3,6 +3,7 @@ import Passwordless from 'supertokens-auth-react/recipe/passwordless'
 import Session from 'supertokens-auth-react/recipe/session'
 
 import { API_ORIGIN, AUTH_API_BASE_PATH, AUTH_WEBSITE_BASE_PATH } from '@/config/authPaths'
+import { isNativeApp } from '@/lib/platform'
 
 /**
  * Sign-in, without passwords.
@@ -14,6 +15,11 @@ import { API_ORIGIN, AUTH_API_BASE_PATH, AUTH_WEBSITE_BASE_PATH } from '@/config
  * `Session.init()` also installs an interceptor on fetch and XMLHttpRequest, so
  * the axios client in lib/api.js gets the session and the silent refresh for
  * free.
+ *
+ * The Android and iOS apps are the exception. They load this bundle from inside
+ * the app, so the API is on another origin, where a phone's web view drops the
+ * session cookies as third-party. There the SDK keeps the tokens itself and
+ * sends them as headers instead - the same interceptor, the same refresh.
  */
 export function initSuperTokens() {
   SuperTokens.init({
@@ -27,7 +33,7 @@ export function initSuperTokens() {
       websiteBasePath: AUTH_WEBSITE_BASE_PATH,
     },
     recipeList: [
-      Session.init(),
+      Session.init(isNativeApp ? { tokenTransferMethod: 'header' } : undefined),
       Passwordless.init({
         contactMethod: 'EMAIL',
         // A code as well as a link: a technician who cannot open a link on a

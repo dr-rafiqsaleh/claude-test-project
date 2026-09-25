@@ -1,4 +1,5 @@
 import api, { API_BASE_URL, unwrap } from '@/lib/api'
+import { saveBlob } from '@/lib/saveFile'
 
 function buildParams(params) {
   const query = {}
@@ -71,10 +72,12 @@ export async function getInvoiceSummary(signal) {
 }
 
 /**
- * A URL that renders an invoice PDF, safe to use in an `<a download>`.
+ * A URL that renders an invoice PDF, safe to use in an `<a download>` in a
+ * browser.
  *
  * The session lives in a cookie on this origin, and the browser sends it on a
- * plain anchor's request by itself, so there is nothing to add here.
+ * plain anchor's request by itself, so there is nothing to add here. Not in the
+ * app, where the session is a header: use downloadInvoicePdf there.
  */
 export function getInvoicePdfUrl(id) {
   return `${API_BASE_URL}/invoices/${id}/pdf`
@@ -86,17 +89,8 @@ export async function getInvoicePdf(id) {
   return response.data
 }
 
-/** Fetch the invoice PDF and trigger a browser download. */
+/** Fetch the invoice PDF and download it (or share it, in the app). */
 export async function downloadInvoicePdf(id, invoiceNumber) {
   const blob = await getInvoicePdf(id)
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `invoice-${invoiceNumber ?? id}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-
-  URL.revokeObjectURL(url)
+  await saveBlob(blob, `invoice-${invoiceNumber ?? id}.pdf`)
 }

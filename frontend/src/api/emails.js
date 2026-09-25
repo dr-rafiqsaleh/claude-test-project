@@ -1,4 +1,5 @@
 import api, { unwrap } from '@/lib/api'
+import { saveBlob } from '@/lib/saveFile'
 
 /** Building the PDF and handing it to the mail server can take a while. */
 const SEND_TIMEOUT = 90000
@@ -36,14 +37,7 @@ export async function getEmailRecord(id) {
 
 async function download(path, filename) {
   const response = await api.get(path, { responseType: 'blob' })
-  const url = URL.createObjectURL(response.data)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+  await saveBlob(response.data, filename)
 }
 
 /** Download the attachment exactly as it was sent. */

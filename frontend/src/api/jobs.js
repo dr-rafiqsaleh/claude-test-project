@@ -1,4 +1,5 @@
 import api, { API_BASE_URL, unwrap } from '@/lib/api'
+import { saveBlob } from '@/lib/saveFile'
 
 function buildParams(params) {
   const query = {}
@@ -69,19 +70,10 @@ export async function getJobReport(id) {
   return response.data
 }
 
-/** Fetch the inspection report and trigger a browser download. */
+/** Fetch the inspection report and download it (or share it, in the app). */
 export async function downloadJobReport(id, jobNumber) {
   const blob = await getJobReport(id)
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `job-${jobNumber ?? id}-report.pdf`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-
-  URL.revokeObjectURL(url)
+  await saveBlob(blob, `job-${jobNumber ?? id}-report.pdf`)
 }
 
 /* -------------------------------------------------------------------------

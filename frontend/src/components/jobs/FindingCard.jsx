@@ -5,6 +5,7 @@ import { getPhotoUrl } from '@/api/jobs'
 import { RiskLevelBadge } from '@/components/jobs/RiskLevelBadge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { useAuthedSrc } from '@/hooks/useAuthedSrc'
 import { cn } from '@/lib/utils'
 import { PRIORITY_LABELS, RESPONSIBLE_PARTY_LABELS } from '@/lib/constants'
 
@@ -23,6 +24,12 @@ import { PRIORITY_LABELS, RESPONSIBLE_PARTY_LABELS } from '@/lib/constants'
  *   - `onRemovePhoto(photoId)`  async
  *   - `onViewPhoto(photo)`
  */
+/** A photo thumbnail that also loads in the app, where an <img> cannot send the session. */
+function PhotoThumb({ src, ...props }) {
+  const authedSrc = useAuthedSrc(src)
+  return <img src={authedSrc} loading="lazy" {...props} />
+}
+
 export function FindingCard({
   finding,
   index,
@@ -158,10 +165,9 @@ export function FindingCard({
                   onClick={() => onViewPhoto?.(photo)}
                   className="block overflow-hidden rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <img
+                  <PhotoThumb
                     src={getPhotoUrl(jobId, photo.id)}
                     alt={photo.filename}
-                    loading="lazy"
                     className="h-20 w-20 bg-muted object-cover transition-transform group-hover:scale-105"
                   />
                 </button>
