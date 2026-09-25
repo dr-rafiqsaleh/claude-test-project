@@ -7,11 +7,14 @@ second, so a mail outage costs a notification, never the enquiry itself.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional, Tuple
+
+from beanie import PydanticObjectId
 
 from app.config import settings
 from app.models.company_settings import CompanySettings
 from app.models.contact_enquiry import ContactEnquiry
+from app.models.user import User
 from app.services import email_service
 
 logger = logging.getLogger(__name__)
@@ -100,4 +103,67 @@ async def submit(data: dict, ip_address: Optional[str], user_agent: Optional[str
     await _notify(enquiry)
     await enquiry.save()
     logger.info("Contact enquiry %s (%s), emailed=%s", enquiry.id, enquiry.topic, enquiry.emailed)
+    return enquiry
+
+
+# ---------------------------------------------------------------------------
+# For platform staff: the enquiries list
+# ---------------------------------------------------------------------------
+
+
+class EnquiryNotFoundError(Exception):
+    """No enquiry with that id."""
+
+
+async def list_enquiries(
+    page: int, page_size: int, status: Optional[str] = None
+) -> Tuple[List[ContactEnquiry], int]:
+    """Newest first. `status` is "open", "handled" or None for all."""
+    criteria: dict = {}
+    if status == "open":
+        criteria["handled_at"] = None
+    elif status == "handled":
+        criteria["handled_at"] = {"$ne": None}
+
+    query = ContactEnquiry.find(criteria)
+    total = await query.count()
+    items = await query.sort("-created_at").skip((page - 1) * page_size).limit(page_size).to_list()
+    return items, total
+
+
+async def count_open() -> int:
+    return await ContactEnquiry.find({"handled_at": None}).count()
+
+
+async def _get(enquiry_id: str) -> ContactEnquiry:
+    try:
+        enquiry = await ContactEnquiry.get(PydanticObjectId(enquiry_id))
+    except Exception:  # noqa: BLE001 - a malformed id is simply not found
+        enquiry = None
+    if enquiry is None:
+        raise EnquiryNotFoundError("That enquiry no longer exists.")
+    return enquiry
+
+
+async def set_handled(enquiry_id: str, handled: bool, user: User) -> ContactEnquiry:
+    """Mark an enquiry answered, or open it again."""
+    enquiry = await _get(enquiry_id)
+    if handled:
+        enquiry.handled_at = datetime.utcnow()
+        enquiry.handled_by = user.id
+        enquiry.handled_by_name = user.full_name
+    else:
+        enquiry.handled_at = None
+        enquiry.handled_by = None
+        enquiry.handled_by_name = None
+    await enquiry.save()
+    return enquiry
+
+
+async def resend(enquiry_id: str) -> ContactEnquiry:
+    """Try the notification email again, e.g. once mail settings are fixed."""
+    enquiry = await _get(enquiry_id)
+    enquiry.email_error = None
+    await _notify(enquiry)
+    await enquiry.save()
     return enquiry

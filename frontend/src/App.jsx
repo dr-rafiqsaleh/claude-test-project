@@ -34,6 +34,7 @@ const QuotesPage = lazy(() => import('@/pages/quotes/QuotesPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const UsersPage = lazy(() => import('@/pages/users/UsersPage'))
 const ClientsPage = lazy(() => import('@/pages/platform/ClientsPage'))
+const EnquiriesPage = lazy(() => import('@/pages/platform/EnquiriesPage'))
 const AuditPage = lazy(() => import('@/pages/audit/AuditPage'))
 const PlatformSettingsPage = lazy(() => import('@/pages/platform/PlatformSettingsPage'))
 
@@ -272,6 +273,15 @@ export function App() {
             element={
               <RoleGuard platform>
                 <PlatformSettingsPage />
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="/platform/enquiries"
+            element={
+              <RoleGuard platform>
+                <EnquiriesPage />
               </RoleGuard>
             }
           />

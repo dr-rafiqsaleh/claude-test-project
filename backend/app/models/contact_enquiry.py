@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from beanie import Document
+from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
 
@@ -30,12 +30,19 @@ class ContactEnquiry(Document):
     emailed: bool = False
     email_error: Optional[str] = None
 
+    #: Set by platform staff once someone has answered it.
+    handled_at: Optional[datetime] = None
+    handled_by: Optional[PydanticObjectId] = None
+    handled_by_name: Optional[str] = None
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "contact_enquiries"
         indexes = [
             IndexModel([("created_at", -1)], name="idx_enquiry_created"),
+            # The platform's list: open ones first, newest first.
+            IndexModel([("handled_at", 1), ("created_at", -1)], name="idx_enquiry_handled"),
             # The rate limit counts recent enquiries from one address.
             IndexModel([("ip_address", 1), ("created_at", -1)], name="idx_enquiry_ip_window"),
         ]

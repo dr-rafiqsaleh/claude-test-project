@@ -30,6 +30,10 @@ platform's mail settings (Platform > Settings in the app), with the enquirer as
 the reply-to. If sending fails the enquiry is still kept, marked with the
 reason.
 
+Platform staff see every enquiry in the app under **Platform > Enquiries**:
+open ones first, with who handled each, and an "Email again" button for any
+that could not be emailed.
+
 Spam protection: a hidden honeypot field, and at most `CONTACT_RATE_LIMIT_MAX`
 enquiries per IP address per hour (5 by default).
 
