@@ -21,6 +21,7 @@ from app.routers import (
     auth,
     bookings,
     clients,
+    contact,
     company_settings,
     customers,
     emails,
@@ -119,6 +120,7 @@ app.include_router(clients.router)
 app.include_router(audit.router)
 app.include_router(support_access.router)
 app.include_router(platform_settings.router)
+app.include_router(contact.router)
 
 
 @app.exception_handler(TenantScopeError)
