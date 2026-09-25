@@ -197,6 +197,20 @@ async def main() -> None:
         ended = await create_booking(booking(uk(2026, 10, 7), recurrence_until=datetime(2027, 1, 7)), current_user=office)
         assert len(await series(ended.data.id)) == 3
         ok("with 'repeat until 7 January', a monthly job stops at 7 January")
+
+        print("From the booking form")
+        # The portal sends ISO strings with an offset. Kept aware, they met naive
+        # UTC further in and creating a repeating job failed with a 500.
+        form = BookingCreate(
+            customer_id=str(customer.id), technician_id=str(tom.id),
+            scheduled_start="2027-03-01T10:00:00.000Z", scheduled_end="2027-03-01T11:00:00.000Z",
+            service_type="Rodent Control", recurrence=RecurrenceType.WEEKLY,
+            recurrence_until="2027-03-29T00:00:00.000Z",
+        )
+        assert form.scheduled_start.tzinfo is None and form.scheduled_start.hour == 10, form.scheduled_start
+        from_form = await create_booking(form, current_user=office)
+        assert len(await series(from_form.data.id)) == 4, len(await series(from_form.data.id))
+        ok("a repeating job sent as the portal sends it (UTC, with a 'Z') books its series")
     finally:
         server.stop()
         await client.drop_database(CHECK_DB)
