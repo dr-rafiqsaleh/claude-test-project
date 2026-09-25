@@ -817,11 +817,16 @@ async def sweep_overdue_invoices() -> int:
     return len(invoices)
 
 
-#: How many days before the due date the customer is reminded.
+#: The default window, when a client has not set its own. The real value comes
+#: from that client's `payment_reminder_days`; this is what a fresh client gets
+#: and what `due_for_payment_reminder` falls back to when called without one.
 PAYMENT_REMINDER_DAYS = 3
 
 
-async def due_for_payment_reminder(now: Optional[datetime] = None) -> List[Invoice]:
+async def due_for_payment_reminder(
+    now: Optional[datetime] = None,
+    days: int = PAYMENT_REMINDER_DAYS,
+) -> List[Invoice]:
     """Unpaid invoices within three days of falling due, not yet reminded.
 
     Four conditions, and each one is doing a job:
@@ -840,12 +845,15 @@ async def due_for_payment_reminder(now: Optional[datetime] = None) -> List[Invoi
       field existed, which is what we want: they have not been reminded either.
     """
     now = now or datetime.utcnow()
+    # Not `days or PAYMENT_REMINDER_DAYS`: 0 is falsy, so that quietly turned a
+    # zero into the three-day default instead of clamping it to one.
+    days = PAYMENT_REMINDER_DAYS if days is None else max(1, min(int(days), 30))
     return await Invoice.find(
         {
             "status": {"$in": [InvoiceStatus.SENT.value, InvoiceStatus.PARTIALLY_PAID.value]},
             "due_date": {
                 "$gte": now,
-                "$lte": now + timedelta(days=PAYMENT_REMINDER_DAYS),
+                "$lte": now + timedelta(days=days),
             },
             "payment_reminder_sent_at": None,
         }
@@ -872,7 +880,7 @@ async def sweep_payment_reminders() -> int:
         return 0
 
     sent = 0
-    for invoice in await due_for_payment_reminder():
+    for invoice in await due_for_payment_reminder(days=settings.payment_reminder_days):
         log = await email_service.send_payment_reminder(settings, invoice)
         if log is None:
             # No address to send to. Left unstamped so it can still go out if

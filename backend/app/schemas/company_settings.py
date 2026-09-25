@@ -136,6 +136,7 @@ class CompanySettingsUpdate(BaseModel):
     email_templates: Optional[EmailTemplatesSchema] = None
     email_technicians: Optional[bool] = None
     email_payment_reminders: Optional[bool] = None
+    payment_reminder_days: Optional[int] = Field(default=None, ge=1, le=30)
 
     primary_color: Optional[str] = Field(None, max_length=9)
 
@@ -231,6 +232,7 @@ class CompanySettingsResponse(BaseModel):
     default_email_templates: EmailTemplatesSchema
     email_technicians: bool = True
     email_payment_reminders: bool = False
+    payment_reminder_days: int = 3
     email_placeholders: dict = Field(default_factory=lambda: EMAIL_PLACEHOLDERS)
 
     primary_color: str = "#059669"

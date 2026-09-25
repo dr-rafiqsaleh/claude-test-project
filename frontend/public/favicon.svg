@@ -1,6 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <rect width="24" height="24" rx="5" fill="#0f172a" stroke="none" />
-  <path d="M8 4l1.5 2M16 4l-1.5 2" />
-  <ellipse cx="12" cy="13" rx="3.5" ry="5.5" />
-  <path d="M12 8.5v9M8.5 10.5L5.5 9M8.5 13.5h-3M8.5 16.5l-3 1.5M15.5 10.5l3-1.5M15.5 13.5h3M15.5 16.5l3 1.5" />
+<!-- The PestBase wasp. Paths are shared verbatim with
+     src/components/layout/Logo.jsx - change one, change both. Colours are
+     hard-coded because a favicon is served before any stylesheet exists:
+     emerald-600, the app's DEFAULT_PRIMARY_COLOR. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="15" fill="#059669" />
+  <g transform="translate(32 32) scale(0.88) translate(-32 -32)" fill="#FFFFFF">
+    <path d="M27.5 20 C21 19.5 12 25 10.5 31 C15.5 32.6 23.5 28.4 28.5 24.5 Z" />
+    <path d="M36.5 20 C43 19.5 52 25 53.5 31 C48.5 32.6 40.5 28.4 35.5 24.5 Z" />
+    <path d="M27.5 8.5 C24.5 4 20.5 3.5 18.5 5.5" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" />
+    <path d="M36.5 8.5 C39.5 4 43.5 3.5 45.5 5.5" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" />
+    <ellipse cx="32" cy="13.5" rx="6.6" ry="5.6" />
+    <ellipse cx="32" cy="23.5" rx="7.6" ry="6.2" />
+    <rect x="30.2" y="28.8" width="3.6" height="4.6" rx="1.4" />
+    <path fill-rule="evenodd" d="M32 32.5 C27 32.5 23.5 36 22.6 41 C21.3 47.8 25.5 55.5 32 59 C38.5 55.5 42.7 47.8 41.4 41 C40.5 36 37 32.5 32 32.5 Z M23.9 39.2 H40.1 A1.8 1.8 0 0 1 40.1 42.8 H23.9 A1.8 1.8 0 0 1 23.9 39.2 Z M26.3 46.8 H37.7 A1.8 1.8 0 0 1 37.7 50.4 H26.3 A1.8 1.8 0 0 1 26.3 46.8 Z" />
+  </g>
 </svg>

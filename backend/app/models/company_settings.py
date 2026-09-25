@@ -270,6 +270,8 @@ class CompanySettings(TenantDocument):
     #: Off by default on purpose: switching it on starts sending mail to this
     #: client's customers without them doing anything, and that is their call.
     email_payment_reminders: bool = False
+    #: How many days before the due date the reminder goes. One email, once.
+    payment_reminder_days: int = 3
 
     # Appearance
     primary_color: str = "#059669"  # emerald-600

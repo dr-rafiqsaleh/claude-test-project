@@ -102,6 +102,7 @@ const EMPTY_FORM = {
   email_templates: null,
   email_technicians: true,
   email_payment_reminders: false,
+  payment_reminder_days: 3,
   primary_color: DEFAULT_PRIMARY_COLOR,
 }
 
@@ -191,6 +192,8 @@ function toPayload(form, loaded) {
     email_bcc: optional(form.email_bcc),
     email_technicians: form.email_technicians !== false,
     email_payment_reminders: form.email_payment_reminders === true,
+    // A number input hands back a string, and an emptied one hands back ''.
+    payment_reminder_days: Math.min(30, Math.max(1, Number(form.payment_reminder_days) || 3)),
     ...(form.email_templates ? { email_templates: form.email_templates } : {}),
     primary_color: String(form.primary_color ?? DEFAULT_PRIMARY_COLOR).trim() || DEFAULT_PRIMARY_COLOR,
   }

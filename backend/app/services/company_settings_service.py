@@ -91,6 +91,8 @@ def build_settings_payload(settings: CompanySettings) -> dict:
         "email_templates": (settings.email_templates or EmailTemplates()).model_dump(),
         "default_email_templates": EmailTemplates().model_dump(),
         "email_technicians": settings.email_technicians,
+        "email_payment_reminders": settings.email_payment_reminders,
+        "payment_reminder_days": settings.payment_reminder_days,
         "primary_color": settings.primary_color,
         "updated_at": settings.updated_at,
         "updated_by": str(settings.updated_by) if settings.updated_by else None,

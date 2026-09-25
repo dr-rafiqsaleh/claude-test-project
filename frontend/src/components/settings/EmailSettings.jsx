@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { AlertCircle, RotateCcw } from 'lucide-react'
+import { AlertCircle, ChevronRight, RotateCcw } from 'lucide-react'
 
 import { CheckboxField } from '@/components/jobs/JobFormControls'
 import { Button } from '@/components/ui/button'
@@ -27,9 +27,22 @@ function Field({ label, htmlFor, hint, className, children }) {
   )
 }
 
-/** Subject and message for one kind of document, with its placeholders. */
+/**
+ * One template, in a card that opens.
+ *
+ * A plain <details>: the browser already does disclosure, including the
+ * keyboard and the accessibility tree, so there is no open state to hold, no
+ * aria-expanded to keep in step, and nothing to reset when the form reloads.
+ * The only cost is hiding the default triangle.
+ *
+ * The buttons live in the body rather than the summary - a button inside a
+ * <summary> toggles the card as well as doing its own job.
+ */
 function TemplateEditor({ kind, label, template, fallback, placeholders, onChange }) {
   const bodyRef = useRef(null)
+  const edited =
+    Boolean(fallback) &&
+    (template.subject !== fallback.subject || template.body !== fallback.body)
 
   function insert(placeholder) {
     const token = `{${placeholder}}`
@@ -45,46 +58,62 @@ function TemplateEditor({ kind, label, template, fallback, placeholders, onChang
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-        <Button type="button" variant="ghost" size="sm" onClick={() => onChange({ ...fallback })}>
-          <RotateCcw className="h-3.5 w-3.5" />
-          Reset to default
-        </Button>
-      </div>
-      <Field label="Subject" htmlFor={`template-${kind}-subject`}>
-        <Input
-          id={`template-${kind}-subject`}
-          value={template.subject}
-          onChange={(event) => onChange({ ...template, subject: event.target.value })}
-        />
-      </Field>
-      <Field label="Message" htmlFor={`template-${kind}-body`}>
-        <Textarea
-          id={`template-${kind}-body`}
-          ref={bodyRef}
-          rows={8}
-          value={template.body}
-          onChange={(event) => onChange({ ...template, body: event.target.value })}
-        />
-      </Field>
-      <div className="space-y-1.5">
-        <p className="text-xs text-muted-foreground">Tap to add to the message:</p>
-        <div className="flex flex-wrap gap-1.5">
-          {placeholders.map((placeholder) => (
-            <button
-              key={placeholder}
-              type="button"
-              onClick={() => insert(placeholder)}
-              className="rounded border border-input bg-card px-2 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted"
-            >
-              {`{${placeholder}}`}
-            </button>
-          ))}
+    <details className="group rounded-lg border border-border bg-card transition-colors open:bg-muted/20">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+        <span className="shrink-0 text-sm font-semibold text-foreground">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground group-open:invisible">
+          {template.subject}
+        </span>
+        {edited ? (
+          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+            Edited
+          </span>
+        ) : null}
+      </summary>
+
+      <div className="space-y-3 border-t border-border px-4 pb-4 pt-4">
+        <Field label="Subject" htmlFor={`template-${kind}-subject`}>
+          <Input
+            id={`template-${kind}-subject`}
+            value={template.subject}
+            onChange={(event) => onChange({ ...template, subject: event.target.value })}
+          />
+        </Field>
+        <Field label="Message" htmlFor={`template-${kind}-body`}>
+          <Textarea
+            id={`template-${kind}-body`}
+            ref={bodyRef}
+            rows={8}
+            value={template.body}
+            onChange={(event) => onChange({ ...template, body: event.target.value })}
+          />
+        </Field>
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Tap to add to the message:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {placeholders.map((placeholder) => (
+              <button
+                key={placeholder}
+                type="button"
+                onClick={() => insert(placeholder)}
+                className="rounded border border-input bg-card px-2 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted"
+              >
+                {`{${placeholder}}`}
+              </button>
+            ))}
+          </div>
         </div>
+      {edited ? (
+        <div className="flex justify-end pt-1">
+          <Button type="button" variant="ghost" size="sm" onClick={() => onChange({ ...fallback })}>
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset to default
+          </Button>
+        </div>
+      ) : null}
       </div>
-    </section>
+    </details>
   )
 }
 
@@ -166,13 +195,33 @@ export function EmailSettings({ form, set, settings, saving, dirty, onSave, Save
             description="With the date, address, site contact and a link to the job. One email covers a whole repeating series."
           />
 
-          <CheckboxField
-            id="email_payment_reminders"
-            checked={form.email_payment_reminders === true}
-            onChange={(checked) => set('email_payment_reminders', checked)}
-            label="Remind customers before an invoice falls due"
-            description="One email, three days before the due date, only if the invoice is still unpaid. Nothing is attached. Edit the wording under Payment reminder below."
-          />
+          <div className="space-y-3">
+            <CheckboxField
+              id="email_payment_reminders"
+              checked={form.email_payment_reminders === true}
+              onChange={(checked) => set('email_payment_reminders', checked)}
+              label="Remind customers before an invoice falls due"
+              description="One email per invoice, sent once, and only while it is still unpaid. Nothing is attached. Edit the wording under Payment reminder below."
+            />
+            {form.email_payment_reminders === true ? (
+              <div className="ml-8 max-w-[15rem]">
+                <Field
+                  label="Days before the due date"
+                  htmlFor="payment_reminder_days"
+                  hint="Between 1 and 30. An invoice already overdue is never sent one."
+                >
+                  <Input
+                    id="payment_reminder_days"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={form.payment_reminder_days ?? 3}
+                    onChange={(event) => set('payment_reminder_days', event.target.value)}
+                  />
+                </Field>
+              </div>
+            ) : null}
+          </div>
 
           <SaveBar saving={saving} dirty={dirty} onSave={() => void onSave()} />
         </CardContent>
@@ -187,7 +236,7 @@ export function EmailSettings({ form, set, settings, saving, dirty, onSave, Save
             you can still change the email before it goes.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-8">
+        <CardContent className="space-y-3">
           {TEMPLATE_KINDS.map(({ key, label }) =>
             templates?.[key] ? (
               <TemplateEditor
@@ -201,7 +250,9 @@ export function EmailSettings({ form, set, settings, saving, dirty, onSave, Save
               />
             ) : null,
           )}
-          <SaveBar saving={saving} dirty={dirty} onSave={() => void onSave()} />
+          <div className="pt-3">
+            <SaveBar saving={saving} dirty={dirty} onSave={() => void onSave()} />
+          </div>
         </CardContent>
       </Card>
     </div>
