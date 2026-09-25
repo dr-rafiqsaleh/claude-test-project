@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.core.supertokens import init_supertokens
+from app.core.responses import UtcJSONResponse
 from app.core.tenancy import TenantScopeError
 from app.database import close_db, init_db
 from app.routers import (
@@ -77,6 +78,8 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
+    # Stored times are naive UTC; this marks them as such in every response.
+    default_response_class=UtcJSONResponse,
 )
 
 # SuperTokens has to see the request before the routes do: it serves its own
