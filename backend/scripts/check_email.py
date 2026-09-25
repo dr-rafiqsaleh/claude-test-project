@@ -26,6 +26,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx
 
+from beanie import PydanticObjectId
+
+from app.core.tenancy import set_current_client
 from app.database import init_db
 from app.models.booking import Booking
 from app.models.company_settings import CompanySettings, EmailProvider, SmtpSecurity
@@ -39,7 +42,15 @@ from app.schemas.company_settings import CompanySettingsUpdate
 from app.schemas.invoice import InvoiceCreate, InvoiceItemSchema
 from app.schemas.job import JobUpdate
 from app.schemas.quote import QuoteCreate, QuoteItemSchema
-from app.services import company_settings_service, email_service, invoice_service, job_service, quote_service
+from app.services import (
+    company_settings_service,
+    email_service,
+    invoice_service,
+    job_service,
+    platform_settings_service,
+    quote_service,
+)
+from app.routers.platform_settings import _response as platform_settings_response
 from app.routers.emails import email_attachment, email_eml, email_record
 from app.services.email_service import Attachment, EmailError, OutgoingEmail
 
@@ -151,6 +162,19 @@ class FakeGraph:
 
 
 async def use_settings(**changes) -> CompanySettings:
+    """Change mail settings the way the app now splits them.
+
+    How mail is sent - provider, server, credentials, From - is one platform-wide
+    setting (Platform > Settings); what a client's customers see - reply-to, the
+    office copy - stays in the client's company settings.
+    """
+    transport = {
+        key: changes.pop(key)
+        for key in list(changes)
+        if key in platform_settings_service.TRANSPORT_FIELDS or key in platform_settings_service.SECRET_FIELDS
+    }
+    if transport:
+        await platform_settings_service.update_settings(transport)
     return await company_settings_service.update_settings(CompanySettingsUpdate(**changes))
 
 
@@ -178,6 +202,9 @@ async def main() -> None:
     client = await init_db(database_name=CHECK_DB)
     await client.drop_database(CHECK_DB)  # clear leftovers from an interrupted run
     await init_db(database_name=CHECK_DB)  # recreate the indexes
+    # Everything a client owns is scoped to a client since multi-client support;
+    # this run acts as one throwaway client, as check_payment_reminders does.
+    set_current_client(PydanticObjectId())
     server = FakeMailServer()
     server.start()
 
@@ -221,12 +248,14 @@ async def main() -> None:
             email_reply_to="accounts@example.com",
             email_bcc="office@example.com",
         )
-        payload = await company_settings_service.settings_payload(settings)
+        platform = await platform_settings_service.get_settings()
+        payload = platform_settings_response(platform).model_dump()
         assert "s3cret-pass" not in json.dumps(payload, default=str)
         assert payload["smtp_password_set"] is True
-        assert settings.smtp_password_encrypted and "s3cret" not in settings.smtp_password_encrypted
-        settings = await use_settings(smtp_password="")
-        assert settings.smtp_password_encrypted, "a blank password should keep the saved one"
+        assert platform.smtp_password_encrypted and "s3cret" not in platform.smtp_password_encrypted
+        await use_settings(smtp_password="")
+        platform = await platform_settings_service.get_settings()
+        assert platform.smtp_password_encrypted, "a blank password should keep the saved one"
         ok("the password is stored encrypted, never sent back, and kept when left blank")
 
         print("SMTP")
@@ -371,7 +400,8 @@ async def main() -> None:
 
         big = FakeGraph()
         content = b"%PDF" + b"x" * (4 * 1024 * 1024)
-        settings = await company_settings_service.get_settings()
+        # What the app sends with: the client's settings under the platform's transport.
+        settings = await platform_settings_service.sending_config(await company_settings_service.get_settings())
         await email_service.send(
             settings,
             OutgoingEmail(to=["lena@example.com"], subject="Big", body="Big", attachments=[Attachment("big.pdf", content)]),

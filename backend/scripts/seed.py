@@ -234,7 +234,7 @@ async def seed_users() -> List[User]:
     for spec in SEED_USERS:
         existing = await User.find_one(User.email == spec["email"])
         if existing is not None:
-            print(f"  - user already exists: {spec['email']} ({existing.role.value})")
+            print(f"  - user already exists: {spec['email']} ({existing.role})")
             created.append(existing)
             continue
 
@@ -249,7 +249,7 @@ async def seed_users() -> List[User]:
         )
         await user.insert()
         created.append(user)
-        print(f"  + created user: {user.email} ({user.role.value})")
+        print(f"  + created user: {user.email} ({user.role})")
 
     return created
 

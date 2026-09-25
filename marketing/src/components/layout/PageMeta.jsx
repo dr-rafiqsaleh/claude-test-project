@@ -13,7 +13,9 @@ export function PageMeta() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    const page = PAGES[pathname] ?? PAGES['/404']
+    // "/contact/" is the same page as "/contact" (nginx serves both).
+    const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
+    const page = PAGES[path] ?? PAGES['/404']
     document.title = page.title
     document.querySelector('meta[name="description"]')?.setAttribute('content', page.description)
   }, [pathname])

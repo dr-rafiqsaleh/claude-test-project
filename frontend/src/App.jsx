@@ -174,7 +174,14 @@ export function App() {
             }
           />
 
-          <Route path="/quotes" element={<QuotesPage />} />
+          <Route
+            path="/quotes"
+            element={
+              <RoleGuard permission="quotes.view">
+                <QuotesPage />
+              </RoleGuard>
+            }
+          />
           <Route
             path="/quotes/new"
             element={
@@ -183,7 +190,14 @@ export function App() {
               </RoleGuard>
             }
           />
-          <Route path="/quotes/:id" element={<QuoteDetailPage />} />
+          <Route
+            path="/quotes/:id"
+            element={
+              <RoleGuard permission="quotes.view">
+                <QuoteDetailPage />
+              </RoleGuard>
+            }
+          />
           <Route
             path="/quotes/:id/edit"
             element={

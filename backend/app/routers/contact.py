@@ -5,7 +5,7 @@ POST /api/v1/contact is open to anyone - no sign-in. Everything under
 """
 
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
