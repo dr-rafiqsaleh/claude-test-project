@@ -24,6 +24,22 @@ def _assume_utc(value: Optional[datetime]) -> Optional[datetime]:
 UtcDateTime = Annotated[datetime, AfterValidator(_assume_utc)]
 
 
+def _as_stored_utc(value: Optional[datetime]) -> Optional[datetime]:
+    """An incoming time as the app stores and compares it: naive UTC.
+
+    The portal sends ISO strings with an offset ("...Z"). Kept aware, they meet
+    naive UTC values from Mongo and datetime.utcnow() further in, and Python
+    refuses to compare the two - creating a repeating job failed exactly so.
+    """
+    if value is None or value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+#: A time arriving in a request, normalised to naive UTC.
+InputDateTime = Annotated[datetime, AfterValidator(_as_stored_utc)]
+
+
 def _clean_optional_text(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
@@ -55,8 +71,8 @@ class BookingCreate(BaseModel):
     customer_id: str
     quote_id: Optional[str] = None
     technician_id: Optional[str] = None
-    scheduled_start: datetime
-    scheduled_end: datetime
+    scheduled_start: InputDateTime
+    scheduled_end: InputDateTime
     service_type: str = Field(min_length=1, max_length=120)
     pest_types: List[str] = Field(default_factory=list)
     service_address: Optional[Dict[str, Any]] = None
@@ -64,7 +80,7 @@ class BookingCreate(BaseModel):
     site_contact_phone: Optional[str] = Field(default=None, max_length=40)
     order_number: Optional[str] = Field(default=None, max_length=60)
     recurrence: RecurrenceType = RecurrenceType.NONE
-    recurrence_until: Optional[datetime] = None
+    recurrence_until: Optional[InputDateTime] = None
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     internal_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     customer_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
@@ -114,8 +130,8 @@ class BookingUpdate(BaseModel):
     customer_id: Optional[str] = None
     quote_id: Optional[str] = None
     technician_id: Optional[str] = None
-    scheduled_start: Optional[datetime] = None
-    scheduled_end: Optional[datetime] = None
+    scheduled_start: Optional[InputDateTime] = None
+    scheduled_end: Optional[InputDateTime] = None
     service_type: Optional[str] = Field(default=None, min_length=1, max_length=120)
     pest_types: Optional[List[str]] = None
     service_address: Optional[Dict[str, Any]] = None
@@ -123,7 +139,7 @@ class BookingUpdate(BaseModel):
     site_contact_phone: Optional[str] = Field(default=None, max_length=40)
     order_number: Optional[str] = Field(default=None, max_length=60)
     recurrence: Optional[RecurrenceType] = None
-    recurrence_until: Optional[datetime] = None
+    recurrence_until: Optional[InputDateTime] = None
     #: Also apply these changes to the later, not yet confirmed visits in its series.
     apply_to_series: bool = False
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
@@ -188,8 +204,8 @@ class QuoteToBookingRequest(BaseModel):
     """Payload for converting an accepted quote into a booking."""
 
     technician_id: Optional[str] = None
-    scheduled_start: datetime
-    scheduled_end: datetime
+    scheduled_start: InputDateTime
+    scheduled_end: InputDateTime
     service_type: Optional[str] = Field(default=None, max_length=120)
     pest_types: Optional[List[str]] = None
     service_address: Optional[Dict[str, Any]] = None
@@ -202,7 +218,7 @@ class QuoteToBookingRequest(BaseModel):
     technician_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     internal_notes: Optional[str] = Field(default=None, max_length=MAX_NOTE_LENGTH)
     recurrence: RecurrenceType = RecurrenceType.NONE
-    recurrence_until: Optional[datetime] = None
+    recurrence_until: Optional[InputDateTime] = None
 
     @field_validator("technician_id")
     @classmethod

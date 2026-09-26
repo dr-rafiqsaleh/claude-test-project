@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, FileText, History, Home, Inbox, Receipt, Settings, Settings2, UserCog, Users } from 'lucide-react'
+import { BookOpen, Building2, ClipboardList, FileText, History, Home, Inbox, Receipt, Settings, Settings2, UserCog, Users } from 'lucide-react'
 
 /**
  * The app's navigation, shared by the desktop sidebar and the phone tab bar.
@@ -22,6 +22,9 @@ export const ADMIN_NAV = [
   { label: 'Audit', to: '/audit', icon: History, permission: 'audit.view' },
   { label: 'Settings', to: '/settings', icon: Settings, permission: 'settings.manage' },
 ]
+
+/** Help for everyone: the in-app user guide. */
+export const HELP_NAV = [{ label: 'Guide', to: '/guide', icon: BookOpen }]
 
 /** Running PestBase itself rather than any one client: platform staff only. */
 export const PLATFORM_NAV = [

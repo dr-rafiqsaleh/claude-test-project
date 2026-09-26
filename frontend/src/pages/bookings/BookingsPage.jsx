@@ -4,6 +4,7 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import enGbLocale from '@fullcalendar/core/locales/en-gb'
 import {
   AlertCircle,
   CalendarClock,
@@ -661,6 +662,8 @@ function BookingsCalendar({ technicians, canFilterTechnician, onSelectBooking })
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="timeGridWeek"
+            // UK dates ("Mon 28/09", "28 Sept - 4 Oct 2026"), not FullCalendar's US default.
+            locale={enGbLocale}
             headerToolbar={false}
             height="auto"
             events={events}

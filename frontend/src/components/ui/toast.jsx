@@ -25,8 +25,9 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: 'border-border bg-card text-foreground',
-        success: 'border-primary/30 bg-primary/10 text-primary',
-        destructive: 'border-destructive/30 bg-destructive/10 text-destructive',
+        // Solid backgrounds: a see-through toast let the page's text show through its own.
+        success: 'border-primary/30 bg-accent text-accent-foreground',
+        destructive: 'border-destructive/40 bg-card text-destructive',
       },
     },
     defaultVariants: {

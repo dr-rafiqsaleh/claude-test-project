@@ -17,6 +17,7 @@ from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.job import Job
 from app.core.tenancy import tenant_filter
+from app.core.uk_time import to_uk
 from app.models.notification import Notification, NotificationType
 from app.models.quote import Quote, QuoteStatus
 from app.models.user import User, UserRole
@@ -224,11 +225,18 @@ def _money(value: Optional[float]) -> str:
 
 
 def _when(value: Optional[datetime]) -> str:
-    return value.strftime("%d %b %Y at %I:%M %p").replace(" 0", " ") if value else "an unknown time"
+    """A stored (UTC) time as the office reads it: UK clock time, 24-hour."""
+    if not value:
+        return "an unknown time"
+    local = to_uk(value)
+    return f"{local.day} {local:%b %Y} at {local:%H:%M}"
 
 
 def _day(value: Optional[datetime]) -> str:
-    return value.strftime("%d %b %Y") if value else "an unknown date"
+    if not value:
+        return "an unknown date"
+    local = to_uk(value)
+    return f"{local.day} {local:%b %Y}"
 
 
 # ---------------------------------------------------------------------------

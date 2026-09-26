@@ -158,6 +158,10 @@ async def main() -> None:
         item = data["items"][0]
         assert item["topic_label"] == "Book a demo" and item["emailed"] is False and item["email_error"], item
         ok("platform staff see open enquiries, with why one was not emailed")
+        # Stored times are naive UTC; every response must say so, or a browser
+        # reads them as local time (an hour out in British Summer Time).
+        assert item["created_at"].endswith("Z"), item["created_at"]
+        ok(f"times come back marked as UTC ({item['created_at']})")
 
         response = await api.post(f"/api/v1/contact/enquiries/{item['id']}/resend")
         assert response.status_code == 400 and "Still couldn't email it" in response.json()["message"], response.text
